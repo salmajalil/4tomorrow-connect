@@ -31,11 +31,12 @@ export function ConnectFlow() {
 
   async function launchMatching() {
     setPhase("loading");
-    // The API route caps the Anthropic call at 30s server-side; this client
-    // timeout is a safety net slightly above that so the user always gets an
-    // actionable error instead of an indefinite spinner.
+    // The API route budgets ~55s for the Anthropic call server-side (see
+    // MATCHING_TIMEOUT_MS in src/lib/anthropic.ts) inside a 90s function
+    // ceiling; this client timeout sits above both so the server's own
+    // error message always wins over a raw client-side abort.
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 35_000);
+    const timeout = setTimeout(() => controller.abort(), 95_000);
 
     try {
       const res = await fetch("/api/match", {
@@ -53,7 +54,7 @@ export function ConnectFlow() {
     } catch (err) {
       const message =
         err instanceof DOMException && err.name === "AbortError"
-          ? "Le matching a pris trop de temps (délai de 30s dépassé). Réessaie."
+          ? "Le matching a pris trop de temps. Réessaie."
           : err instanceof Error
             ? err.message
             : "Une erreur inattendue est survenue.";

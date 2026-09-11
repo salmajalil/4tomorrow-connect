@@ -12,7 +12,9 @@ import {
 } from "@/lib/matching";
 import type { EcosystemMember } from "@/types/database";
 
-export const maxDuration = 60;
+// Headroom above MATCHING_TIMEOUT_MS (src/lib/anthropic.ts) so our own
+// timeout error fires before Vercel kills the function outright.
+export const maxDuration = 90;
 
 const requestSchema = z.object({
   industry: z.string().trim().min(1, "Choisis ou saisis une industrie."),
@@ -74,7 +76,9 @@ export async function POST(request: Request) {
         {
           type: "web_search_20260318",
           name: "web_search",
-          max_uses: 5,
+          // Kept modest: each round trip adds real latency, and the whole
+          // call has to land inside MATCHING_TIMEOUT_MS (see src/lib/anthropic.ts).
+          max_uses: 3,
         },
       ],
     });
@@ -87,7 +91,7 @@ export async function POST(request: Request) {
       );
     }
     return NextResponse.json(
-      { error: "Le moteur de matching a mis trop de temps à répondre (délai de 30s dépassé). Réessaie." },
+      { error: "Le moteur de matching a mis trop de temps à répondre. Réessaie — une description plus courte peut aussi aider." },
       { status: 504 }
     );
   }

@@ -6,7 +6,7 @@ export function MatchingLoadingState() {
         <p className="font-medium text-neutral-900">Recherche en cours...</p>
         <p className="mt-1 max-w-xs text-sm text-neutral-500">
           On explore le répertoire et le web pour trouver des partenaires réels. Ça peut prendre
-          jusqu&apos;à 15 secondes.
+          jusqu&apos;à une minute selon la complexité du projet.
         </p>
       </div>
     </div>

@@ -15,7 +15,7 @@ export function SignOutButton() {
         router.push("/");
         router.refresh();
       }}
-      className="text-neutral-600 hover:text-neutral-900"
+      className="text-muted hover:text-ink"
     >
       Se déconnecter
     </button>

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Bebas_Neue } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/nav";
 
@@ -10,6 +10,14 @@ const geistSans = Geist({
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+// Display face for headings — condensed, industrial, high-contrast with the
+// body sans, to carry the "industrial luxury" brand direction.
+const bebasNeue = Bebas_Neue({
+  variable: "--font-bebas",
+  weight: "400",
   subsets: ["latin"],
 });
 
@@ -28,9 +36,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="fr"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${bebasNeue.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col bg-neutral-50 text-neutral-900">
+      <body className="flex min-h-full flex-col bg-bg text-ink">
         <Nav />
         <main className="flex flex-1 flex-col">{children}</main>
       </body>

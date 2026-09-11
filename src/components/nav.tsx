@@ -9,18 +9,18 @@ export async function Nav() {
   } = await supabase.auth.getUser();
 
   return (
-    <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-10 border-b border-border bg-bg/90 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-        <Link href="/" className="text-sm font-bold tracking-tight text-neutral-900">
-          4 Tomorrow <span className="font-normal text-neutral-400">/ Connect</span>
+        <Link href="/" className="font-display text-lg tracking-wide text-ink">
+          4 TOMORROW <span className="font-sans text-sm font-normal text-accent">/ Connect</span>
         </Link>
         <nav className="flex items-center gap-4 text-sm">
-          <Link href="/ecosystem/join" className="text-neutral-600 hover:text-neutral-900">
+          <Link href="/ecosystem/join" className="text-muted hover:text-ink">
             Rejoindre l&apos;écosystème
           </Link>
           {user ? (
             <>
-              <Link href="/connect" className="font-medium text-neutral-900">
+              <Link href="/connect" className="font-medium text-ink hover:text-accent">
                 Lancer un matching
               </Link>
               <SignOutButton />
@@ -28,7 +28,7 @@ export async function Nav() {
           ) : (
             <Link
               href="/login"
-              className="rounded-lg bg-neutral-900 px-3 py-1.5 font-medium text-white hover:bg-neutral-700"
+              className="rounded-lg bg-accent px-3 py-1.5 font-medium text-accent-ink hover:bg-accent-strong"
             >
               Se connecter
             </Link>

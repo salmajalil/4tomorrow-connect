@@ -4,11 +4,14 @@ import type { EcosystemMember } from "@/types/database";
 export interface MatchingInput {
   industry: string;
   partnerTypes: string[];
+  location: string;
+  budget: string;
+  co2Target: string;
   description: string;
 }
 
 const matchSchema = z.object({
-  category: z.enum(["technology", "startup", "expert", "partner"]),
+  category: z.enum(["technology", "startup", "expert", "partner", "funding"]),
   name: z.string().min(1),
   reason: z.string().min(1),
   gapAddressed: z.string().min(1),
@@ -93,11 +96,13 @@ STRICT RULES:
 1. Every recommendation MUST explicitly name the gap it addresses (gapAddressed must match one of the "gaps" you output, by its "name").
 2. NEVER recommend something generic ("an AI platform", "a consulting firm"). Every match MUST be a real, specific, verifiable organization or named person.
 3. Only include a website or contactEmail when you are reasonably confident it is real (found via web_search or present in the directory above). If you cannot verify one, omit the field entirely — never invent a plausible-looking email or URL.
-4. category must be one of: "technology", "startup", "expert", "partner".
+4. category must be one of: "technology", "startup", "expert", "partner", "funding". Use "funding" for real, named grant programs, subsidy schemes, or investors — never a vague "funding is available" statement without naming the specific program or organization.
 5. source must be "registry" only when the match came from the KNOWN ECOSYSTEM DIRECTORY above (include its id as ecosystemMemberId); otherwise "web_search".
 6. strategicBrief is ONE synthesis paragraph (not a list) naming the specific opportunity and the recommended strategic angle for this exact project.
 7. goodIdeas is exactly 3 numbered, actionable, project-specific recommendations — never generic advice.
 8. Identify 2-4 concrete gaps from the project description before proposing matches; every match must trace back to one of them.
+9. If the user gave a location, take it into account: prefer matches genuinely relevant to that region, but don't invent a fake local presence for an organization — note in "reason" when a strong match operates outside the stated region rather than silently claiming otherwise.
+10. Never state a specific number (a percentage, a euro amount, a tonnage of CO2) unless you found it from a real, citable source via web_search or the directory — if you don't have a verified figure, describe the opportunity qualitatively instead of inventing one.
 
 Respond in French, matching the user's own language, EXCEPT for the JSON keys themselves which must stay in English exactly as specified below.
 
@@ -109,7 +114,7 @@ ${RESULT_START}
   "goodIdeas": [string, string, string],
   "matches": [
     {
-      "category": "technology" | "startup" | "expert" | "partner",
+      "category": "technology" | "startup" | "expert" | "partner" | "funding",
       "name": string,
       "reason": string,
       "gapAddressed": string,
@@ -135,8 +140,15 @@ export function buildUserPrompt(input: MatchingInput): string {
     ? input.description.trim()
     : "(non fourni — base-toi uniquement sur l'industrie et les types de partenaires recherchés)";
 
+  const locationLine = input.location.trim() || "(non précisée — pas de contrainte géographique)";
+  const budgetLine = input.budget.trim() || "(non précisé)";
+  const co2Line = input.co2Target.trim() || "(non précisé)";
+
   return `Industrie : ${input.industry}
 Types de partenaires recherchés : ${partnerTypesLine}
+Zone géographique recherchée : ${locationLine}
+Budget approximatif : ${budgetLine}
+Objectif de réduction CO2 : ${co2Line}
 Description du projet :
 ${descriptionLine}`;
 }

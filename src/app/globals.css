@@ -1,26 +1,43 @@
 @import "tailwindcss";
 
+/*
+ * "Industrial luxury / futuristic" theme: dark ground, warm brass accent.
+ * Single fixed theme (not following OS light/dark) — a deliberate brand
+ * choice for this product, not an oversight.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #0b0d10;
+  --surface: #14171b;
+  --surface-2: #1b1f24;
+  --border: #262b31;
+  --ink: #eef1f4;
+  --muted: #8b929c;
+  --accent: #c9a256;
+  --accent-strong: #e0bd6e;
+  --accent-ink: #14171b;
+  --success: #4fae7a;
+  --danger: #d9695a;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-ink: var(--accent-ink);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-display: var(--font-bebas);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }

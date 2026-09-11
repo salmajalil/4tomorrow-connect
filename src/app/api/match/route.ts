@@ -19,6 +19,9 @@ export const maxDuration = 180;
 const requestSchema = z.object({
   industry: z.string().trim().min(1, "Choisis ou saisis une industrie."),
   partnerTypes: z.array(z.string().trim().min(1)).default([]),
+  location: z.string().trim().default(""),
+  budget: z.string().trim().default(""),
+  co2Target: z.string().trim().default(""),
   description: z.string().trim().default(""),
 });
 
@@ -139,11 +142,18 @@ export async function POST(request: Request) {
         .eq("id", organizationId);
     }
 
+    const objectivesParts = [
+      body.location && `Zone : ${body.location}`,
+      body.budget && `Budget : ${body.budget}`,
+      body.co2Target && `Objectif CO2 : ${body.co2Target}`,
+    ].filter(Boolean);
+
     const { data: transformation, error: transformationError } = await supabase
       .from("transformations")
       .insert({
         organization_id: organizationId,
         challenges: body.description || null,
+        objectives: objectivesParts.length > 0 ? objectivesParts.join(" · ") : null,
         constraints:
           body.partnerTypes.length > 0
             ? `Partenaires recherchés : ${body.partnerTypes.join(", ")}`

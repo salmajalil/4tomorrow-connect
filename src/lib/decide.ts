@@ -248,7 +248,7 @@ ${SLOT_HINTS[slot]}
 KNOWN ECOSYSTEM DIRECTORY (community-contributed, same "living directory" mechanism used by the CONNECT module — prefer these when relevant and mark source "registry" with their id):
 ${registryBlock}
 
-You have a web_search tool (max 3 uses). Use it efficiently — batch what you need, then finalize. You are working under a hard time budget; a complete, on-time answer beats an exhaustive but late one.
+You have a web_search tool (max 2 uses). Use it efficiently — batch what you need, then finalize. You are working under a hard time budget; a complete, on-time answer beats an exhaustive but late one.
 
 PRINCIPE DIRECTEUR — everything adapts to the actual subject, nothing is templated:
 - Choose scenario postures that fit the detected domain(s) — e.g. for digitalization: deployment speed vs integration depth vs legacy resilience; for go-to-market: fast penetration vs brand-building vs distribution partnerships; for product development: build vs partner vs acquire; for technical modernization: full replacement vs progressive migration vs hybrid; for heavy industrial transformation: operational efficiency vs technology balance vs environmental leadership. Pick whichever framing actually fits this challenge — never force a "cost vs CO2 vs physical tech" frame on a non-industrial subject.

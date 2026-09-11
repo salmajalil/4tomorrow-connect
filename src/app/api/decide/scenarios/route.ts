@@ -84,10 +84,10 @@ export async function POST(request: Request) {
       const system = buildScenarioSystemPrompt((registry ?? []) as EcosystemMember[], slot);
       const response = await anthropic.messages.create({
         model: MATCHING_MODEL,
-        max_tokens: 3500,
+        max_tokens: 3000,
         system,
         messages: [{ role: "user", content: userPrompt }],
-        tools: [{ type: "web_search_20260318", name: "web_search", max_uses: 3 }],
+        tools: [{ type: "web_search_20260318", name: "web_search", max_uses: 2 }],
       });
       const rawText = response.content
         .filter((block): block is Anthropic.TextBlock => block.type === "text")

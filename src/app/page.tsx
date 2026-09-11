@@ -25,8 +25,8 @@ const MODULES = [
     key: "decide",
     label: "Decide",
     blurb: "Make better decisions.",
-    href: null,
-    active: false,
+    href: "/decide",
+    active: true,
     icon: <path d="M4 20V10m6 10V4m6 16v-7" />,
   },
   {

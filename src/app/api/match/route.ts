@@ -11,6 +11,7 @@ import {
   type MatchingInput,
 } from "@/lib/matching";
 import type { EcosystemMember } from "@/types/database";
+import { setModuleStatus } from "@/lib/module-status";
 
 // Headroom above MATCHING_TIMEOUT_MS (src/lib/anthropic.ts) so our own
 // timeout error fires before Vercel kills the function outright.
@@ -201,6 +202,8 @@ export async function POST(request: Request) {
         }))
       );
     }
+
+    await setModuleStatus(supabase, txId, "connect", "done");
   } catch {
     // Persistence is a best-effort side effect — the user still gets their
     // results even if saving history fails. Not surfaced as a hard error.

@@ -10,18 +10,21 @@ export async function Nav() {
 
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-bg/90 backdrop-blur">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-        <Link href="/" className="font-display text-lg tracking-wide text-ink">
-          4 TOMORROW <span className="font-sans text-sm font-normal text-accent">/ Connect</span>
+      <div className="mx-auto flex max-w-5xl items-center gap-4 overflow-x-auto px-4 py-3">
+        <Link href="/" className="shrink-0 font-display text-lg tracking-wide text-ink">
+          4 TOMORROW
         </Link>
-        <nav className="flex items-center gap-4 text-sm">
+        <nav className="ml-auto flex shrink-0 items-center gap-4 whitespace-nowrap text-sm">
           <Link href="/ecosystem/join" className="text-muted hover:text-ink">
             Rejoindre l&apos;écosystème
           </Link>
           {user ? (
             <>
+              <Link href="/decide" className="font-medium text-ink hover:text-accent">
+                Decide
+              </Link>
               <Link href="/connect" className="font-medium text-ink hover:text-accent">
-                Lancer un matching
+                Connect
               </Link>
               <SignOutButton />
             </>

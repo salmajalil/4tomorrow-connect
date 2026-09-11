@@ -1,6 +1,7 @@
-// Hand-written types mirroring supabase/migrations/0001_init.sql.
-// Regenerate with `supabase gen types typescript` once the project is linked
-// to a Supabase CLI project if these drift from the live schema.
+// Hand-written types mirroring supabase/migrations/0001_init.sql and
+// 0002_decide.sql. Regenerate with `supabase gen types typescript` once the
+// project is linked to a Supabase CLI project if these drift from the live
+// schema.
 //
 // These are deliberately `type` aliases, not `interface` declarations: the
 // generic Supabase client checks `Row extends Record<string, unknown>` to
@@ -10,6 +11,11 @@
 // Update generic to `never`.
 
 export type EcosystemMemberSource = "registry" | "web_search";
+export type ModuleName = "decide" | "connect" | "deliver" | "learn";
+export type RecommendableModule = "connect" | "deliver" | "learn";
+export type ModuleRelevance = "relevant" | "possible" | "not_relevant";
+export type ModuleStatusValue = "not_started" | "in_progress" | "done";
+export type Language = "fr" | "en";
 
 export type Organization = {
   id: string;
@@ -26,6 +32,7 @@ export type Transformation = {
   objectives: string | null;
   constraints: string | null;
   status: string;
+  domains: string[];
   created_at: string;
 };
 
@@ -59,6 +66,7 @@ export type EcosystemMember = {
 export type Match = {
   id: string;
   transformation_id: string;
+  trajectory_id: string | null;
   category: string;
   name: string;
   reason: string | null;
@@ -73,6 +81,10 @@ export type Match = {
 export type TechStackEntry = {
   name: string;
   maturity: string;
+  maturityScale?: string; // e.g. "TRL 1-9", "validated / pilot / hypothesis" — whatever fits the item
+  detail?: string;
+  benefit?: string;
+  verified?: boolean; // true when maturity/detail came from a cited source, not an estimate
 };
 
 export type TrajectoryScores = {
@@ -81,6 +93,15 @@ export type TrajectoryScores = {
   risk?: number;
   roi?: number;
   feasibility?: number;
+  [axis: string]: number | undefined; // 5th axis adapts per domain (e.g. speed, scalability)
+};
+
+export type TrajectoryIndicators = Record<string, string | number>;
+
+export type RegulationEntry = {
+  name: string;
+  description: string;
+  sourceUrl?: string | null;
 };
 
 export type Trajectory = {
@@ -94,14 +115,71 @@ export type Trajectory = {
   roi_years: number | null;
   tech_stack: TechStackEntry[];
   scores: TrajectoryScores;
+  indicators: TrajectoryIndicators;
+  regulations: RegulationEntry[];
+  executive_briefing: string | null;
+  roadmap_start_date: string | null;
+  priority_cost: number | null;
+  priority_co2: number | null;
+  priority_risk: number | null;
+  priority_speed: number | null;
   created_at: string;
 };
 
 export type Risk = {
   id: string;
   transformation_id: string;
+  trajectory_id: string | null;
   name: string;
   reason: string | null;
+  created_at: string;
+};
+
+export type Opportunity = {
+  id: string;
+  transformation_id: string;
+  trajectory_id: string | null;
+  name: string;
+  reason: string | null;
+  module_origin: string;
+  created_at: string;
+};
+
+export type RoadmapPhaseEntry = {
+  id: string;
+  transformation_id: string;
+  trajectory_id: string;
+  phase_name: string;
+  start_date: string;
+  end_date: string;
+  deliverables: string[];
+  actions: string[];
+  kpis: string[];
+  order_index: number;
+  created_at: string;
+};
+
+export type ModuleRecommendation = {
+  id: string;
+  transformation_id: string;
+  module: RecommendableModule;
+  relevance: ModuleRelevance;
+  reason: string | null;
+  user_override: boolean;
+  created_at: string;
+};
+
+export type ModuleStatusRow = {
+  id: string;
+  transformation_id: string;
+  module: ModuleName;
+  status: ModuleStatusValue;
+  updated_at: string;
+};
+
+export type Profile = {
+  id: string;
+  language: Language;
   created_at: string;
 };
 
@@ -122,6 +200,21 @@ export type Database = {
       matches: Table<Match, Partial<Match> & Pick<Match, "transformation_id" | "category" | "name" | "source">>;
       trajectories: Table<Trajectory, Partial<Trajectory> & Pick<Trajectory, "transformation_id" | "name">>;
       risks: Table<Risk, Partial<Risk> & Pick<Risk, "transformation_id" | "name">>;
+      opportunities: Table<Opportunity, Partial<Opportunity> & Pick<Opportunity, "transformation_id" | "name">>;
+      roadmap_phases: Table<
+        RoadmapPhaseEntry,
+        Partial<RoadmapPhaseEntry> &
+          Pick<RoadmapPhaseEntry, "transformation_id" | "trajectory_id" | "phase_name" | "start_date" | "end_date">
+      >;
+      module_recommendations: Table<
+        ModuleRecommendation,
+        Partial<ModuleRecommendation> & Pick<ModuleRecommendation, "transformation_id" | "module" | "relevance">
+      >;
+      module_status: Table<
+        ModuleStatusRow,
+        Partial<ModuleStatusRow> & Pick<ModuleStatusRow, "transformation_id" | "module">
+      >;
+      profiles: Table<Profile, Partial<Profile> & Pick<Profile, "id">>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

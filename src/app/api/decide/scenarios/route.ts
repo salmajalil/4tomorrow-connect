@@ -82,20 +82,39 @@ export async function POST(request: Request) {
   const settled = await Promise.allSettled(
     slots.map(async (slot) => {
       const system = buildScenarioSystemPrompt((registry ?? []) as EcosystemMember[], slot);
-      const response = await anthropic.messages.create({
-        model: MATCHING_MODEL,
-        // max_tokens covers the whole call, search rounds included, not just
-        // the final block — 3000 was tuned for CONNECT's single-category
-        // match and was too tight for one full scenario (tech stack +
-        // suppliers + regulations + briefing + risks/opportunities): the
-        // model was hitting the cap mid-JSON, which surfaced as "no
-        // <RESULT_JSON> found" in production once the earlier network-drop
-        // issue was fixed and real server responses started coming through.
-        max_tokens: 5000,
-        system,
-        messages: [{ role: "user", content: userPrompt }],
-        tools: [{ type: "web_search_20260318", name: "web_search", max_uses: 2 }],
-      });
+      const createCall = () =>
+        anthropic.messages.create({
+          model: MATCHING_MODEL,
+          // max_tokens covers the whole call, search rounds included, not
+          // just the final block — 3000 was tuned for CONNECT's single-
+          // category match and was too tight for one full scenario (tech
+          // stack + suppliers + regulations + briefing + risks/
+          // opportunities): the model was hitting the cap mid-JSON, which
+          // surfaced as "no <RESULT_JSON> found" in production.
+          max_tokens: 5000,
+          system,
+          messages: [{ role: "user", content: userPrompt }],
+          tools: [{ type: "web_search_20260318", name: "web_search", max_uses: 2 }],
+        });
+
+      // getAnthropicClient() forces maxRetries: 0 (see src/lib/anthropic.ts —
+      // that's about avoiding the SDK silently doubling a timeout, not about
+      // never retrying at all). 3 parallel calls firing right after each
+      // other legitimately hits transient 429/529 in production; one manual
+      // retry with a short backoff for exactly those two statuses uses the
+      // 180s budget's remaining headroom instead of failing the whole batch.
+      let response;
+      try {
+        response = await createCall();
+      } catch (err) {
+        if (err instanceof Anthropic.APIError && (err.status === 429 || err.status === 529)) {
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          response = await createCall();
+        } else {
+          throw err;
+        }
+      }
+
       const rawText = response.content
         .filter((block): block is Anthropic.TextBlock => block.type === "text")
         .map((block) => block.text)

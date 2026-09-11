@@ -199,14 +199,18 @@ const scenarioSchema = z.object({
   indicators: z.record(z.string(), z.union([z.string(), z.number()])),
   radarScores: z.record(z.string(), z.number()),
   techStack: z.array(techStackItemSchema).min(1).max(4),
-  suppliers: z.array(scenarioSupplierSchema).min(0).max(4),
-  regulations: z.array(regulationSchema).min(0).max(4),
+  // Max kept a couple items above what the prompt asks for (4/4/3/3) — the
+  // model overshot the exact caps in production even once told the target
+  // count in prose, and a hard zod failure discards an otherwise-good
+  // scenario. This is slack for that overshoot, not a raised target.
+  suppliers: z.array(scenarioSupplierSchema).min(0).max(6),
+  regulations: z.array(regulationSchema).min(0).max(6),
   executiveBriefing: z.string().min(1),
-  risksSpecific: z.array(z.object({ name: z.string().min(1), reason: z.string().min(1) })).min(1).max(3),
+  risksSpecific: z.array(z.object({ name: z.string().min(1), reason: z.string().min(1) })).min(1).max(5),
   opportunitiesSpecific: z
     .array(z.object({ name: z.string().min(1), reason: z.string().min(1) }))
     .min(1)
-    .max(3),
+    .max(5),
 });
 
 export type ScenarioOutput = z.infer<typeof scenarioSchema>;
@@ -258,6 +262,8 @@ PRINCIPE DIRECTEUR — everything adapts to the actual subject, nothing is templ
 - regulations: search for and list only regulations/certifications/standards actually relevant to this specific subject and found with a source — industrial/safety standards for a physical subject, sectoral regulation (GDPR, financial compliance, etc.) for a digital or product subject, market standards for a commercialization subject. Never invent a reference; if none found, return an empty array.
 - radarScores: 0-10 per axis, in coherence with the indicators you just stated (never a score disconnected from the displayed numbers). Always include "cost", "risk", "roi", "feasibility" as axes, plus ONE more axis you choose to fit the subject (e.g. "co2" for an industrial/environmental subject, "speed" or "scalability" for a digital/commercial one).
 - risksSpecific / opportunitiesSpecific: distinct from the transverse risks already identified in the diagnostic — specific to what makes THIS scenario's approach risky or promising.
+
+HARD ARRAY LIMITS — never exceed these, the response is rejected otherwise: techStack ≤4 items, suppliers ≤4 items, regulations ≤4 items, risksSpecific ≤3 items, opportunitiesSpecific ≤3 items. Pick the most important entries rather than listing everything you found.
 
 CORE RULE — NEVER GENERIC, same as the diagnostic: every sentence must contain something only true for this exact challenge. If information is insufficient to be precise on a point, say so rather than filling in a plausible generality.
 

@@ -52,6 +52,7 @@ export function DecideFlow() {
   const [phase, setPhase] = useState<Phase>("intake");
   const [diagnosticError, setDiagnosticError] = useState("");
   const [scenariosError, setScenariosError] = useState("");
+  const [scenariosWarning, setScenariosWarning] = useState("");
   const [roadmapError, setRoadmapError] = useState("");
   const [roadmapGenerating, setRoadmapGenerating] = useState(false);
   const [lastIntake, setLastIntake] = useState<IntakeState | null>(null);
@@ -85,6 +86,7 @@ export function DecideFlow() {
     if (!diagnostic) return;
     setPhase("scenarios-loading");
     setScenariosError("");
+    setScenariosWarning("");
     try {
       const res = await fetch("/api/decide/scenarios", {
         method: "POST",
@@ -94,6 +96,7 @@ export function DecideFlow() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
       setScenarios(data.scenarios as ScenarioWithId[]);
+      if (data.warning) setScenariosWarning(data.warning as string);
       setPhase("scenarios");
     } catch (err) {
       setScenariosError(err instanceof Error ? err.message : "Une erreur est survenue.");
@@ -184,6 +187,12 @@ export function DecideFlow() {
       <div className="mx-auto w-full max-w-4xl px-4 py-10">
         <Eyebrow>Scénarios stratégiques</Eyebrow>
         <h1 className="mt-3 font-display text-3xl text-ink">Trois trajectoires possibles</h1>
+
+        {scenariosWarning && (
+          <p className="mt-4 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-sm text-ink">
+            {scenariosWarning}
+          </p>
+        )}
 
         <div className="mt-6">
           <RadarChart axes={axes} series={radarSeries} />

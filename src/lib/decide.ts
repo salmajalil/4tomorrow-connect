@@ -209,14 +209,26 @@ const scenarioSchema = z.object({
     .max(3),
 });
 
-const scenariosOutputSchema = z.object({
-  scenarios: z.array(scenarioSchema).length(3),
-});
-
 export type ScenarioOutput = z.infer<typeof scenarioSchema>;
-export type ScenariosGenerationOutput = z.infer<typeof scenariosOutputSchema>;
 
-export function buildScenariosSystemPrompt(registry: EcosystemMember[]): string {
+// Generated one scenario per call, in parallel (see route.ts) — a single
+// call asked to produce all 3 full scenarios (stack, suppliers, regulations,
+// briefing, risks/opportunities each) with web search ran past the 170s
+// Anthropic timeout / 180s function budget in production ("Load failed" on
+// the client — the platform dropped the connection before our own timeout
+// handler could respond). Three parallel single-scenario calls each carry
+// roughly CONNECT's original single-category workload, which stayed inside
+// budget, and total wall-clock time is bounded by the slowest one, not the
+// sum of all three.
+export type ScenarioSlot = 1 | 2 | 3;
+
+const SLOT_HINTS: Record<ScenarioSlot, string> = {
+  1: "You are generating SCENARIO 1 of 3: the more CONSERVATIVE / lower-risk / faster-to-first-value option along whatever axis actually fits this subject (e.g. progressive migration, partnership over build, phased rollout, quick-win-first).",
+  2: "You are generating SCENARIO 2 of 3: the BALANCED option — a middle path between a conservative and an ambitious framing, whatever that means for this specific subject.",
+  3: "You are generating SCENARIO 3 of 3: the more AMBITIOUS / higher-commitment / higher-upside option along whatever axis fits this subject (e.g. full replacement, build over partner, leadership positioning) — still realistic and grounded, never reckless just to be different.",
+};
+
+export function buildScenarioSystemPrompt(registry: EcosystemMember[], slot: ScenarioSlot): string {
   const registryBlock =
     registry.length > 0
       ? registry
@@ -229,12 +241,14 @@ export function buildScenariosSystemPrompt(registry: EcosystemMember[]): string 
           .join("\n")
       : "(empty — rely entirely on web search)";
 
-  return `You are the scenario engine for "4 Tomorrow / Decide". You generate exactly 3 distinct strategic scenarios (trajectories) for a transformation challenge already diagnosed (domains, gaps, priorities given below).
+  return `You are the scenario engine for "4 Tomorrow / Decide". You generate ONE distinct strategic scenario (trajectory) for a transformation challenge already diagnosed (domains, gaps, priorities given below). Two other calls, run in parallel, are generating the other two scenarios independently — your job is only to make sure THIS one is coherent and clearly positioned at its assigned slot, not to reference the others.
+
+${SLOT_HINTS[slot]}
 
 KNOWN ECOSYSTEM DIRECTORY (community-contributed, same "living directory" mechanism used by the CONNECT module — prefer these when relevant and mark source "registry" with their id):
 ${registryBlock}
 
-You have a web_search tool (max 4 uses total across all 3 scenarios). Use it efficiently — batch what you need, then finalize. You are working under a hard time budget; a complete, on-time answer beats an exhaustive but late one.
+You have a web_search tool (max 3 uses). Use it efficiently — batch what you need, then finalize. You are working under a hard time budget; a complete, on-time answer beats an exhaustive but late one.
 
 PRINCIPE DIRECTEUR — everything adapts to the actual subject, nothing is templated:
 - Choose scenario postures that fit the detected domain(s) — e.g. for digitalization: deployment speed vs integration depth vs legacy resilience; for go-to-market: fast penetration vs brand-building vs distribution partnerships; for product development: build vs partner vs acquire; for technical modernization: full replacement vs progressive migration vs hybrid; for heavy industrial transformation: operational efficiency vs technology balance vs environmental leadership. Pick whichever framing actually fits this challenge — never force a "cost vs CO2 vs physical tech" frame on a non-industrial subject.
@@ -251,25 +265,20 @@ Respond in French except JSON keys, which stay in English exactly as specified.
 
 ${RESULT_INSTRUCTION}
 
-Schema:
+Schema (a single scenario object, not an array):
 {
-  "scenarios": [
-    {
-      "name": string,
-      "stance": string,
-      "description": string,
-      "indicators": { [key: string]: string | number },
-      "radarScores": { "cost": number, "risk": number, "roi": number, "feasibility": number, [fifthAxis: string]: number },
-      "techStack": [{ "name": string, "maturity": string, "maturityScale": string, "detail": string, "benefit": string }],
-      "suppliers": [{ "category": "technology"|"startup"|"expert"|"partner"|"funding", "name": string, "reason": string, "website": string|null, "contactEmail": string|null, "source": "registry"|"web_search", "ecosystemMemberId": string|null }],
-      "regulations": [{ "name": string, "description": string, "sourceUrl": string|null }],
-      "executiveBriefing": string,
-      "risksSpecific": [{ "name": string, "reason": string }],
-      "opportunitiesSpecific": [{ "name": string, "reason": string }]
-    }
-  ]
-}
-(exactly 3 entries in "scenarios")`;
+  "name": string,
+  "stance": string,
+  "description": string,
+  "indicators": { [key: string]: string | number },
+  "radarScores": { "cost": number, "risk": number, "roi": number, "feasibility": number, [fifthAxis: string]: number },
+  "techStack": [{ "name": string, "maturity": string, "maturityScale": string, "detail": string, "benefit": string }],
+  "suppliers": [{ "category": "technology"|"startup"|"expert"|"partner"|"funding", "name": string, "reason": string, "website": string|null, "contactEmail": string|null, "source": "registry"|"web_search", "ecosystemMemberId": string|null }],
+  "regulations": [{ "name": string, "description": string, "sourceUrl": string|null }],
+  "executiveBriefing": string,
+  "risksSpecific": [{ "name": string, "reason": string }],
+  "opportunitiesSpecific": [{ "name": string, "reason": string }]
+}`;
 }
 
 export function buildScenariosUserPrompt(input: ScenarioGenerationInput): string {
@@ -287,12 +296,12 @@ Priorités identifiées :
 ${input.priorities.map((p) => `- ${p.name} : ${p.reason}`).join("\n")}`;
 }
 
-export function parseScenariosOutput(rawText: string): ScenariosGenerationOutput {
+export function parseScenarioOutput(rawText: string): ScenarioOutput {
   const raw = extractJson(rawText);
-  const parsed = scenariosOutputSchema.safeParse(raw);
+  const parsed = scenarioSchema.safeParse(raw);
   if (!parsed.success) {
     throw new DecideParseError(
-      `Le résultat des scénarios ne respecte pas le format attendu : ${parsed.error.message}`
+      `Le résultat d'un scénario ne respecte pas le format attendu : ${parsed.error.message}`
     );
   }
   return parsed.data;

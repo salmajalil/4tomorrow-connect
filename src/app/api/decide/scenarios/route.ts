@@ -4,11 +4,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
 import {
-  buildScenariosSystemPrompt,
+  buildScenarioSystemPrompt,
   buildScenariosUserPrompt,
-  parseScenariosOutput,
+  parseScenarioOutput,
   DecideParseError,
   type Domain,
+  type ScenarioOutput,
+  type ScenarioSlot,
 } from "@/lib/decide";
 import { setModuleStatus } from "@/lib/module-status";
 import type { EcosystemMember } from "@/types/database";
@@ -61,7 +63,6 @@ export async function POST(request: Request) {
 
   const domains = (transformation.domains as Domain[]) ?? [];
   const anthropic = getAnthropicClient();
-  const system = buildScenariosSystemPrompt((registry ?? []) as EcosystemMember[]);
   const userPrompt = buildScenariosUserPrompt({
     domains,
     organization: org?.name ?? "",
@@ -73,22 +74,44 @@ export async function POST(request: Request) {
     priorities: (priorities ?? []).map((p) => ({ name: p.name, reason: p.reason ?? "" })),
   });
 
-  let response;
-  try {
-    response = await anthropic.messages.create({
-      model: MATCHING_MODEL,
-      max_tokens: 7000,
-      system,
-      messages: [{ role: "user", content: userPrompt }],
-      tools: [{ type: "web_search_20260318", name: "web_search", max_uses: 4 }],
-    });
-  } catch (err) {
-    if (err instanceof Anthropic.APIError) {
-      const status = err.status === 401 || err.status === 403 ? 502 : (err.status ?? 502);
+  // One scenario per call, in parallel — a single call generating all 3 full
+  // scenarios exceeded the production timeout budget (see decide.ts comment
+  // above buildScenarioSystemPrompt). Wall-clock time here is bounded by the
+  // slowest of the 3, not their sum.
+  const slots: ScenarioSlot[] = [1, 2, 3];
+  const settled = await Promise.allSettled(
+    slots.map(async (slot) => {
+      const system = buildScenarioSystemPrompt((registry ?? []) as EcosystemMember[], slot);
+      const response = await anthropic.messages.create({
+        model: MATCHING_MODEL,
+        max_tokens: 3500,
+        system,
+        messages: [{ role: "user", content: userPrompt }],
+        tools: [{ type: "web_search_20260318", name: "web_search", max_uses: 3 }],
+      });
+      const rawText = response.content
+        .filter((block): block is Anthropic.TextBlock => block.type === "text")
+        .map((block) => block.text)
+        .join("\n");
+      return parseScenarioOutput(rawText);
+    })
+  );
+
+  const scenarios: ScenarioOutput[] = settled
+    .filter((r): r is PromiseFulfilledResult<ScenarioOutput> => r.status === "fulfilled")
+    .map((r) => r.value);
+
+  if (scenarios.length === 0) {
+    const firstError = settled.find((r): r is PromiseRejectedResult => r.status === "rejected")?.reason;
+    if (firstError instanceof Anthropic.APIError) {
+      const status = firstError.status === 401 || firstError.status === 403 ? 502 : (firstError.status ?? 502);
       return NextResponse.json(
         { error: "Le moteur de scénarios n'a pas pu répondre. Réessaie dans un instant." },
         { status }
       );
+    }
+    if (firstError instanceof DecideParseError) {
+      return NextResponse.json({ error: firstError.message }, { status: 502 });
     }
     return NextResponse.json(
       { error: "Le moteur de scénarios a mis trop de temps à répondre. Réessaie." },
@@ -96,25 +119,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const rawText = response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("\n");
-
-  let result;
-  try {
-    result = parseScenariosOutput(rawText);
-  } catch (err) {
-    if (err instanceof DecideParseError) {
-      return NextResponse.json({ error: err.message }, { status: 502 });
-    }
-    throw err;
-  }
-
   const knownRegistryIds = new Set((registry ?? []).map((m) => m.id));
-  const persistedScenarios: { trajectoryId: string; scenario: (typeof result.scenarios)[number] }[] = [];
+  const persistedScenarios: { trajectoryId: string; scenario: ScenarioOutput }[] = [];
 
-  for (const scenario of result.scenarios) {
+  for (const scenario of scenarios) {
     const { data: trajectory, error: trajectoryError } = await supabase
       .from("trajectories")
       .insert({
@@ -182,5 +190,8 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     scenarios: persistedScenarios.map(({ trajectoryId, scenario }) => ({ trajectoryId, ...scenario })),
+    ...(persistedScenarios.length < 3
+      ? { warning: `${persistedScenarios.length} scénario(s) sur 3 généré(s) — les autres ont échoué, tu peux réessayer.` }
+      : {}),
   });
 }

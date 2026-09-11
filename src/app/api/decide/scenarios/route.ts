@@ -84,7 +84,14 @@ export async function POST(request: Request) {
       const system = buildScenarioSystemPrompt((registry ?? []) as EcosystemMember[], slot);
       const response = await anthropic.messages.create({
         model: MATCHING_MODEL,
-        max_tokens: 3000,
+        // max_tokens covers the whole call, search rounds included, not just
+        // the final block — 3000 was tuned for CONNECT's single-category
+        // match and was too tight for one full scenario (tech stack +
+        // suppliers + regulations + briefing + risks/opportunities): the
+        // model was hitting the cap mid-JSON, which surfaced as "no
+        // <RESULT_JSON> found" in production once the earlier network-drop
+        // issue was fixed and real server responses started coming through.
+        max_tokens: 5000,
         system,
         messages: [{ role: "user", content: userPrompt }],
         tools: [{ type: "web_search_20260318", name: "web_search", max_uses: 2 }],

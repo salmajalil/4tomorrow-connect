@@ -31,12 +31,12 @@ export function ConnectFlow() {
 
   async function launchMatching() {
     setPhase("loading");
-    // The API route budgets ~55s for the Anthropic call server-side (see
-    // MATCHING_TIMEOUT_MS in src/lib/anthropic.ts) inside a 90s function
-    // ceiling; this client timeout sits above both so the server's own
-    // error message always wins over a raw client-side abort.
+    // The API route budgets up to ~170s for the Anthropic call server-side
+    // (see MATCHING_TIMEOUT_MS in src/lib/anthropic.ts) inside a 180s
+    // function ceiling; this client timeout sits above both so the
+    // server's own error message always wins over a raw client-side abort.
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 95_000);
+    const timeout = setTimeout(() => controller.abort(), 185_000);
 
     try {
       const res = await fetch("/api/match", {

@@ -10,9 +10,15 @@ let client: Anthropic | null = null;
 // the Vercel function's own maxDuration (see src/app/api/match/route.ts) so
 // our own timeout fires first and the user gets an actionable error instead
 // of a raw platform 504. maxRetries is forced to 0 below — the SDK retries
-// timeouts by default, which silently turns one 30s budget into 60s+ and is
-// exactly what caused the very 504s this timeout is meant to prevent.
-export const MATCHING_TIMEOUT_MS = 55_000;
+// timeouts by default, which silently turns one budget into 2x that and was
+// the original cause of the 504s this timeout is meant to prevent.
+//
+// A single, non-retried, web_search-augmented call was observed taking
+// 56s+ end to end in production, so this is set with real headroom above
+// that rather than the 30s the brief originally asked for — that figure
+// didn't survive contact with how long multi-round web search actually
+// takes for a well-detailed project description.
+export const MATCHING_TIMEOUT_MS = 170_000;
 
 export function getAnthropicClient() {
   if (!process.env.ANTHROPIC_API_KEY) {

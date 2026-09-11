@@ -14,7 +14,7 @@ import type { EcosystemMember } from "@/types/database";
 
 // Headroom above MATCHING_TIMEOUT_MS (src/lib/anthropic.ts) so our own
 // timeout error fires before Vercel kills the function outright.
-export const maxDuration = 90;
+export const maxDuration = 180;
 
 const requestSchema = z.object({
   industry: z.string().trim().min(1, "Choisis ou saisis une industrie."),

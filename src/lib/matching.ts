@@ -90,7 +90,7 @@ export function buildSystemPrompt(registry: EcosystemMember[]): string {
 KNOWN ECOSYSTEM DIRECTORY (community-contributed, re-injected on every run — prefer these when genuinely relevant to avoid redundant web search, and mark them as source "registry" with their id as ecosystemMemberId):
 ${registryBlock}
 
-You also have a web_search tool. Use it to find additional real organizations or people not already covered by the directory above, when it strengthens the match.
+You also have a web_search tool (max 2 uses). Use it efficiently: batch what you need into as few searches as possible, then finalize your answer — do not keep searching for marginal improvements once you have enough real, verifiable matches to answer well. You are working under a hard time budget; a complete, on-time answer beats an exhaustive but late one.
 
 STRICT RULES:
 1. Every recommendation MUST explicitly name the gap it addresses (gapAddressed must match one of the "gaps" you output, by its "name").

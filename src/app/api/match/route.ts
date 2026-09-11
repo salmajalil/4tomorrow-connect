@@ -72,7 +72,7 @@ export async function POST(request: Request) {
   try {
     response = await anthropic.messages.create({
       model: MATCHING_MODEL,
-      max_tokens: 4096,
+      max_tokens: 3000,
       system,
       messages: [{ role: "user", content: userPrompt }],
       tools: [
@@ -81,7 +81,10 @@ export async function POST(request: Request) {
           name: "web_search",
           // Kept modest: each round trip adds real latency, and the whole
           // call has to land inside MATCHING_TIMEOUT_MS (see src/lib/anthropic.ts).
-          max_uses: 3,
+          // Production logs showed wall-clock time as high as ~170s+ with
+          // max_uses 3 on a detailed query — trimmed further to bring the
+          // typical case down, at some cost to how exhaustive the search is.
+          max_uses: 2,
         },
       ],
     });

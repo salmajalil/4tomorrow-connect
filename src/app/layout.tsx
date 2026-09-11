@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Bebas_Neue } from "next/font/google";
+import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/nav";
 
@@ -13,11 +13,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Display face for headings — condensed, industrial, high-contrast with the
-// body sans, to carry the "industrial luxury" brand direction.
-const bebasNeue = Bebas_Neue({
-  variable: "--font-bebas",
-  weight: "400",
+// Display face for headings — elegant editorial serif, matching the
+// official 4 Tomorrow brand deck ("From Complexity to Action.").
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
   subsets: ["latin"],
 });
 
@@ -36,7 +35,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="fr"
-      className={`${geistSans.variable} ${geistMono.variable} ${bebasNeue.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-bg text-ink">
         <Nav />

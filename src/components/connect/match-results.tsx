@@ -1,5 +1,6 @@
 import type { ModelOutput, MatchOutput } from "@/lib/matching";
 import { EcosystemDiagram } from "@/components/connect/ecosystem-diagram";
+import { Eyebrow } from "@/components/eyebrow";
 
 const CATEGORY_LABELS: Record<MatchOutput["category"], string> = {
   technology: "Technologies",
@@ -81,17 +82,13 @@ export function MatchResults({
   return (
     <div className="flex flex-col gap-8">
       <section>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
-          Strategic Brief
-        </h2>
-        <p className="mt-2 text-base leading-relaxed text-ink">{result.strategicBrief}</p>
+        <Eyebrow>Strategic Brief</Eyebrow>
+        <p className="mt-3 text-base leading-relaxed text-ink">{result.strategicBrief}</p>
       </section>
 
       <section>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
-          Good Ideas for Your Mission
-        </h2>
-        <ol className="mt-2 flex flex-col gap-2">
+        <Eyebrow>Good Ideas for Your Mission</Eyebrow>
+        <ol className="mt-3 flex flex-col gap-2">
           {result.goodIdeas.map((idea, i) => (
             <li key={i} className="flex gap-3 rounded-xl border border-border bg-surface p-3">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-ink">
@@ -104,10 +101,8 @@ export function MatchResults({
       </section>
 
       <section>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
-          Ton écosystème
-        </h2>
-        <div className="mt-2">
+        <Eyebrow>Ton écosystème</Eyebrow>
+        <div className="mt-3">
           <EcosystemDiagram
             projectLabel={projectLabel}
             groups={byCategory.map(({ category, matches }) => ({
@@ -120,7 +115,7 @@ export function MatchResults({
       </section>
 
       <section className="flex flex-col gap-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Matches</h2>
+        <Eyebrow>Matches</Eyebrow>
         {byCategory.map(({ category, matches }) => (
           <div key={category}>
             <h3 className="text-base font-semibold text-ink">{CATEGORY_LABELS[category]}</h3>

@@ -76,7 +76,7 @@ export default function LoginPage() {
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-64px)] w-full max-w-sm flex-col justify-center px-4 py-12">
-      <h1 className="font-display text-3xl tracking-wide text-ink">
+      <h1 className="font-display text-3xl text-ink">
         {isSignUp ? "Créer un compte" : "Se connecter"}
       </h1>
       <p className="mt-1 text-sm text-muted">

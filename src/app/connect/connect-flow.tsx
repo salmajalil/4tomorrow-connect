@@ -89,7 +89,7 @@ export function ConnectFlow() {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-10">
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="font-display text-2xl tracking-wide text-ink">Tes résultats</h1>
+          <h1 className="font-display text-2xl text-ink">Tes résultats</h1>
           <button
             type="button"
             onClick={() => {

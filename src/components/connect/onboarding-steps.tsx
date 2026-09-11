@@ -26,7 +26,7 @@ export function IndustryStep({
 
   return (
     <div>
-      <h2 className="font-display text-3xl tracking-wide text-ink">Quelle est ton industrie ?</h2>
+      <h2 className="font-display text-3xl text-ink">Quelle est ton industrie ?</h2>
       <p className="mt-1 text-sm text-muted">Choisis la tuile la plus proche de ton secteur.</p>
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -96,7 +96,7 @@ export function PartnerTypesStep({
 
   return (
     <div>
-      <h2 className="font-display text-3xl tracking-wide text-ink">
+      <h2 className="font-display text-3xl text-ink">
         Quels types de partenaires recherches-tu ?
       </h2>
       <p className="mt-1 text-sm text-muted">
@@ -170,7 +170,7 @@ export function ContextStep({
 
   return (
     <div>
-      <h2 className="font-display text-3xl tracking-wide text-ink">Zone et objectifs (optionnel)</h2>
+      <h2 className="font-display text-3xl text-ink">Zone et objectifs (optionnel)</h2>
       <p className="mt-1 text-sm text-muted">
         Aide le moteur à cibler des partenaires pertinents — rien de tout ça n&apos;est obligatoire.
       </p>
@@ -251,7 +251,7 @@ export function DescriptionStep({
 }) {
   return (
     <div>
-      <h2 className="font-display text-3xl tracking-wide text-ink">Décris ton projet</h2>
+      <h2 className="font-display text-3xl text-ink">Décris ton projet</h2>
       <p className="mt-1 text-sm text-muted">
         Optionnelle mais encouragée — plus tu détailles, plus le matching est puissant.
       </p>
@@ -271,7 +271,7 @@ export function DescriptionStep({
 export function ReviewStep({ state }: { state: OnboardingState }) {
   return (
     <div>
-      <h2 className="font-display text-3xl tracking-wide text-ink">Prêt à lancer le matching ?</h2>
+      <h2 className="font-display text-3xl text-ink">Prêt à lancer le matching ?</h2>
       <p className="mt-1 text-sm text-muted">
         Vérifie ton projet — la recherche peut prendre 1 à 2 minutes.
       </p>

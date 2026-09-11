@@ -87,20 +87,41 @@ export function DecideFlow() {
     setPhase("scenarios-loading");
     setScenariosError("");
     setScenariosWarning("");
-    try {
-      const res = await fetch("/api/decide/scenarios", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transformationId: diagnostic.transformationId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
-      setScenarios(data.scenarios as ScenarioWithId[]);
-      if (data.warning) setScenariosWarning(data.warning as string);
-      setPhase("scenarios");
-    } catch (err) {
-      setScenariosError(err instanceof Error ? err.message : "Une erreur est survenue.");
-      setPhase("scenarios-loading");
+
+    // The scenarios call legitimately takes 60-90s+ (3 parallel web-search
+    // backed generations). Over that long a mobile connection can drop
+    // mid-flight even when the server finishes cleanly — fetch() then
+    // rejects with a network-level TypeError (WebKit's "Load failed"),
+    // never reaching the res.ok branch below. That's distinct from a real
+    // server error (which returns a JSON body), so only network-level
+    // failures get an automatic retry here.
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const res = await fetch("/api/decide/scenarios", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ transformationId: diagnostic.transformationId }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
+        setScenarios(data.scenarios as ScenarioWithId[]);
+        if (data.warning) setScenariosWarning(data.warning as string);
+        setPhase("scenarios");
+        return;
+      } catch (err) {
+        const isNetworkError = err instanceof TypeError;
+        if (isNetworkError && attempt < maxAttempts) continue;
+        setScenariosError(
+          isNetworkError
+            ? "La connexion a été coupée pendant la génération (réseau mobile instable sur une requête longue). Réessaie, idéalement en Wi-Fi."
+            : err instanceof Error
+              ? err.message
+              : "Une erreur est survenue."
+        );
+        setPhase("scenarios-loading");
+        return;
+      }
     }
   }
 

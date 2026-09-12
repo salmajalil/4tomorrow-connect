@@ -1,33 +1,28 @@
 @import "tailwindcss";
 
 /*
- * "Industrial luxury" theme: warm stone/beige ground, brass gold accent,
- * near-black ink — the brand deck's "From Complexity to Action" palette
- * (cream walls, brass fixtures, a little wrought iron), not the earlier
- * near-black version. Single fixed theme (not following OS light/dark) —
- * a deliberate brand choice, not an oversight. Learn keeps its own scoped
- * mint theme (src/components/learn/learn-theme.tsx) — unaffected by this.
- * Every screen already reads color through these custom properties (never
- * a hardcoded hex), so retuning them here reskins the whole site at once.
+ * "Industrial luxury / futuristic" theme: dark ground, warm brass accent.
+ * Single fixed theme (not following OS light/dark) — a deliberate brand
+ * choice for this product, not an oversight.
  */
 :root {
-  --bg: #eee5d3;
-  --surface: #f8f3e8;
-  --surface-2: #e3d6ba;
-  --border: #cdbb95;
-  --ink: #221c14;
-  --muted: #6b5f49;
-  --accent: #a97731;
-  --accent-strong: #8a5e22;
-  --accent-ink: #1c130a;
-  --success: #3f8c5c;
-  --danger: #b3402c;
+  --bg: #0b0d10;
+  --surface: #14171b;
+  --surface-2: #1b1f24;
+  --border: #262b31;
+  --ink: #eef1f4;
+  --muted: #8b929c;
+  --accent: #c9a256;
+  --accent-strong: #e0bd6e;
+  --accent-ink: #14171b;
+  --success: #4fae7a;
+  --danger: #d9695a;
   /* Cool signal color reserved for live/real-time indicators (Control
      Tower pulse dots, "mis à jour à l'instant" badges) — kept distinct
      from the warm brass --accent so a live update never reads as a
      regular interactive/brand element. */
-  --live: #1f8fa3;
-  --live-ink: #f8f3e8;
+  --live: #5fc7d6;
+  --live-ink: #0b0d10;
 }
 
 @theme inline {

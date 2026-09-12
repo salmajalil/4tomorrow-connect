@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { ScenarioOutput } from "@/lib/decide";
-import type { IndicatorEntry, IndicatorFeedback, IndicatorFeedbackValue, TrajectoryIndicators } from "@/types/database";
+import type { IndicatorEntry, IndicatorFeedback, TrajectoryIndicators } from "@/types/database";
 
 export type ScenarioWithId = ScenarioOutput & { trajectoryId: string };
 
@@ -29,16 +29,29 @@ function SourceBadge({ source }: { source: "registry" | "web_search" }) {
   );
 }
 
-// Every indicator carries its own confidence (see src/lib/decide.ts) instead
-// of being shown as a flat fact. "unknown" never has a fabricated number —
-// it's an inline invite to fill in the real one. "estimate" is shown but
-// asks the viewer to confirm or dispute it, feeding a lightweight
-// human-in-the-loop signal rather than presenting a guess as certainty.
-function IndicatorTile({
+// A validated indicator (confidence "verified") displays as a plain fact.
+function ValidatedIndicatorChip({ indicatorKey, entry }: { indicatorKey: string; entry: IndicatorEntry }) {
+  return (
+    <div className="flex min-w-[7rem] flex-col items-center gap-0.5 rounded-lg border border-border bg-surface-2 px-3 py-2 text-center">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{indicatorKey}</p>
+      <p className="mt-0.5 text-sm font-semibold text-ink">{String(entry.value)}</p>
+      <span className="text-[10px] text-success">Validé ✓</span>
+    </div>
+  );
+}
+
+// Everything that ISN'T "verified" (estimate or unknown) never shows a raw
+// number by default — an AI guess presented next to a hard fact reads as a
+// hard fact. Instead: the number stays masked behind an explicit "afficher"
+// toggle, and a small note thread is the only way to move it to "verified".
+// Sending a note is both the record of who said what and, at the same time,
+// how the value gets entered/confirmed — there's no separate "edit" step,
+// since it's the same person (the transformation owner) doing both.
+function IndicatorReview({
   trajectoryId,
   indicatorKey,
   entry,
-  feedbackValue,
+  notes,
   indicatorsSnapshot,
   feedbackSnapshot,
   onIndicatorsChange,
@@ -47,108 +60,95 @@ function IndicatorTile({
   trajectoryId: string;
   indicatorKey: string;
   entry: IndicatorEntry;
-  feedbackValue: IndicatorFeedbackValue | undefined;
+  notes: { note: string; at: string }[];
   indicatorsSnapshot: TrajectoryIndicators;
   feedbackSnapshot: IndicatorFeedback;
   onIndicatorsChange: (next: TrajectoryIndicators) => void;
   onFeedbackChange: (next: IndicatorFeedback) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draftValue, setDraftValue] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
 
-  async function saveExpertValue() {
-    const trimmed = draftValue.trim();
+  async function send() {
+    const trimmed = draft.trim();
     if (!trimmed) return;
-    setSaving(true);
-    const updated: TrajectoryIndicators = {
+    setSending(true);
+    const updatedIndicators: TrajectoryIndicators = {
       ...indicatorsSnapshot,
       [indicatorKey]: { value: trimmed, confidence: "verified" },
     };
-    await createClient().from("trajectories").update({ indicators: updated }).eq("id", trajectoryId);
-    onIndicatorsChange(updated);
-    setSaving(false);
-    setEditing(false);
-  }
-
-  async function vote(value: IndicatorFeedbackValue) {
-    const updated: IndicatorFeedback = { ...feedbackSnapshot, [indicatorKey]: value };
-    onFeedbackChange(updated);
-    await createClient().from("trajectories").update({ indicators_feedback: updated }).eq("id", trajectoryId);
-  }
-
-  if (entry.confidence === "unknown" && entry.value === null && !editing) {
-    return (
-      <button
-        type="button"
-        onClick={() => setEditing(true)}
-        className="flex min-w-[7rem] flex-col items-center gap-0.5 rounded-lg border border-dashed border-border bg-surface-2/50 px-3 py-2 text-center"
-      >
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{indicatorKey}</p>
-        <p className="mt-0.5 text-xs font-medium text-muted">À renseigner ✎</p>
-      </button>
-    );
-  }
-
-  if (editing) {
-    return (
-      <div className="flex min-w-[9rem] flex-col gap-1 rounded-lg border border-accent/40 bg-surface-2 px-3 py-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{indicatorKey}</p>
-        <input
-          autoFocus
-          value={draftValue}
-          onChange={(e) => setDraftValue(e.target.value)}
-          placeholder="Valeur réelle"
-          className="w-full rounded border border-border bg-surface px-1.5 py-1 text-xs text-ink focus:border-accent focus:outline-none"
-        />
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={saveExpertValue}
-            disabled={saving}
-            className="text-[11px] font-semibold text-accent disabled:opacity-40"
-          >
-            Enregistrer
-          </button>
-          <button type="button" onClick={() => setEditing(false)} className="text-[11px] text-muted">
-            Annuler
-          </button>
-        </div>
-      </div>
-    );
+    const updatedFeedback: IndicatorFeedback = {
+      ...feedbackSnapshot,
+      [indicatorKey]: [...(feedbackSnapshot[indicatorKey] ?? []), { note: trimmed, at: new Date().toISOString() }],
+    };
+    await createClient()
+      .from("trajectories")
+      .update({ indicators: updatedIndicators, indicators_feedback: updatedFeedback })
+      .eq("id", trajectoryId);
+    onIndicatorsChange(updatedIndicators);
+    onFeedbackChange(updatedFeedback);
+    setDraft("");
+    setSending(false);
   }
 
   return (
-    <div className="flex min-w-[7rem] flex-col items-center gap-0.5 rounded-lg border border-border bg-surface-2 px-3 py-2 text-center">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{indicatorKey}</p>
-      <p className="mt-0.5 text-sm font-semibold text-ink">{String(entry.value)}</p>
-      {entry.confidence === "verified" && <span className="text-[10px] text-success">Vérifié ✓</span>}
-      {entry.confidence === "estimate" &&
-        (feedbackValue ? (
-          <span className="text-[10px] text-muted">
-            {feedbackValue === "confirmed" ? "Confirmé ✓" : "Signalé ⚠"}
-          </span>
+    <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border bg-surface-2/50 p-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">{indicatorKey}</p>
+        <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent-strong">
+          Non validé
+        </span>
+      </div>
+
+      {entry.confidence === "estimate" ? (
+        revealed ? (
+          <p className="text-sm text-muted">
+            Estimation IA (sans source) : <span className="font-medium text-ink">{String(entry.value)}</span>{" "}
+            <button type="button" onClick={() => setRevealed(false)} className="text-xs text-accent underline underline-offset-2">
+              masquer
+            </button>
+          </p>
         ) : (
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-muted">≈ estimation</span>
-            <button
-              type="button"
-              onClick={() => vote("confirmed")}
-              aria-label="Confirmer cette estimation"
-              className="text-xs leading-none"
-            >
-              👍
-            </button>
-            <button
-              type="button"
-              onClick={() => vote("disputed")}
-              aria-label="Signaler cette estimation comme inexacte"
-              className="text-xs leading-none"
-            >
-              👎
-            </button>
-          </div>
-        ))}
+          <button
+            type="button"
+            onClick={() => setRevealed(true)}
+            className="self-start text-xs font-medium text-accent underline underline-offset-2"
+          >
+            Afficher l&apos;estimation IA (non validée)
+          </button>
+        )
+      ) : (
+        <p className="text-sm text-muted">Non estimable par l&apos;IA à partir des informations fournies.</p>
+      )}
+
+      {notes.length > 0 && (
+        <ul className="flex flex-col gap-1 border-t border-border pt-2 text-xs text-muted">
+          {notes.map((n, i) => (
+            <li key={i}>
+              <span className="font-medium text-ink">{n.note}</span>{" "}
+              <span className="text-[10px]">— {new Date(n.at).toLocaleDateString("fr-FR")}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex gap-2">
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Confirmer ou indiquer la vraie valeur"
+          className="min-w-0 flex-1 rounded border border-border bg-surface px-2 py-1.5 text-xs text-ink focus:border-accent focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={send}
+          disabled={sending || !draft.trim()}
+          className="shrink-0 rounded bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Envoyer
+        </button>
+      </div>
     </div>
   );
 }
@@ -195,6 +195,10 @@ export function ScenarioCard({
   const [indicators, setIndicators] = useState<TrajectoryIndicators>(scenario.indicators);
   const [feedback, setFeedback] = useState<IndicatorFeedback>({});
 
+  const indicatorEntries = Object.entries(indicators);
+  const validatedEntries = indicatorEntries.filter(([, entry]) => entry.confidence === "verified");
+  const unvalidatedEntries = indicatorEntries.filter(([, entry]) => entry.confidence !== "verified");
+
   return (
     <div
       className={`flex flex-col gap-4 rounded-xl border p-5 transition ${
@@ -213,21 +217,34 @@ export function ScenarioCard({
 
       <p className="text-sm text-muted">{scenario.description}</p>
 
-      <div className="flex flex-wrap gap-2">
-        {Object.entries(indicators).map(([key, entry]) => (
-          <IndicatorTile
-            key={key}
-            trajectoryId={scenario.trajectoryId}
-            indicatorKey={key}
-            entry={entry}
-            feedbackValue={feedback[key]}
-            indicatorsSnapshot={indicators}
-            feedbackSnapshot={feedback}
-            onIndicatorsChange={setIndicators}
-            onFeedbackChange={setFeedback}
-          />
-        ))}
-      </div>
+      {validatedEntries.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {validatedEntries.map(([key, entry]) => (
+            <ValidatedIndicatorChip key={key} indicatorKey={key} entry={entry} />
+          ))}
+        </div>
+      )}
+
+      {unvalidatedEntries.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+            Données financières à valider — jamais affichées comme un fait tant que non confirmées
+          </p>
+          {unvalidatedEntries.map(([key, entry]) => (
+            <IndicatorReview
+              key={key}
+              trajectoryId={scenario.trajectoryId}
+              indicatorKey={key}
+              entry={entry}
+              notes={feedback[key] ?? []}
+              indicatorsSnapshot={indicators}
+              feedbackSnapshot={feedback}
+              onIndicatorsChange={setIndicators}
+              onFeedbackChange={setFeedback}
+            />
+          ))}
+        </div>
+      )}
 
       {(scenario.risksSpecific.length > 0 || scenario.opportunitiesSpecific.length > 0) && (
         <div className="flex flex-wrap gap-1.5">

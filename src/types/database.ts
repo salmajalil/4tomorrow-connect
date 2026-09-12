@@ -105,8 +105,8 @@ export type IndicatorEntry = {
 
 export type TrajectoryIndicators = Record<string, IndicatorEntry>;
 
-export type IndicatorFeedbackValue = "confirmed" | "disputed";
-export type IndicatorFeedback = Record<string, IndicatorFeedbackValue>;
+export type IndicatorNote = { note: string; at: string };
+export type IndicatorFeedback = Record<string, IndicatorNote[]>;
 
 export type RegulationEntry = {
   name: string;

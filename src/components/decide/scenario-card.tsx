@@ -196,14 +196,21 @@ export function ScenarioCard({
   co2SliderLabel,
   selected,
   onSelect,
+  detail = false,
+  onOpenDetail,
 }: {
   scenario: ScenarioWithId;
   index: number;
   co2SliderLabel: string;
   selected: boolean;
   onSelect: () => void;
+  // Compact mode (comparison list): summary only, "voir le détail" navigates
+  // away instead of expanding inline — 3 cards each unfolding their own
+  // tabs in place got cluttered fast. Detail mode (focused single-scenario
+  // page): tabs always shown, no toggle needed.
+  detail?: boolean;
+  onOpenDetail?: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<DetailTab>("brief");
   const [indicators, setIndicators] = useState<TrajectoryIndicators>(scenario.indicators);
   const [feedback, setFeedback] = useState<IndicatorFeedback>({});
@@ -282,15 +289,17 @@ export function ScenarioCard({
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="self-start text-xs font-semibold text-accent underline underline-offset-2"
-      >
-        {expanded ? "Réduire ▲" : "Voir le détail complet ▼"}
-      </button>
+      {!detail && (
+        <button
+          type="button"
+          onClick={onOpenDetail}
+          className="self-start text-xs font-semibold text-accent underline underline-offset-2"
+        >
+          Voir le détail complet →
+        </button>
+      )}
 
-      {expanded && (
+      {detail && (
         <div className="flex flex-col gap-4 border-t border-border pt-4">
           <div className="flex gap-1 overflow-x-auto">
             {TABS.map((tab) => (

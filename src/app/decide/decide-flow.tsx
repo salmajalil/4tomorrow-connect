@@ -9,7 +9,7 @@ import { Eyebrow } from "@/components/eyebrow";
 import { parseJsonResponse } from "@/lib/parse-json-response";
 import type { Domain } from "@/lib/decide";
 
-type Phase = "intake" | "diagnostic-loading" | "diagnostic" | "scenarios-loading" | "scenarios";
+type Phase = "intake" | "diagnostic-loading" | "diagnostic" | "scenarios-loading" | "scenarios" | "scenario-detail";
 
 function LoadingBlock({ label, hint }: { label: string; hint: string }) {
   return (
@@ -58,6 +58,7 @@ export function DecideFlow() {
   const [diagnostic, setDiagnostic] = useState<DiagnosticResult | null>(null);
   const [scenarios, setScenarios] = useState<ScenarioWithId[] | null>(null);
   const [selectedTrajectoryId, setSelectedTrajectoryId] = useState<string | null>(null);
+  const [detailTrajectoryId, setDetailTrajectoryId] = useState<string | null>(null);
 
   async function runDiagnostic(intake: IntakeState) {
     setLastIntake(intake);
@@ -199,9 +200,42 @@ export function DecideFlow() {
               co2SliderLabel={fifthAxisLabel(diagnostic.domains)}
               selected={selectedTrajectoryId === s.trajectoryId}
               onSelect={() => setSelectedTrajectoryId(s.trajectoryId)}
+              onOpenDetail={() => {
+                setDetailTrajectoryId(s.trajectoryId);
+                setPhase("scenario-detail");
+              }}
             />
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (phase === "scenario-detail" && scenarios && diagnostic) {
+    const index = scenarios.findIndex((s) => s.trajectoryId === detailTrajectoryId);
+    const scenario = index >= 0 ? scenarios[index] : null;
+    if (!scenario) {
+      setPhase("scenarios");
+      return null;
+    }
+
+    return (
+      <div className="mx-auto w-full max-w-3xl px-4 py-10">
+        <button
+          type="button"
+          onClick={() => setPhase("scenarios")}
+          className="mb-4 text-sm text-muted underline underline-offset-2 hover:text-accent"
+        >
+          ← Retour aux scénarios
+        </button>
+        <ScenarioCard
+          scenario={scenario}
+          index={index}
+          co2SliderLabel={fifthAxisLabel(diagnostic.domains)}
+          selected={selectedTrajectoryId === scenario.trajectoryId}
+          onSelect={() => setSelectedTrajectoryId(scenario.trajectoryId)}
+          detail
+        />
       </div>
     );
   }

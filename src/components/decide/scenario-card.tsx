@@ -9,6 +9,14 @@ export type ScenarioWithId = ScenarioOutput & { trajectoryId: string };
 
 const SLOT_LABELS = ["A", "B", "C"];
 
+type DetailTab = "brief" | "techno" | "suppliers";
+
+const TABS: { id: DetailTab; label: string }[] = [
+  { id: "brief", label: "Brief stratégique" },
+  { id: "techno", label: "Solutions & techno" },
+  { id: "suppliers", label: "Fournisseurs & partenaires" },
+];
+
 const CATEGORY_LABELS: Record<string, string> = {
   technology: "Technologie",
   startup: "Startup",
@@ -192,6 +200,7 @@ export function ScenarioCard({
   onSelect: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<DetailTab>("brief");
   const [indicators, setIndicators] = useState<TrajectoryIndicators>(scenario.indicators);
   const [feedback, setFeedback] = useState<IndicatorFeedback>({});
 
@@ -279,21 +288,99 @@ export function ScenarioCard({
 
       {expanded && (
         <div className="flex flex-col gap-4 border-t border-border pt-4">
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">Stack / solutions</h4>
-            <div className="mt-2 flex flex-col gap-2">
-              {scenario.techStack.map((item, i) => (
-                <TechStackRow key={i} item={item} />
-              ))}
-            </div>
+          <div className="flex gap-1 overflow-x-auto">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                  activeTab === tab.id
+                    ? "bg-accent text-accent-ink"
+                    : "border border-border text-muted hover:text-ink"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
-          {scenario.suppliers.length > 0 && (
-            <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
-                Fournisseurs & partenaires
-              </h4>
-              <div className="mt-2 flex flex-col gap-2">
+          {activeTab === "brief" && (
+            <div className="flex flex-col gap-4">
+              <div className="rounded-lg border border-border bg-surface-2 p-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">Briefing exécutif</h4>
+                <p className="mt-1 text-sm text-ink">{scenario.executiveBriefing}</p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">Risques du scénario</h4>
+                  <ul className="mt-1.5 flex flex-col gap-1 text-xs text-muted">
+                    {scenario.risksSpecific.map((r, i) => (
+                      <li key={i}>
+                        <span className="font-medium text-ink">{r.name}</span> — {r.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    Opportunités du scénario
+                  </h4>
+                  <ul className="mt-1.5 flex flex-col gap-1 text-xs text-muted">
+                    {scenario.opportunitiesSpecific.map((o, i) => (
+                      <li key={i}>
+                        <span className="font-medium text-ink">{o.name}</span> — {o.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "techno" && (
+            <div className="flex flex-col gap-4">
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">Stack / solutions</h4>
+                <div className="mt-2 flex flex-col gap-2">
+                  {scenario.techStack.map((item, i) => (
+                    <TechStackRow key={i} item={item} />
+                  ))}
+                </div>
+              </div>
+              {scenario.regulations.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    Régulations / standards applicables
+                  </h4>
+                  <ul className="mt-2 flex flex-col gap-1.5 text-xs text-muted">
+                    {scenario.regulations.map((r, i) => (
+                      <li key={i}>
+                        <span className="font-medium text-ink">{r.name}</span> — {r.description}
+                        {r.sourceUrl && (
+                          <>
+                            {" "}
+                            <a
+                              href={r.sourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-accent underline underline-offset-2"
+                            >
+                              source ↗
+                            </a>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "suppliers" &&
+            (scenario.suppliers.length > 0 ? (
+              <div className="flex flex-col gap-2">
                 {scenario.suppliers.map((s, i) => (
                   <div key={i} className="rounded-lg border border-border bg-surface-2 p-3 text-sm">
                     <div className="flex items-start justify-between gap-2">
@@ -331,66 +418,9 @@ export function ScenarioCard({
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-
-          {scenario.regulations.length > 0 && (
-            <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
-                Régulations / standards applicables
-              </h4>
-              <ul className="mt-2 flex flex-col gap-1.5 text-xs text-muted">
-                {scenario.regulations.map((r, i) => (
-                  <li key={i}>
-                    <span className="font-medium text-ink">{r.name}</span> — {r.description}
-                    {r.sourceUrl && (
-                      <>
-                        {" "}
-                        <a
-                          href={r.sourceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-accent underline underline-offset-2"
-                        >
-                          source ↗
-                        </a>
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="rounded-lg border border-border bg-surface-2 p-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">Briefing exécutif</h4>
-            <p className="mt-1 text-sm text-ink">{scenario.executiveBriefing}</p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">Risques du scénario</h4>
-              <ul className="mt-1.5 flex flex-col gap-1 text-xs text-muted">
-                {scenario.risksSpecific.map((r, i) => (
-                  <li key={i}>
-                    <span className="font-medium text-ink">{r.name}</span> — {r.reason}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
-                Opportunités du scénario
-              </h4>
-              <ul className="mt-1.5 flex flex-col gap-1 text-xs text-muted">
-                {scenario.opportunitiesSpecific.map((o, i) => (
-                  <li key={i}>
-                    <span className="font-medium text-ink">{o.name}</span> — {o.reason}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
+            ) : (
+              <p className="text-xs text-muted">Aucun fournisseur identifié pour ce scénario.</p>
+            ))}
         </div>
       )}
 

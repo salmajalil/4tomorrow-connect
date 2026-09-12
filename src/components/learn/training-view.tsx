@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { LearnHeader } from "@/components/learn/learn-header";
+import { ExportPdfButton } from "@/components/export-pdf-button";
 import { DOMAIN_LABELS, type Domain } from "@/lib/learn";
 import type { Training } from "@/types/database";
 
@@ -181,6 +182,13 @@ export function TrainingView({ training }: { training: Training }) {
               ⚡ {quizScore * 10} XP
             </span>
           )}
+        </div>
+        <div>
+          <ExportPdfButton
+            kind="learn"
+            payload={training}
+            filename={`4tomorrow-learn-${training.id}.pdf`}
+          />
         </div>
       </div>
 

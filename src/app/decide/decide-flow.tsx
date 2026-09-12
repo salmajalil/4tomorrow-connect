@@ -6,6 +6,7 @@ import { DiagnosticView, type DiagnosticResult } from "@/components/decide/diagn
 import { RadarChart } from "@/components/decide/radar-chart";
 import { ScenarioCard, type ScenarioWithId } from "@/components/decide/scenario-card";
 import { Eyebrow } from "@/components/eyebrow";
+import { ExportPdfButton } from "@/components/export-pdf-button";
 import { parseJsonResponse } from "@/lib/parse-json-response";
 import type { Domain } from "@/lib/decide";
 
@@ -178,8 +179,17 @@ export function DecideFlow() {
 
     return (
       <div className="mx-auto w-full max-w-4xl px-4 py-10">
-        <Eyebrow>Scénarios stratégiques</Eyebrow>
-        <h1 className="mt-3 font-display text-3xl text-ink">Trois trajectoires possibles</h1>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <Eyebrow>Scénarios stratégiques</Eyebrow>
+            <h1 className="mt-3 font-display text-3xl text-ink">Trois trajectoires possibles</h1>
+          </div>
+          <ExportPdfButton
+            kind="decide"
+            payload={{ diagnostic, scenarios }}
+            filename={`4tomorrow-decide-${diagnostic.transformationId}.pdf`}
+          />
+        </div>
 
         {scenariosWarning && (
           <p className="mt-4 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-sm text-ink">

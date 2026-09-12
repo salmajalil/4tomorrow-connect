@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { fetchControlTowerProjects, MODULE_ORDER, type ControlTowerProject } from "@/lib/control-tower";
 import { Eyebrow } from "@/components/eyebrow";
+import { ExportPdfButton } from "@/components/export-pdf-button";
 import { DOMAIN_LABELS, type Domain } from "@/lib/decide";
 import type { ModuleName, ModuleStatusValue } from "@/types/database";
 
@@ -313,7 +314,16 @@ export function ControlTowerView({
           <Eyebrow>Tour de contrôle</Eyebrow>
           <h1 className="mt-3 font-display text-3xl text-ink">Vue d&apos;ensemble de tes projets</h1>
         </div>
-        <LivePulse lastSync={lastSync} />
+        <div className="flex flex-col items-end gap-2">
+          <LivePulse lastSync={lastSync} />
+          {projects.length > 0 && (
+            <ExportPdfButton
+              kind="control-tower"
+              payload={{ projects }}
+              filename="4tomorrow-tour-de-controle.pdf"
+            />
+          )}
+        </div>
       </div>
 
       <div className="mt-6 grid grid-cols-3 gap-3">

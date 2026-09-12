@@ -13,6 +13,7 @@ import {
 } from "@/components/connect/onboarding-steps";
 import { MatchingLoadingState, MatchingErrorState } from "@/components/connect/loading-error";
 import { MatchResults } from "@/components/connect/match-results";
+import { ExportPdfButton } from "@/components/export-pdf-button";
 import type { ModelOutput } from "@/lib/matching";
 
 const TOTAL_STEPS = 5;
@@ -88,18 +89,25 @@ export function ConnectFlow() {
   if (phase === "results" && result) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-10">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="font-display text-2xl text-ink">Tes résultats</h1>
-          <button
-            type="button"
-            onClick={() => {
-              setPhase("form");
-              setStep(1);
-            }}
-            className="text-sm font-medium text-muted underline underline-offset-2 hover:text-accent"
-          >
-            Nouveau matching
-          </button>
+          <div className="flex items-center gap-4">
+            <ExportPdfButton
+              kind="connect"
+              payload={{ result, projectLabel: state.industry || "Ton projet" }}
+              filename="4tomorrow-connect.pdf"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setPhase("form");
+                setStep(1);
+              }}
+              className="text-sm font-medium text-muted underline underline-offset-2 hover:text-accent"
+            >
+              Nouveau matching
+            </button>
+          </div>
         </div>
         <MatchResults result={result} projectLabel={state.industry || "Ton projet"} />
         <div className="mt-10 rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted">

@@ -17,6 +17,12 @@
   --accent-ink: #14171b;
   --success: #4fae7a;
   --danger: #d9695a;
+  /* Cool signal color reserved for live/real-time indicators (Control
+     Tower pulse dots, "mis à jour à l'instant" badges) — kept distinct
+     from the warm brass --accent so a live update never reads as a
+     regular interactive/brand element. */
+  --live: #5fc7d6;
+  --live-ink: #0b0d10;
 }
 
 @theme inline {
@@ -31,6 +37,8 @@
   --color-accent-ink: var(--accent-ink);
   --color-success: var(--success);
   --color-danger: var(--danger);
+  --color-live: var(--live);
+  --color-live-ink: var(--live-ink);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-playfair);

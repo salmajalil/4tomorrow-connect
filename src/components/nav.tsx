@@ -20,6 +20,9 @@ export async function Nav() {
           </Link>
           {user ? (
             <>
+              <Link href="/control-tower" className="font-medium text-ink hover:text-accent">
+                Tour de contrôle
+              </Link>
               <Link href="/decide" className="font-medium text-ink hover:text-accent">
                 Decide
               </Link>

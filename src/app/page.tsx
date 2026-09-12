@@ -25,8 +25,8 @@ const MODULES = [
     key: "learn",
     label: "Learn",
     blurb: "Former les équipes sur les bons sujets.",
-    href: null,
-    active: false,
+    href: "/learn",
+    active: true,
     icon: <path d="M2 8l10-5 10 5-10 5-10-5Zm4 2v6c0 1.5 3 3 6 3s6-1.5 6-3v-6" />,
   },
   {

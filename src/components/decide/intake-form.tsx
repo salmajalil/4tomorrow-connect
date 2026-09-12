@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Eyebrow } from "@/components/eyebrow";
+import { extractFileText } from "@/lib/extract-file-text";
 
 export type RiskTolerance = "low" | "medium" | "high";
 export type ProjectScope = "local" | "national" | "global";
@@ -66,22 +67,6 @@ function formatStructuredContext(state: IntakeState): string {
 }
 
 const CHALLENGES_PLACEHOLDER = `Ex : On veut digitaliser notre suivi de production, aujourd'hui géré sur Excel par 3 personnes à temps plein. Erreurs fréquentes de saisie, pas de visibilité temps réel pour la direction. Contrainte : l'ERP actuel a 12 ans et personne en interne ne sait le modifier.`;
-
-async function extractFileText(file: File): Promise<string> {
-  const lower = file.name.toLowerCase();
-  if (lower.endsWith(".txt") || lower.endsWith(".md")) {
-    return file.text();
-  }
-  if (lower.endsWith(".docx")) {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/decide/extract-doc", { method: "POST", body: formData });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Extraction impossible.");
-    return data.text as string;
-  }
-  throw new Error("Format non supporté — utilise .txt, .md ou .docx (le PDF n'est pas pris en charge).");
-}
 
 export function IntakeForm({
   onSubmit,

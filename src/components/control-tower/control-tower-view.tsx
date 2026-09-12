@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { fetchControlTowerProjects, MODULE_ORDER, type ControlTowerProject } from "@/lib/control-tower";
 import { Eyebrow } from "@/components/eyebrow";
 import { DOMAIN_LABELS, type Domain } from "@/lib/decide";
-import type { ModuleName, ModuleStatusValue, RecommendableModule } from "@/types/database";
+import type { ModuleName, ModuleStatusValue } from "@/types/database";
 
 const MODULE_LABELS: Record<ModuleName, string> = {
   decide: "Decide",
@@ -15,10 +15,12 @@ const MODULE_LABELS: Record<ModuleName, string> = {
   deliver: "Deliver",
 };
 
-const MODULE_HREF: Partial<Record<ModuleName, string>> = {
-  decide: "/decide",
-  connect: "/connect",
-};
+function moduleHref(module: ModuleName, transformationId: string): string | null {
+  if (module === "decide") return "/decide";
+  if (module === "connect") return "/connect";
+  if (module === "learn") return `/learn?transformationId=${transformationId}`;
+  return null;
+}
 
 const STATUS_LABELS: Record<ModuleStatusValue, string> = {
   not_started: "Non démarré",
@@ -237,7 +239,7 @@ function ProjectCard({ project }: { project: ControlTowerProject }) {
       {panel === "recs" && (
         <div className="flex flex-col gap-2 border-t border-border pt-4">
           {relevantRecs.map((r) => {
-            const href = MODULE_HREF[r.module as RecommendableModule];
+            const href = moduleHref(r.module, project.transformationId);
             return (
               <div key={r.module} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface-2 p-2.5 text-xs">
                 <div className="min-w-0">

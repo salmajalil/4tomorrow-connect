@@ -26,9 +26,11 @@ const MODULE_LABELS: Record<RecommendableModule, string> = {
   deliver: "Deliver",
 };
 
-const MODULE_HREF: Partial<Record<RecommendableModule, string>> = {
-  connect: "/connect",
-};
+function moduleHref(module: RecommendableModule, transformationId: string): string | null {
+  if (module === "connect") return "/connect";
+  if (module === "learn") return `/learn?transformationId=${transformationId}`;
+  return null;
+}
 
 const RELEVANCE_LABELS: Record<ModuleRelevance, string> = {
   relevant: "Pertinent",
@@ -49,7 +51,7 @@ function ModuleRecommendationCard({
 }) {
   const [checked, setChecked] = useState(relevance === "relevant");
   const [saving, setSaving] = useState(false);
-  const href = MODULE_HREF[module];
+  const href = moduleHref(module, transformationId);
 
   async function toggle() {
     const next = !checked;

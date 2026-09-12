@@ -1,0 +1,323 @@
+"use client";
+
+import { useState } from "react";
+import { Eyebrow } from "@/components/eyebrow";
+import { DOMAIN_LABELS, type Domain } from "@/lib/learn";
+import type { Training } from "@/types/database";
+
+const TABS = [
+  { id: "apercu", label: "Aperçu" },
+  { id: "points-cles", label: "Points clés" },
+  { id: "experience", label: "Expérience" },
+  { id: "video", label: "Vidéo" },
+  { id: "qualiopi", label: "Fiche Qualiopi" },
+] as const;
+
+type Tab = (typeof TABS)[number]["id"];
+
+function Flashcard({ question, answer, category, index }: { question: string; answer: string; category?: string | null; index: number }) {
+  const [revealed, setRevealed] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => setRevealed((v) => !v)}
+      className={`flex min-h-[9rem] flex-col justify-between rounded-xl border p-4 text-left transition ${
+        revealed ? "border-accent bg-accent/10" : "border-border bg-surface hover:border-accent/50"
+      }`}
+    >
+      <div>
+        {category && (
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-accent-strong">{category}</span>
+        )}
+        <p className="mt-1 text-sm font-medium text-ink">
+          {index + 1}. {question}
+        </p>
+      </div>
+      {revealed ? (
+        <p className="mt-3 text-sm text-muted">{answer}</p>
+      ) : (
+        <span className="mt-3 self-start rounded-full border border-border px-3 py-1 text-xs font-semibold text-accent">
+          Toucher pour révéler →
+        </span>
+      )}
+    </button>
+  );
+}
+
+function QuizQuestion({
+  question,
+  options,
+  correctOptionId,
+  explanation,
+  index,
+  onAnswered,
+}: {
+  question: string;
+  options: { id: string; text: string }[];
+  correctOptionId: string;
+  explanation: string;
+  index: number;
+  onAnswered: (correct: boolean) => void;
+}) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const letters = ["A", "B", "C", "D"];
+
+  function pick(optionId: string) {
+    if (selected) return;
+    setSelected(optionId);
+    onAnswered(optionId === correctOptionId);
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-surface p-4">
+      <p className="text-sm font-semibold text-ink">
+        {index + 1}. {question}
+      </p>
+      <div className="mt-3 flex flex-col gap-2">
+        {options.map((opt, i) => {
+          const isCorrect = opt.id === correctOptionId;
+          const isSelected = opt.id === selected;
+          const showState = !!selected;
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => pick(opt.id)}
+              disabled={!!selected}
+              className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left text-sm transition disabled:cursor-not-allowed ${
+                showState && isCorrect
+                  ? "border-success bg-success/10 text-ink"
+                  : showState && isSelected && !isCorrect
+                    ? "border-danger bg-danger/10 text-ink"
+                    : "border-border bg-surface-2 text-ink hover:border-accent/50"
+              }`}
+            >
+              <span
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
+                  showState && isCorrect
+                    ? "border-success text-success"
+                    : showState && isSelected && !isCorrect
+                      ? "border-danger text-danger"
+                      : "border-border text-muted"
+                }`}
+              >
+                {letters[i] ?? i + 1}
+              </span>
+              {opt.text}
+              {showState && isCorrect && <span className="ml-auto text-success">✓</span>}
+              {showState && isSelected && !isCorrect && <span className="ml-auto text-danger">✗</span>}
+            </button>
+          );
+        })}
+      </div>
+      {selected && <p className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-muted">{explanation}</p>}
+    </div>
+  );
+}
+
+export function TrainingView({ training }: { training: Training }) {
+  const [tab, setTab] = useState<Tab>("apercu");
+  const [quizScore, setQuizScore] = useState(0);
+  const [quizAnswered, setQuizAnswered] = useState(0);
+  const domains = training.domains as Domain[];
+  const totalQuestions = training.comprehension_check.length;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <Eyebrow>Learn</Eyebrow>
+        <h1 className="mt-3 font-display text-2xl text-ink">{training.topic}</h1>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {domains.map((d) => (
+            <span key={d} className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent-strong">
+              {DOMAIN_LABELS[d] ?? d}
+            </span>
+          ))}
+          {training.duration_minutes && (
+            <span className="rounded-full border border-border bg-surface-2 px-3 py-1 text-xs text-muted">
+              ⏱ {training.duration_minutes} min
+            </span>
+          )}
+          {quizAnswered > 0 && (
+            <span className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent-strong">
+              ⚡ {quizScore * 10} XP
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex gap-1 overflow-x-auto border-b border-border pb-2">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
+              tab === t.id ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "apercu" && (
+        <div className="flex flex-col gap-4">
+          <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-accent-strong">Défi adressé</h2>
+            <p className="mt-2 text-sm text-ink">{training.executive_summary.addressedChallenge}</p>
+          </div>
+          <div className="rounded-xl border border-border bg-surface p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Résumé</h2>
+            <p className="mt-2 text-sm text-ink">{training.executive_summary.summary}</p>
+          </div>
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Plan d&apos;action</h2>
+            <ol className="mt-2 flex flex-col gap-2">
+              {training.executive_summary.actionPlan.map((step, i) => (
+                <li key={i} className="flex gap-3 rounded-lg border border-border bg-surface p-3 text-sm">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-ink">
+                    {i + 1}
+                  </span>
+                  <span className="text-ink">{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      )}
+
+      {tab === "points-cles" && (
+        <div className="flex flex-col gap-6">
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Insights clés</h2>
+            <div className="mt-2 flex flex-col gap-2">
+              {training.key_insights.map((insight, i) => (
+                <div key={i} className="flex gap-3 rounded-lg border border-border bg-surface p-3 text-sm">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-accent text-xs font-semibold text-accent-strong">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <div>
+                    <p className="text-ink">{insight.text}</p>
+                    {insight.source && <p className="mt-1 text-xs text-muted">Source : {insight.source}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Implications business</h2>
+            <div className="mt-2 flex flex-col gap-2">
+              {training.business_implications.map((b, i) => (
+                <div key={i} className="rounded-lg border border-success/30 bg-success/5 p-3 text-sm text-ink">
+                  {b.text}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === "experience" && (
+        <div className="flex flex-col gap-6">
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Flashcards</h2>
+            <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {training.flashcards.map((f, i) => (
+                <Flashcard key={i} index={i} question={f.question} answer={f.answer} category={f.category} />
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Quiz de validation</h2>
+              {quizAnswered > 0 && (
+                <span className="text-xs font-semibold text-accent-strong">
+                  {quizScore}/{quizAnswered} correct{quizAnswered === totalQuestions ? " — terminé" : ""}
+                </span>
+              )}
+            </div>
+            <div className="mt-2 flex flex-col gap-3">
+              {training.comprehension_check.map((q, i) => (
+                <QuizQuestion
+                  key={i}
+                  index={i}
+                  question={q.question}
+                  options={q.options}
+                  correctOptionId={q.correctOptionId}
+                  explanation={q.explanation}
+                  onAnswered={(correct) => {
+                    setQuizAnswered((n) => n + 1);
+                    if (correct) setQuizScore((n) => n + 1);
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === "video" && (
+        <div className="flex flex-col gap-4">
+          <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
+            <h2 className="font-display text-lg text-ink">{training.video_script.title}</h2>
+            <p className="mt-1 text-xs text-muted">
+              Script et storyboard générés — à filmer, faire monter, ou passer à un outil de génération vidéo.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3">
+            {training.video_script.scenes.map((scene) => (
+              <div key={scene.sceneNumber} className="rounded-xl border border-border bg-surface p-4">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-accent-strong">
+                    Scène {scene.sceneNumber}
+                  </span>
+                  <span className="text-xs text-muted">{scene.durationSeconds}s</span>
+                </div>
+                <p className="mt-2 text-sm text-ink">{scene.narration}</p>
+                <p className="mt-2 text-xs text-muted">🎬 {scene.visualSuggestion}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === "qualiopi" && (
+        <div className="flex flex-col gap-4">
+          <p className="text-xs text-muted">
+            Généré automatiquement à partir du contenu — sert de preuve pour les critères Qualiopi C1 à C4 et C7.
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-border bg-surface p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Public visé</p>
+              <p className="mt-1 text-sm text-ink">{training.audience || "Non précisé"}</p>
+            </div>
+            <div className="rounded-lg border border-border bg-surface p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Durée</p>
+              <p className="mt-1 text-sm text-ink">{training.duration_minutes ?? "—"} min</p>
+            </div>
+            <div className="rounded-lg border border-border bg-surface p-3 sm:col-span-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Prérequis</p>
+              <p className="mt-1 text-sm text-ink">{training.prerequisites}</p>
+            </div>
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Objectifs pédagogiques</p>
+            <ul className="mt-2 flex flex-col gap-1.5">
+              {training.objectives.map((o, i) => (
+                <li key={i} className="rounded-lg border border-border bg-surface p-2.5 text-sm text-ink">
+                  {o}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-lg border border-border bg-surface-2 p-3 text-xs text-muted">
+            Méthode mobilisée : génération IA{training.source_doc_name ? ` à partir du document « ${training.source_doc_name} »` : ""}
+            {training.mode === "diagnostic" ? ", à partir d'un diagnostic Decide existant" : ""}. Preuve d&apos;évaluation
+            des acquis : quiz de {totalQuestions} question{totalQuestions > 1 ? "s" : ""} ci-dessus.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

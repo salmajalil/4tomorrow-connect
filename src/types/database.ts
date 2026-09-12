@@ -194,6 +194,52 @@ export type Profile = {
   created_at: string;
 };
 
+export type TrainingMode = "rapide" | "document" | "diagnostic";
+
+export type ExecutiveSummary = {
+  addressedChallenge: string;
+  summary: string;
+  actionPlan: string[];
+};
+
+export type KeyInsight = { text: string; source?: string | null };
+export type BusinessImplication = { text: string };
+export type Flashcard = { question: string; answer: string; category?: string | null };
+export type QuizOption = { id: string; text: string };
+export type ComprehensionQuestion = {
+  question: string;
+  options: QuizOption[];
+  correctOptionId: string;
+  explanation: string;
+};
+export type VideoScene = {
+  sceneNumber: number;
+  narration: string;
+  visualSuggestion: string;
+  durationSeconds: number;
+};
+export type VideoScript = { title: string; scenes: VideoScene[] };
+
+export type Training = {
+  id: string;
+  transformation_id: string;
+  topic: string;
+  mode: TrainingMode;
+  domains: string[];
+  audience: string | null;
+  objectives: string[];
+  prerequisites: string | null;
+  duration_minutes: number | null;
+  executive_summary: ExecutiveSummary;
+  key_insights: KeyInsight[];
+  business_implications: BusinessImplication[];
+  flashcards: Flashcard[];
+  comprehension_check: ComprehensionQuestion[];
+  video_script: VideoScript;
+  source_doc_name: string | null;
+  created_at: string;
+};
+
 // @supabase/postgrest-js requires every table entry to also carry a
 // `Relationships` array (used for typed embedded-resource joins, which this
 // project doesn't use) and the schema to declare `Views`/`Functions`, even
@@ -226,6 +272,7 @@ export type Database = {
         Partial<ModuleStatusRow> & Pick<ModuleStatusRow, "transformation_id" | "module">
       >;
       profiles: Table<Profile, Partial<Profile> & Pick<Profile, "id">>;
+      trainings: Table<Training, Partial<Training> & Pick<Training, "transformation_id" | "topic">>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

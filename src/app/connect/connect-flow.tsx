@@ -14,6 +14,7 @@ import {
 import { MatchingLoadingState, MatchingErrorState } from "@/components/connect/loading-error";
 import { MatchResults } from "@/components/connect/match-results";
 import { ExportPdfButton } from "@/components/export-pdf-button";
+import { useLanguage } from "@/components/language-provider";
 import type { ModelOutput } from "@/lib/matching";
 
 const TOTAL_STEPS = 5;
@@ -21,6 +22,7 @@ const TOTAL_STEPS = 5;
 type Phase = "form" | "loading" | "results" | "error";
 
 export function ConnectFlow() {
+  const { t } = useLanguage();
   const [step, setStep] = useState(1);
   const [phase, setPhase] = useState<Phase>("form");
   const [state, setState] = useState<OnboardingState>({
@@ -52,17 +54,17 @@ export function ConnectFlow() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Une erreur inattendue est survenue.");
+        throw new Error(data.error || t.connect.error.unexpectedError);
       }
       setResult(data as ModelOutput);
       setPhase("results");
     } catch (err) {
       const message =
         err instanceof DOMException && err.name === "AbortError"
-          ? "Le matching a pris trop de temps. Réessaie."
+          ? t.connect.error.timedOut
           : err instanceof Error
             ? err.message
-            : "Une erreur inattendue est survenue.";
+            : t.connect.error.unexpectedError;
       setErrorMessage(message);
       setPhase("error");
     } finally {
@@ -90,11 +92,11 @@ export function ConnectFlow() {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="font-display text-2xl text-ink">Tes résultats</h1>
+          <h1 className="font-display text-2xl text-ink">{t.connect.results.title}</h1>
           <div className="flex items-center gap-4">
             <ExportPdfButton
               kind="connect"
-              payload={{ result, projectLabel: state.industry || "Ton projet" }}
+              payload={{ result, projectLabel: state.industry || t.connect.results.yourProject }}
               filename="4tomorrow-connect.pdf"
             />
             <button
@@ -105,15 +107,15 @@ export function ConnectFlow() {
               }}
               className="text-sm font-medium text-muted underline underline-offset-2 hover:text-accent"
             >
-              Nouveau matching
+              {t.connect.results.newMatching}
             </button>
           </div>
         </div>
-        <MatchResults result={result} projectLabel={state.industry || "Ton projet"} />
+        <MatchResults result={result} projectLabel={state.industry || t.connect.results.yourProject} />
         <div className="mt-10 rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted">
-          Un partenaire manque à l&apos;appel ?{" "}
+          {t.connect.results.missingPartner}{" "}
           <Link href="/ecosystem/join" className="font-medium text-accent underline underline-offset-2">
-            Ajoute-le à l&apos;écosystème
+            {t.connect.results.addToEcosystem}
           </Link>
           .
         </div>
@@ -166,7 +168,7 @@ export function ConnectFlow() {
           disabled={step === 1}
           className="rounded-lg px-4 py-2.5 text-sm font-medium text-muted disabled:opacity-0"
         >
-          Retour
+          {t.connect.onboarding.back}
         </button>
 
         {step < TOTAL_STEPS ? (
@@ -176,7 +178,7 @@ export function ConnectFlow() {
             disabled={!canGoNext}
             className="rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Continuer
+            {t.connect.onboarding.continue}
           </button>
         ) : (
           <button
@@ -184,7 +186,7 @@ export function ConnectFlow() {
             onClick={launchMatching}
             className="rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong"
           >
-            Lancer le matching
+            {t.connect.onboarding.launchMatching}
           </button>
         )}
       </div>

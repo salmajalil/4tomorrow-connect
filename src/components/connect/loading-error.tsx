@@ -1,35 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-const LOADING_MESSAGES = [
-  "Lecture du répertoire de l'écosystème...",
-  "Recherche de technologies pertinentes...",
-  "Analyse des startups du secteur...",
-  "Identification d'experts et de partenaires...",
-  "Recherche de pistes de financement...",
-  "Rédaction du brief stratégique...",
-];
+import { useLanguage } from "@/components/language-provider";
 
 export function MatchingLoadingState() {
+  const { t } = useLanguage();
+  const messages = t.connect.loading.messages;
   const [messageIndex, setMessageIndex] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setMessageIndex((i) => (i + 1) % LOADING_MESSAGES.length);
+      setMessageIndex((i) => (i + 1) % messages.length);
     }, 6000);
     return () => clearInterval(interval);
-  }, []);
+  }, [messages.length]);
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
       <div className="h-10 w-10 animate-spin rounded-full border-4 border-surface-2 border-t-accent" />
       <div>
-        <p className="font-display text-xl text-ink">{LOADING_MESSAGES[messageIndex]}</p>
-        <p className="mt-2 max-w-xs text-sm text-muted">
-          On explore le répertoire et le web pour trouver des partenaires réels. Ça peut prendre
-          1 à 2 minutes selon la complexité du projet — merci de patienter.
-        </p>
+        <p className="font-display text-xl text-ink">{messages[messageIndex]}</p>
+        <p className="mt-2 max-w-xs text-sm text-muted">{t.connect.loading.hint}</p>
       </div>
     </div>
   );
@@ -42,10 +33,12 @@ export function MatchingErrorState({
   message: string;
   onRetry: () => void;
 }) {
+  const { t } = useLanguage();
+
   return (
     <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-danger/40 bg-danger/10 px-6 py-12 text-center">
       <div>
-        <p className="font-display text-xl text-danger">Le matching a échoué</p>
+        <p className="font-display text-xl text-danger">{t.connect.error.title}</p>
         <p className="mt-1 max-w-sm text-sm text-ink">{message}</p>
       </div>
       <button
@@ -53,7 +46,7 @@ export function MatchingErrorState({
         onClick={onRetry}
         className="rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
       >
-        Réessayer
+        {t.common.retry}
       </button>
     </div>
   );

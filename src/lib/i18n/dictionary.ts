@@ -226,6 +226,9 @@ const fr = {
         co2Hint: "Sert de contexte pour la recherche — le calcul d'impact chiffré arrivera avec le module DECIDE.",
         descriptionTitle: "Décris ton projet",
         descriptionSubtitle: "Optionnelle mais encouragée — plus tu détailles, plus le matching est puissant.",
+        descriptionPlaceholder:
+          "Ex : On veut réduire de 30% notre consommation énergétique sur notre ligne d'assemblage principale d'ici 2027, sans interrompre la production. On a déjà des capteurs IoT installés mais pas d'outil d'analyse en temps réel. Budget limité, on cherche des solutions éprouvées plutôt que de la R&D expérimentale.",
+        locations: ["France", "Europe", "Amérique du Nord", "Asie", "Monde entier"],
         reviewTitle: "Prêt à lancer le matching ?",
         reviewSubtitle: "Vérifie ton projet — la recherche peut prendre 1 à 2 minutes.",
         reviewIndustry: "Industrie",
@@ -249,6 +252,8 @@ const fr = {
       },
       error: {
         title: "Le matching a échoué",
+        unexpectedError: "Une erreur inattendue est survenue.",
+        timedOut: "Le matching a pris trop de temps. Réessaie.",
       },
       results: {
         title: "Tes résultats",
@@ -707,6 +712,9 @@ const en: Dictionary = {
         co2Hint: "Used as search context — the quantified impact calculation arrives with the DECIDE module.",
         descriptionTitle: "Describe your project",
         descriptionSubtitle: "Optional but encouraged — the more detail, the more powerful the matching.",
+        descriptionPlaceholder:
+          "E.g.: We want to cut energy consumption on our main assembly line by 30% by 2027, without interrupting production. We already have IoT sensors installed but no real-time analytics tool. Limited budget — we're looking for proven solutions rather than experimental R&D.",
+        locations: ["France", "Europe", "North America", "Asia", "Worldwide"],
         reviewTitle: "Ready to launch the matching?",
         reviewSubtitle: "Check your project — the search can take 1 to 2 minutes.",
         reviewIndustry: "Industry",
@@ -730,6 +738,8 @@ const en: Dictionary = {
       },
       error: {
         title: "The matching failed",
+        unexpectedError: "An unexpected error occurred.",
+        timedOut: "The matching took too long. Try again.",
       },
       results: {
         title: "Your results",

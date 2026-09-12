@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { INDUSTRIES, PARTNER_TYPES, LOCATIONS, DESCRIPTION_PLACEHOLDER } from "@/lib/onboarding-data";
+import { INDUSTRIES, PARTNER_TYPES } from "@/lib/onboarding-data";
+import { useLanguage } from "@/components/language-provider";
 
 export interface OnboardingState {
   industry: string;
@@ -19,6 +20,8 @@ export function IndustryStep({
   value: string;
   onChange: (industry: string) => void;
 }) {
+  const { t } = useLanguage();
+  const onboarding = t.connect.onboarding;
   const [customValue, setCustomValue] = useState(
     value && !INDUSTRIES.some((i) => i.value === value) ? value : ""
   );
@@ -26,8 +29,8 @@ export function IndustryStep({
 
   return (
     <div>
-      <h2 className="font-display text-3xl text-ink">Quelle est ton industrie ?</h2>
-      <p className="mt-1 text-sm text-muted">Choisis la tuile la plus proche de ton secteur.</p>
+      <h2 className="font-display text-3xl text-ink">{onboarding.industryTitle}</h2>
+      <p className="mt-1 text-sm text-muted">{onboarding.industrySubtitle}</p>
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
         {INDUSTRIES.map((industry) => {
@@ -54,7 +57,7 @@ export function IndustryStep({
       </div>
 
       <label className="mt-4 flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-ink">Ton secteur n&apos;est pas dans la liste ?</span>
+        <span className="font-medium text-ink">{onboarding.industryOtherLabel}</span>
         <input
           type="text"
           value={customValue}
@@ -62,7 +65,7 @@ export function IndustryStep({
             setCustomValue(e.target.value);
             onChange(e.target.value);
           }}
-          placeholder="Ou tape ta propre industrie..."
+          placeholder={onboarding.industryOtherPlaceholder}
           className={`rounded-lg border bg-surface px-3 py-2.5 text-base text-ink placeholder:text-muted focus:outline-none ${
             isCustomSelected ? "border-accent ring-1 ring-accent" : "border-border focus:border-accent"
           }`}
@@ -79,8 +82,10 @@ export function PartnerTypesStep({
   value: string[];
   onChange: (types: string[]) => void;
 }) {
+  const { t } = useLanguage();
+  const onboarding = t.connect.onboarding;
   const [customType, setCustomType] = useState("");
-  const extraTypes = value.filter((t) => !PARTNER_TYPES.includes(t));
+  const extraTypes = value.filter((type) => !PARTNER_TYPES.includes(type));
 
   function toggle(type: string) {
     onChange(value.includes(type) ? value.filter((t) => t !== type) : [...value, type]);
@@ -96,12 +101,8 @@ export function PartnerTypesStep({
 
   return (
     <div>
-      <h2 className="font-display text-3xl text-ink">
-        Quels types de partenaires recherches-tu ?
-      </h2>
-      <p className="mt-1 text-sm text-muted">
-        Sélectionne-en autant que tu veux — cette étape est optionnelle.
-      </p>
+      <h2 className="font-display text-3xl text-ink">{onboarding.partnerTypesTitle}</h2>
+      <p className="mt-1 text-sm text-muted">{onboarding.partnerTypesSubtitle}</p>
 
       <div className="mt-5 flex flex-wrap gap-2">
         {[...PARTNER_TYPES, ...extraTypes].map((type) => {
@@ -134,7 +135,7 @@ export function PartnerTypesStep({
               addCustom();
             }
           }}
-          placeholder="Ajouter un autre type de partenaire..."
+          placeholder={onboarding.partnerTypesAddPlaceholder}
           className="flex-1 rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-ink placeholder:text-muted focus:border-accent focus:outline-none"
         />
         <button
@@ -142,7 +143,7 @@ export function PartnerTypesStep({
           onClick={addCustom}
           className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-ink hover:border-accent/60"
         >
-          Ajouter
+          {onboarding.add}
         </button>
       </div>
     </div>
@@ -164,22 +165,22 @@ export function ContextStep({
   onChangeBudget: (budget: string) => void;
   onChangeCo2Target: (co2Target: string) => void;
 }) {
+  const { t } = useLanguage();
+  const onboarding = t.connect.onboarding;
   const [customLocation, setCustomLocation] = useState(
-    location && !LOCATIONS.includes(location) ? location : ""
+    location && !onboarding.locations.includes(location) ? location : ""
   );
 
   return (
     <div>
-      <h2 className="font-display text-3xl text-ink">Zone et objectifs (optionnel)</h2>
-      <p className="mt-1 text-sm text-muted">
-        Aide le moteur à cibler des partenaires pertinents — rien de tout ça n&apos;est obligatoire.
-      </p>
+      <h2 className="font-display text-3xl text-ink">{onboarding.contextTitle}</h2>
+      <p className="mt-1 text-sm text-muted">{onboarding.contextSubtitle}</p>
 
       <div className="mt-5 flex flex-col gap-6">
         <div>
-          <span className="text-sm font-medium text-ink">Où cherches-tu des partenaires ?</span>
+          <span className="text-sm font-medium text-ink">{onboarding.locationLabel}</span>
           <div className="mt-2 flex flex-wrap gap-2">
-            {LOCATIONS.map((loc) => {
+            {onboarding.locations.map((loc) => {
               const selected = location === loc;
               return (
                 <button
@@ -207,35 +208,32 @@ export function ContextStep({
               setCustomLocation(e.target.value);
               onChangeLocation(e.target.value);
             }}
-            placeholder="Ou précise une région/un pays..."
+            placeholder={onboarding.locationPlaceholder}
             className="mt-2 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-ink placeholder:text-muted focus:border-accent focus:outline-none"
           />
         </div>
 
         <label className="flex flex-col gap-1.5 text-sm">
-          <span className="font-medium text-ink">Budget approximatif de la transformation</span>
+          <span className="font-medium text-ink">{onboarding.budgetLabel}</span>
           <input
             type="text"
             value={budget}
             onChange={(e) => onChangeBudget(e.target.value)}
-            placeholder="Ex : 500K€ - 1M€, ou « pas encore défini »"
+            placeholder={onboarding.budgetPlaceholder}
             className="rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-ink placeholder:text-muted focus:border-accent focus:outline-none"
           />
         </label>
 
         <label className="flex flex-col gap-1.5 text-sm">
-          <span className="font-medium text-ink">Objectif de réduction CO2 (si tu en as un)</span>
+          <span className="font-medium text-ink">{onboarding.co2Label}</span>
           <input
             type="text"
             value={co2Target}
             onChange={(e) => onChangeCo2Target(e.target.value)}
-            placeholder="Ex : -30% d'ici 2027, ou « pas de cible chiffrée »"
+            placeholder={onboarding.co2Placeholder}
             className="rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-ink placeholder:text-muted focus:border-accent focus:outline-none"
           />
-          <span className="text-xs text-muted">
-            Sert de contexte pour la recherche — le calcul d&apos;impact chiffré arrivera avec le
-            module DECIDE.
-          </span>
+          <span className="text-xs text-muted">{onboarding.co2Hint}</span>
         </label>
       </div>
     </div>
@@ -249,57 +247,59 @@ export function DescriptionStep({
   value: string;
   onChange: (description: string) => void;
 }) {
+  const { t } = useLanguage();
+  const onboarding = t.connect.onboarding;
+
   return (
     <div>
-      <h2 className="font-display text-3xl text-ink">Décris ton projet</h2>
-      <p className="mt-1 text-sm text-muted">
-        Optionnelle mais encouragée — plus tu détailles, plus le matching est puissant.
-      </p>
+      <h2 className="font-display text-3xl text-ink">{onboarding.descriptionTitle}</h2>
+      <p className="mt-1 text-sm text-muted">{onboarding.descriptionSubtitle}</p>
 
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={DESCRIPTION_PLACEHOLDER}
+        placeholder={onboarding.descriptionPlaceholder}
         rows={8}
         className="mt-5 w-full resize-none rounded-xl border border-border bg-surface px-3.5 py-3 text-base leading-relaxed text-ink placeholder:text-muted focus:border-accent focus:outline-none"
       />
-      <p className="mt-2 text-right text-xs text-muted">{value.length} caractères</p>
+      <p className="mt-2 text-right text-xs text-muted">
+        {value.length} {t.common.characters}
+      </p>
     </div>
   );
 }
 
 export function ReviewStep({ state }: { state: OnboardingState }) {
+  const { t } = useLanguage();
+  const onboarding = t.connect.onboarding;
+
   return (
     <div>
-      <h2 className="font-display text-3xl text-ink">Prêt à lancer le matching ?</h2>
-      <p className="mt-1 text-sm text-muted">
-        Vérifie ton projet — la recherche peut prendre 1 à 2 minutes.
-      </p>
+      <h2 className="font-display text-3xl text-ink">{onboarding.reviewTitle}</h2>
+      <p className="mt-1 text-sm text-muted">{onboarding.reviewSubtitle}</p>
 
       <dl className="mt-5 flex flex-col gap-4 rounded-xl border border-border bg-surface p-4">
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-muted">Industrie</dt>
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted">{onboarding.reviewIndustry}</dt>
           <dd className="mt-0.5 text-sm text-ink">{state.industry || "—"}</dd>
         </div>
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-muted">
-            Partenaires recherchés
-          </dt>
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted">{onboarding.reviewPartners}</dt>
           <dd className="mt-0.5 text-sm text-ink">
-            {state.partnerTypes.length > 0 ? state.partnerTypes.join(", ") : "Non précisé"}
+            {state.partnerTypes.length > 0 ? state.partnerTypes.join(", ") : t.common.notSpecified}
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-muted">Zone / Budget / CO2</dt>
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted">{onboarding.reviewZoneBudgetCo2}</dt>
           <dd className="mt-0.5 text-sm text-ink">
             {[state.location, state.budget, state.co2Target].filter(Boolean).join(" · ") ||
-              "Non précisé"}
+              t.common.notSpecified}
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-muted">Projet</dt>
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted">{onboarding.reviewProject}</dt>
           <dd className="mt-0.5 whitespace-pre-wrap text-sm text-ink">
-            {state.description || "Non précisé"}
+            {state.description || t.common.notSpecified}
           </dd>
         </div>
       </dl>

@@ -1,14 +1,10 @@
+"use client";
+
 import type { ModelOutput, MatchOutput } from "@/lib/matching";
 import { EcosystemDiagram } from "@/components/connect/ecosystem-diagram";
 import { Eyebrow } from "@/components/eyebrow";
-
-const CATEGORY_LABELS: Record<MatchOutput["category"], string> = {
-  technology: "Technologies",
-  startup: "Startups",
-  expert: "Experts & consultants",
-  partner: "Partenaires",
-  funding: "Financement & subventions",
-};
+import { useLanguage } from "@/components/language-provider";
+import type { Dictionary } from "@/lib/i18n/dictionary";
 
 const CATEGORY_ORDER: MatchOutput["category"][] = [
   "technology",
@@ -18,28 +14,28 @@ const CATEGORY_ORDER: MatchOutput["category"][] = [
   "funding",
 ];
 
-function SourceBadge({ source }: { source: MatchOutput["source"] }) {
+function SourceBadge({ source, t }: { source: MatchOutput["source"]; t: Dictionary }) {
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
         source === "registry" ? "bg-success/15 text-success" : "bg-accent/15 text-accent-strong"
       }`}
     >
-      {source === "registry" ? "Répertoire" : "Recherche web"}
+      {source === "registry" ? t.connect.results.registrySource : t.connect.results.webSource}
     </span>
   );
 }
 
-function MatchCard({ match }: { match: MatchOutput }) {
+function MatchCard({ match, t }: { match: MatchOutput; t: Dictionary }) {
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-4">
       <div className="flex items-start justify-between gap-2">
         <p className="font-semibold text-ink">{match.name}</p>
-        <SourceBadge source={match.source} />
+        <SourceBadge source={match.source} t={t} />
       </div>
       <p className="text-sm text-muted">{match.reason}</p>
       <p className="text-xs text-muted">
-        <span className="font-medium text-ink">Gap adressé :</span> {match.gapAddressed}
+        <span className="font-medium text-ink">{t.connect.results.gapAddressed}</span> {match.gapAddressed}
       </p>
       {(match.website || match.contactEmail) && (
         <div className="mt-1 flex flex-wrap gap-3 text-sm">
@@ -50,7 +46,7 @@ function MatchCard({ match }: { match: MatchOutput }) {
               rel="noopener noreferrer"
               className="font-medium text-accent underline underline-offset-2"
             >
-              Voir le site ↗
+              {t.connect.results.viewSite}
             </a>
           )}
           {match.contactEmail && (
@@ -69,11 +65,20 @@ function MatchCard({ match }: { match: MatchOutput }) {
 
 export function MatchResults({
   result,
-  projectLabel = "Ton projet",
+  projectLabel,
 }: {
   result: ModelOutput;
   projectLabel?: string;
 }) {
+  const { t } = useLanguage();
+  const results = t.connect.results;
+  const CATEGORY_LABELS: Record<MatchOutput["category"], string> = {
+    technology: results.categoryTechnology,
+    startup: results.categoryStartup,
+    expert: results.categoryExpert,
+    partner: results.categoryPartner,
+    funding: results.categoryFunding,
+  };
   const byCategory = CATEGORY_ORDER.map((category) => ({
     category,
     matches: result.matches.filter((m) => m.category === category),
@@ -82,12 +87,12 @@ export function MatchResults({
   return (
     <div className="flex flex-col gap-8">
       <section>
-        <Eyebrow>Strategic Brief</Eyebrow>
+        <Eyebrow>{results.strategicBrief}</Eyebrow>
         <p className="mt-3 text-base leading-relaxed text-ink">{result.strategicBrief}</p>
       </section>
 
       <section>
-        <Eyebrow>Good Ideas for Your Mission</Eyebrow>
+        <Eyebrow>{results.goodIdeas}</Eyebrow>
         <ol className="mt-3 flex flex-col gap-2">
           {result.goodIdeas.map((idea, i) => (
             <li key={i} className="flex gap-3 rounded-xl border border-border bg-surface p-3">
@@ -101,10 +106,10 @@ export function MatchResults({
       </section>
 
       <section>
-        <Eyebrow>Ton écosystème</Eyebrow>
+        <Eyebrow>{results.yourEcosystem}</Eyebrow>
         <div className="mt-3">
           <EcosystemDiagram
-            projectLabel={projectLabel}
+            projectLabel={projectLabel ?? results.yourProject}
             groups={byCategory.map(({ category, matches }) => ({
               category,
               label: CATEGORY_LABELS[category],
@@ -115,13 +120,13 @@ export function MatchResults({
       </section>
 
       <section className="flex flex-col gap-6">
-        <Eyebrow>Matches</Eyebrow>
+        <Eyebrow>{results.matches}</Eyebrow>
         {byCategory.map(({ category, matches }) => (
           <div key={category}>
             <h3 className="text-base font-semibold text-ink">{CATEGORY_LABELS[category]}</h3>
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {matches.map((match, i) => (
-                <MatchCard key={`${category}-${i}`} match={match} />
+                <MatchCard key={`${category}-${i}`} match={match} t={t} />
               ))}
             </div>
           </div>

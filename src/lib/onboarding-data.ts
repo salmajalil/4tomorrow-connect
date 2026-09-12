@@ -33,10 +33,3 @@ export const PARTNER_TYPES: string[] = [
   "Networks",
 ];
 
-export const DESCRIPTION_PLACEHOLDER = `Ex : On veut réduire de 30% notre consommation énergétique sur notre ligne d'assemblage principale d'ici 2027, sans interrompre la production. On a déjà des capteurs IoT installés mais pas d'outil d'analyse en temps réel. Budget limité, on cherche des solutions éprouvées plutôt que de la R&D expérimentale.`;
-
-// Suggested regions for the optional context step. Free text always
-// extends this list, same "never block" pattern as industry and partner
-// types — these are matching-prompt context, not a filter that hides
-// results with no data behind it.
-export const LOCATIONS: string[] = ["France", "Europe", "Amérique du Nord", "Asie", "Monde entier"];

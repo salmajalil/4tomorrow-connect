@@ -65,7 +65,11 @@ export async function POST(request: Request) {
   try {
     response = await anthropic.messages.create({
       model: MATCHING_MODEL,
-      max_tokens: 3000,
+      // 3000 was truncating mid-JSON before the closing <RESULT_JSON> tag —
+      // same root cause as the scenarios route: 3-5 phases each with up to
+      // 6 deliverables, 6 actions and 4 KPIs (every one a full, specific
+      // sentence per the "never generic" rule) adds up past that budget.
+      max_tokens: 4500,
       system: buildRoadmapSystemPrompt(),
       messages: [
         {

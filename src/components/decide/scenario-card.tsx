@@ -4,16 +4,18 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { ScenarioOutput } from "@/lib/decide";
 import type { IndicatorEntry, IndicatorFeedback, TrajectoryIndicators } from "@/types/database";
+import { RoadmapView } from "@/components/decide/roadmap-view";
 
 export type ScenarioWithId = ScenarioOutput & { trajectoryId: string };
 
 const SLOT_LABELS = ["A", "B", "C"];
 
-type DetailTab = "brief" | "techno" | "suppliers";
+type DetailTab = "brief" | "techno" | "roadmap" | "suppliers";
 
 const TABS: { id: DetailTab; label: string }[] = [
   { id: "brief", label: "Brief stratégique" },
   { id: "techno", label: "Solutions & techno" },
+  { id: "roadmap", label: "Roadmap" },
   { id: "suppliers", label: "Fournisseurs & partenaires" },
 ];
 
@@ -191,11 +193,13 @@ function TechStackRow({ item }: { item: ScenarioOutput["techStack"][number] }) {
 export function ScenarioCard({
   scenario,
   index,
+  co2SliderLabel,
   selected,
   onSelect,
 }: {
   scenario: ScenarioWithId;
   index: number;
+  co2SliderLabel: string;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -376,6 +380,10 @@ export function ScenarioCard({
                 </div>
               )}
             </div>
+          )}
+
+          {activeTab === "roadmap" && (
+            <RoadmapView trajectoryId={scenario.trajectoryId} co2SliderLabel={co2SliderLabel} />
           )}
 
           {activeTab === "suppliers" &&

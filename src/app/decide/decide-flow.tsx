@@ -5,11 +5,11 @@ import { IntakeForm, type IntakeState } from "@/components/decide/intake-form";
 import { DiagnosticView, type DiagnosticResult } from "@/components/decide/diagnostic-view";
 import { RadarChart } from "@/components/decide/radar-chart";
 import { ScenarioCard, type ScenarioWithId } from "@/components/decide/scenario-card";
-import { RoadmapView, type RoadmapPhase } from "@/components/decide/roadmap-view";
 import { Eyebrow } from "@/components/eyebrow";
+import { parseJsonResponse } from "@/lib/parse-json-response";
 import type { Domain } from "@/lib/decide";
 
-type Phase = "intake" | "diagnostic-loading" | "diagnostic" | "scenarios-loading" | "scenarios" | "roadmap";
+type Phase = "intake" | "diagnostic-loading" | "diagnostic" | "scenarios-loading" | "scenarios";
 
 function LoadingBlock({ label, hint }: { label: string; hint: string }) {
   return (
@@ -38,24 +38,6 @@ function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void
   );
 }
 
-// A timed-out or crashed function returns a plain-text/HTML body, not JSON
-// (Vercel's FUNCTION_INVOCATION_TIMEOUT page, for instance). res.json() then
-// throws — on Safari with the cryptic "The string did not match the
-// expected pattern.", which is really just JSON.parse choking on non-JSON.
-// Give the user something they can act on instead of that raw message.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches the untyped res.json() this replaces; each caller casts its own shape.
-async function parseJsonResponse(res: Response): Promise<{ data: any }> {
-  try {
-    return { data: await res.json() };
-  } catch {
-    throw new Error(
-      res.status === 504 || !res.ok
-        ? "Le serveur a mis trop de temps à répondre (délai dépassé). Réessaie."
-        : "Réponse du serveur illisible. Réessaie."
-    );
-  }
-}
-
 // Picks a human label for the "5th" radar/slider axis based on detected
 // domains, since the brief explicitly forbids hard-coding "CO2" for
 // non-industrial subjects.
@@ -71,14 +53,11 @@ export function DecideFlow() {
   const [diagnosticError, setDiagnosticError] = useState("");
   const [scenariosError, setScenariosError] = useState("");
   const [scenariosWarning, setScenariosWarning] = useState("");
-  const [roadmapError, setRoadmapError] = useState("");
-  const [roadmapGenerating, setRoadmapGenerating] = useState(false);
   const [lastIntake, setLastIntake] = useState<IntakeState | null>(null);
 
   const [diagnostic, setDiagnostic] = useState<DiagnosticResult | null>(null);
   const [scenarios, setScenarios] = useState<ScenarioWithId[] | null>(null);
   const [selectedTrajectoryId, setSelectedTrajectoryId] = useState<string | null>(null);
-  const [roadmapPhases, setRoadmapPhases] = useState<RoadmapPhase[]>([]);
 
   async function runDiagnostic(intake: IntakeState) {
     setLastIntake(intake);
@@ -140,32 +119,6 @@ export function DecideFlow() {
         setPhase("scenarios-loading");
         return;
       }
-    }
-  }
-
-  async function runRoadmap(params: {
-    trajectoryId: string;
-    startDate: string;
-    priorityCost: number;
-    priorityCo2: number;
-    priorityRisk: number;
-    prioritySpeed: number;
-  }) {
-    setRoadmapGenerating(true);
-    setRoadmapError("");
-    try {
-      const res = await fetch("/api/decide/roadmap", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(params),
-      });
-      const { data } = await parseJsonResponse(res);
-      if (!res.ok) throw new Error((data.error as string) || "Une erreur est survenue.");
-      setRoadmapPhases(data.phases as RoadmapPhase[]);
-    } catch (err) {
-      setRoadmapError(err instanceof Error ? err.message : "Une erreur est survenue.");
-    } finally {
-      setRoadmapGenerating(false);
     }
   }
 
@@ -243,36 +196,12 @@ export function DecideFlow() {
               key={s.trajectoryId}
               scenario={s}
               index={i}
+              co2SliderLabel={fifthAxisLabel(diagnostic.domains)}
               selected={selectedTrajectoryId === s.trajectoryId}
-              onSelect={() => {
-                setSelectedTrajectoryId(s.trajectoryId);
-                setPhase("roadmap");
-              }}
+              onSelect={() => setSelectedTrajectoryId(s.trajectoryId)}
             />
           ))}
         </div>
-      </div>
-    );
-  }
-
-  if (phase === "roadmap" && selectedTrajectoryId && diagnostic) {
-    return (
-      <div className="mx-auto w-full max-w-3xl px-4 py-10">
-        <button
-          type="button"
-          onClick={() => setPhase("scenarios")}
-          className="mb-4 text-sm text-muted underline underline-offset-2 hover:text-accent"
-        >
-          ← Retour aux scénarios
-        </button>
-        <RoadmapView
-          trajectoryId={selectedTrajectoryId}
-          co2SliderLabel={fifthAxisLabel(diagnostic.domains)}
-          phases={roadmapPhases}
-          onGenerate={runRoadmap}
-          generating={roadmapGenerating}
-          error={roadmapError}
-        />
       </div>
     );
   }

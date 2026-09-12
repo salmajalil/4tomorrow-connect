@@ -1,0 +1,189 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { extractFileText } from "@/lib/extract-file-text";
+import { DOMAIN_LABELS, type Domain } from "@/lib/decide";
+
+function StatusBadge({ done, doneLabel = "Fait", todoLabel = "TO DO" }: { done: boolean; doneLabel?: string; todoLabel?: string }) {
+  return (
+    <span
+      className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+        done ? "bg-success/15 text-success" : "bg-surface-2 text-muted"
+      }`}
+    >
+      {done ? doneLabel : todoLabel}
+    </span>
+  );
+}
+
+export function InputsTab({
+  transformationId,
+  organizationId,
+  initialConstraints,
+  initialIndustry,
+  domains,
+  documentCount,
+  onDocumentAdded,
+}: {
+  transformationId: string;
+  organizationId: string;
+  initialConstraints: string;
+  initialIndustry: string;
+  domains: Domain[];
+  documentCount: number;
+  onDocumentAdded: (text: string) => void;
+}) {
+  const [constraints, setConstraints] = useState(initialConstraints);
+  const [editingConstraints, setEditingConstraints] = useState(false);
+  const [savingConstraints, setSavingConstraints] = useState(false);
+
+  const [industry, setIndustry] = useState(initialIndustry);
+  const [editingIndustry, setEditingIndustry] = useState(false);
+  const [savingIndustry, setSavingIndustry] = useState(false);
+
+  const [uploadError, setUploadError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function saveConstraints() {
+    setSavingConstraints(true);
+    await createClient().from("transformations").update({ constraints }).eq("id", transformationId);
+    setSavingConstraints(false);
+    setEditingConstraints(false);
+  }
+
+  async function saveIndustry() {
+    setSavingIndustry(true);
+    await createClient().from("organizations").update({ industry }).eq("id", organizationId);
+    setSavingIndustry(false);
+    setEditingIndustry(false);
+  }
+
+  async function handleFile(file: File) {
+    setUploadError("");
+    setUploading(true);
+    try {
+      const text = await extractFileText(file);
+      onDocumentAdded(text);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Extraction impossible.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-semibold text-ink">Diagnostic Assessment</h3>
+          <StatusBadge done={constraints.trim().length > 0} />
+        </div>
+        <p className="mt-1 text-xs text-muted">
+          Answer the unified adaptive quest... — contraintes d&apos;implémentation non couvertes par le diagnostic Decide.
+        </p>
+        {editingConstraints ? (
+          <div className="mt-3 flex flex-col gap-2">
+            <textarea
+              value={constraints}
+              onChange={(e) => setConstraints(e.target.value)}
+              rows={4}
+              placeholder="Contraintes réelles d'exécution : ressources disponibles, délais imposés, dépendances externes..."
+              className="resize-none rounded-lg border border-border bg-surface-2 px-3 py-2.5 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={saveConstraints}
+              disabled={savingConstraints}
+              className="self-start rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-accent-ink hover:bg-accent-strong disabled:opacity-50"
+            >
+              {savingConstraints ? "Enregistrement..." : "Enregistrer"}
+            </button>
+          </div>
+        ) : (
+          <>
+            {constraints.trim() && <p className="mt-2 text-sm text-ink">{constraints}</p>}
+            <button
+              type="button"
+              onClick={() => setEditingConstraints(true)}
+              className="mt-3 text-xs font-semibold text-accent underline underline-offset-2"
+            >
+              {constraints.trim() ? "Modifier →" : "Répondre →"}
+            </button>
+          </>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-semibold text-ink">Project Documents</h3>
+          <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[10px] font-semibold text-muted">
+            {documentCount} document{documentCount > 1 ? "s" : ""}
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-muted">
+          Upload your documents (.txt, .md, .docx) — utilisés comme contexte pour la génération des livrables.
+        </p>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".txt,.md,.docx"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFile(file);
+          }}
+          className="mt-3 text-xs text-muted file:mr-3 file:rounded-lg file:border file:border-border file:bg-surface-2 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-ink"
+        />
+        {uploading && <p className="mt-1 text-xs text-muted">Extraction en cours...</p>}
+        {uploadError && <p className="mt-1 text-xs text-danger">{uploadError}</p>}
+      </div>
+
+      <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-semibold text-ink">Industry Context</h3>
+          <StatusBadge done={industry.trim().length > 0} doneLabel="Précisé" todoLabel="TO REFINE" />
+        </div>
+        {domains.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {domains.map((d) => (
+              <span
+                key={d}
+                className="rounded-full border border-accent/40 bg-accent/10 px-2.5 py-0.5 text-xs font-semibold text-accent-strong"
+              >
+                {DOMAIN_LABELS[d]}
+              </span>
+            ))}
+          </div>
+        )}
+        {editingIndustry ? (
+          <div className="mt-3 flex gap-2">
+            <input
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+              placeholder="Ex : aéronautique"
+              className="min-w-0 flex-1 rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={saveIndustry}
+              disabled={savingIndustry}
+              className="shrink-0 rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-accent-ink hover:bg-accent-strong disabled:opacity-50"
+            >
+              {savingIndustry ? "..." : "OK"}
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditingIndustry(true)}
+            className="mt-3 text-xs font-semibold text-accent underline underline-offset-2"
+          >
+            {industry.trim() ? `${industry} — modifier` : "Préciser le secteur →"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

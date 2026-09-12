@@ -33,6 +33,7 @@ export type Transformation = {
   constraints: string | null;
   status: string;
   domains: string[];
+  selected_trajectory_id: string | null;
   created_at: string;
 };
 
@@ -143,6 +144,7 @@ export type Risk = {
   trajectory_id: string | null;
   name: string;
   reason: string | null;
+  module_origin: string;
   created_at: string;
 };
 
@@ -156,6 +158,8 @@ export type Opportunity = {
   created_at: string;
 };
 
+export type RoadmapExecutionStatus = "upcoming" | "in_progress" | "done";
+
 export type RoadmapPhaseEntry = {
   id: string;
   transformation_id: string;
@@ -167,6 +171,9 @@ export type RoadmapPhaseEntry = {
   actions: string[];
   kpis: string[];
   order_index: number;
+  actual_start_date: string | null;
+  actual_end_date: string | null;
+  execution_status: RoadmapExecutionStatus;
   created_at: string;
 };
 
@@ -240,6 +247,77 @@ export type Training = {
   created_at: string;
 };
 
+export const DELIVERABLE_KINDS = [
+  "roadmap",
+  "action_plan",
+  "kpi_dashboard",
+  "risk_map",
+  "executive_report",
+  "toolkit",
+] as const;
+export type DeliverableKind = (typeof DELIVERABLE_KINDS)[number];
+
+export type DeliverableRoadmapContent = {
+  phases: { phaseName: string; detailedActions: string[]; dependencies: string[]; ownerSuggestion: string }[];
+};
+export type DeliverableActionPlanContent = {
+  actions: { title: string; description: string; ownerSuggestion: string; timeframe: string }[];
+};
+export type DeliverableKpiDashboardContent = {
+  kpis: { name: string; target: string; current: string | null; unit: string; source: "trajectory" | "estimate" }[];
+};
+export type DeliverableRiskMapContent = {
+  risks: {
+    name: string;
+    description: string;
+    likelihood: "low" | "medium" | "high";
+    impact: "low" | "medium" | "high";
+    mitigation: string;
+  }[];
+};
+export type DeliverableExecutiveReportContent = {
+  summary: string;
+  keyPoints: string[];
+};
+export type DeliverableToolkitContent = {
+  tools: { name: string; purpose: string; whyThisProject: string }[];
+};
+
+export type DeliverableContent =
+  | DeliverableRoadmapContent
+  | DeliverableActionPlanContent
+  | DeliverableKpiDashboardContent
+  | DeliverableRiskMapContent
+  | DeliverableExecutiveReportContent
+  | DeliverableToolkitContent;
+
+export type Deliverable = {
+  id: string;
+  transformation_id: string;
+  trajectory_id: string;
+  kind: DeliverableKind;
+  title: string;
+  content: DeliverableContent;
+  created_at: string;
+};
+
+export type RecalibrationPhaseChange = { phaseName: string; newEndDate?: string | null; newActions?: string[] | null };
+export type RecalibrationSummary = {
+  updatedPriorities: { name: string; reason: string; weight: number }[];
+  recommendation: string;
+  roadmapAdjustment: { proposed: boolean; note: string; phaseChanges: RecalibrationPhaseChange[] } | null;
+};
+
+export type MissionFeedback = {
+  id: string;
+  transformation_id: string;
+  trajectory_id: string;
+  feedback_text: string;
+  ai_summary: RecalibrationSummary;
+  applied: boolean;
+  created_at: string;
+};
+
 // @supabase/postgrest-js requires every table entry to also carry a
 // `Relationships` array (used for typed embedded-resource joins, which this
 // project doesn't use) and the schema to declare `Views`/`Functions`, even
@@ -273,6 +351,14 @@ export type Database = {
       >;
       profiles: Table<Profile, Partial<Profile> & Pick<Profile, "id">>;
       trainings: Table<Training, Partial<Training> & Pick<Training, "transformation_id" | "topic">>;
+      deliverables: Table<
+        Deliverable,
+        Partial<Deliverable> & Pick<Deliverable, "transformation_id" | "trajectory_id" | "kind" | "title">
+      >;
+      mission_feedback: Table<
+        MissionFeedback,
+        Partial<MissionFeedback> & Pick<MissionFeedback, "transformation_id" | "trajectory_id" | "feedback_text">
+      >;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

@@ -32,6 +32,9 @@ export async function Nav() {
               <Link href="/learn" className="font-medium text-ink hover:text-accent">
                 Learn
               </Link>
+              <Link href="/deliver" className="font-medium text-ink hover:text-accent">
+                Deliver
+              </Link>
               <SignOutButton />
             </>
           ) : (

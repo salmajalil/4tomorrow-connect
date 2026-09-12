@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { IntakeForm, type IntakeState } from "@/components/decide/intake-form";
 import { DiagnosticView, type DiagnosticResult } from "@/components/decide/diagnostic-view";
 import { RadarChart } from "@/components/decide/radar-chart";
 import { ScenarioCard, type ScenarioWithId } from "@/components/decide/scenario-card";
 import { Eyebrow } from "@/components/eyebrow";
 import { ExportPdfButton } from "@/components/export-pdf-button";
+import { createClient } from "@/lib/supabase/client";
 import { parseJsonResponse } from "@/lib/parse-json-response";
 import type { Domain } from "@/lib/decide";
 
@@ -60,6 +62,18 @@ export function DecideFlow() {
   const [scenarios, setScenarios] = useState<ScenarioWithId[] | null>(null);
   const [selectedTrajectoryId, setSelectedTrajectoryId] = useState<string | null>(null);
   const [detailTrajectoryId, setDetailTrajectoryId] = useState<string | null>(null);
+
+  // Previously UI-only ("selected" just highlighted a card) — Deliver needs
+  // to know which trajectory was actually chosen to know what to execute,
+  // so this now persists to transformations.selected_trajectory_id.
+  async function selectTrajectory(trajectoryId: string) {
+    setSelectedTrajectoryId(trajectoryId);
+    if (!diagnostic) return;
+    await createClient()
+      .from("transformations")
+      .update({ selected_trajectory_id: trajectoryId })
+      .eq("id", diagnostic.transformationId);
+  }
 
   async function runDiagnostic(intake: IntakeState) {
     setLastIntake(intake);
@@ -197,6 +211,18 @@ export function DecideFlow() {
           </p>
         )}
 
+        {selectedTrajectoryId && (
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-accent/40 bg-accent/10 px-4 py-3">
+            <p className="text-sm text-ink">Trajectoire choisie — prête à passer en exécution.</p>
+            <Link
+              href={`/deliver?transformationId=${diagnostic.transformationId}`}
+              className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong"
+            >
+              Ouvrir Deliver →
+            </Link>
+          </div>
+        )}
+
         <div className="mt-6">
           <RadarChart axes={axes} series={radarSeries} />
         </div>
@@ -209,7 +235,7 @@ export function DecideFlow() {
               index={i}
               co2SliderLabel={fifthAxisLabel(diagnostic.domains)}
               selected={selectedTrajectoryId === s.trajectoryId}
-              onSelect={() => setSelectedTrajectoryId(s.trajectoryId)}
+              onSelect={() => selectTrajectory(s.trajectoryId)}
               onOpenDetail={() => {
                 setDetailTrajectoryId(s.trajectoryId);
                 setPhase("scenario-detail");
@@ -243,7 +269,7 @@ export function DecideFlow() {
           index={index}
           co2SliderLabel={fifthAxisLabel(diagnostic.domains)}
           selected={selectedTrajectoryId === scenario.trajectoryId}
-          onSelect={() => setSelectedTrajectoryId(scenario.trajectoryId)}
+          onSelect={() => selectTrajectory(scenario.trajectoryId)}
           detail
         />
       </div>

@@ -29,6 +29,7 @@ const MODULE_LABELS: Record<RecommendableModule, string> = {
 function moduleHref(module: RecommendableModule, transformationId: string): string | null {
   if (module === "connect") return "/connect";
   if (module === "learn") return `/learn?transformationId=${transformationId}`;
+  if (module === "deliver") return `/deliver?transformationId=${transformationId}`;
   return null;
 }
 

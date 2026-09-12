@@ -33,8 +33,8 @@ const MODULES = [
     key: "deliver",
     label: "Deliver",
     blurb: "Exécuter et suivre les livrables.",
-    href: null,
-    active: false,
+    href: "/deliver",
+    active: true,
     icon: (
       <>
         <circle cx="12" cy="12" r="3" />

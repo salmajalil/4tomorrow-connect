@@ -20,6 +20,7 @@ function moduleHref(module: ModuleName, transformationId: string): string | null
   if (module === "decide") return "/decide";
   if (module === "connect") return "/connect";
   if (module === "learn") return `/learn?transformationId=${transformationId}`;
+  if (module === "deliver") return `/deliver?transformationId=${transformationId}`;
   return null;
 }
 

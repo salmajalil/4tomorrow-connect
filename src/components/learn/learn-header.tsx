@@ -1,8 +1,14 @@
+"use client";
+
+import { useLanguage } from "@/components/language-provider";
+
 // Recurring identity block from the reference product: a glowing icon
 // tile + "Learn" + an "IA" pill + a small tracked-out tagline. Shown at
 // the top of every Learn screen (intake, loading, result) so the module
 // reads as its own place rather than a generic form embedded in the site.
 export function LearnHeader() {
+  const { t } = useLanguage();
+
   return (
     <div className="flex items-center gap-3">
       <div
@@ -21,9 +27,7 @@ export function LearnHeader() {
             IA
           </span>
         </div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
-          Formez-vous plus vite · 4 Tomorrow
-        </p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">{t.learn.header.tagline}</p>
       </div>
     </div>
   );

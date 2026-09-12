@@ -4,19 +4,35 @@ import { useState } from "react";
 import { LearnHeader } from "@/components/learn/learn-header";
 import { ExportPdfButton } from "@/components/export-pdf-button";
 import { DOMAIN_LABELS, type Domain } from "@/lib/learn";
+import { useLanguage } from "@/components/language-provider";
+import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Training } from "@/types/database";
 
-const TABS = [
-  { id: "apercu", label: "Aperçu" },
-  { id: "points-cles", label: "Points clés" },
-  { id: "experience", label: "Expérience" },
-  { id: "video", label: "Vidéo" },
-  { id: "qualiopi", label: "Fiche Qualiopi" },
-] as const;
+type Tab = "apercu" | "points-cles" | "experience" | "video" | "qualiopi";
 
-type Tab = (typeof TABS)[number]["id"];
+function tabs(training: Dictionary["learn"]["training"]): { id: Tab; label: string }[] {
+  return [
+    { id: "apercu", label: training.tabOverview },
+    { id: "points-cles", label: training.tabKeyPoints },
+    { id: "experience", label: training.tabExperience },
+    { id: "video", label: training.tabVideo },
+    { id: "qualiopi", label: training.tabQualiopi },
+  ];
+}
 
-function Flashcard({ question, answer, category, index }: { question: string; answer: string; category?: string | null; index: number }) {
+function Flashcard({
+  question,
+  answer,
+  category,
+  index,
+  tapToReveal,
+}: {
+  question: string;
+  answer: string;
+  category?: string | null;
+  index: number;
+  tapToReveal: string;
+}) {
   const [revealed, setRevealed] = useState(false);
   return (
     <button
@@ -38,7 +54,7 @@ function Flashcard({ question, answer, category, index }: { question: string; an
         <p className="mt-3 text-sm text-muted">{answer}</p>
       ) : (
         <span className="mt-3 self-start rounded-full border border-border px-3 py-1 text-xs font-semibold text-accent">
-          Toucher pour révéler →
+          {tapToReveal}
         </span>
       )}
     </button>
@@ -72,13 +88,13 @@ function FormatTile({
   );
 }
 
-function QualiopiBadge() {
+function QualiopiBadge({ label }: { label: string }) {
   return (
     <div className="flex w-fit items-center gap-2 rounded-full border border-accent/30 bg-accent/5 px-3.5 py-1.5 text-xs text-muted">
       <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-ink">
         ✓
       </span>
-      Contenu conforme Qualiopi · Traçabilité automatique
+      {label}
     </div>
   );
 }
@@ -155,6 +171,9 @@ function QuizQuestion({
 }
 
 export function TrainingView({ training }: { training: Training }) {
+  const { t } = useLanguage();
+  const tr = t.learn.training;
+  const TABS = tabs(tr);
   const [tab, setTab] = useState<Tab>("apercu");
   const [quizScore, setQuizScore] = useState(0);
   const [quizAnswered, setQuizAnswered] = useState(0);
@@ -193,16 +212,16 @@ export function TrainingView({ training }: { training: Training }) {
       </div>
 
       <div className="flex gap-1 overflow-x-auto border-b border-border pb-2">
-        {TABS.map((t) => (
+        {TABS.map((tabDef) => (
           <button
-            key={t.id}
+            key={tabDef.id}
             type="button"
-            onClick={() => setTab(t.id)}
+            onClick={() => setTab(tabDef.id)}
             className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
-              tab === t.id ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
+              tab === tabDef.id ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
             }`}
           >
-            {t.label}
+            {tabDef.label}
           </button>
         ))}
       </div>
@@ -210,15 +229,15 @@ export function TrainingView({ training }: { training: Training }) {
       {tab === "apercu" && (
         <div className="flex flex-col gap-4">
           <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-accent-strong">Défi adressé</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-accent-strong">{tr.addressedChallenge}</h2>
             <p className="mt-2 text-sm text-ink">{training.executive_summary.addressedChallenge}</p>
           </div>
           <div className="rounded-xl border border-border bg-surface p-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Résumé</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{tr.summary}</h2>
             <p className="mt-2 text-sm text-ink">{training.executive_summary.summary}</p>
           </div>
           <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Plan d&apos;action</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{tr.actionPlan}</h2>
             <ol className="mt-2 flex flex-col gap-2">
               {training.executive_summary.actionPlan.map((step, i) => (
                 <li key={i} className="flex gap-3 rounded-lg border border-border bg-surface p-3 text-sm">
@@ -236,7 +255,7 @@ export function TrainingView({ training }: { training: Training }) {
       {tab === "points-cles" && (
         <div className="flex flex-col gap-6">
           <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Insights clés</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{tr.keyInsights}</h2>
             <div className="mt-2 flex flex-col gap-2">
               {training.key_insights.map((insight, i) => (
                 <div key={i} className="flex gap-3 rounded-lg border border-border bg-surface p-3 text-sm">
@@ -245,14 +264,14 @@ export function TrainingView({ training }: { training: Training }) {
                   </span>
                   <div>
                     <p className="text-ink">{insight.text}</p>
-                    {insight.source && <p className="mt-1 text-xs text-muted">Source : {insight.source}</p>}
+                    {insight.source && <p className="mt-1 text-xs text-muted">{tr.source} {insight.source}</p>}
                   </div>
                 </div>
               ))}
             </div>
           </div>
           <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Implications business</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{tr.businessImplications}</h2>
             <div className="mt-2 flex flex-col gap-2">
               {training.business_implications.map((b, i) => (
                 <div key={i} className="rounded-lg border border-success/30 bg-success/5 p-3 text-sm text-ink">
@@ -270,21 +289,29 @@ export function TrainingView({ training }: { training: Training }) {
             <FormatTile
               icon="🃏"
               gradient="linear-gradient(135deg, #a78bfa, #7c3aed)"
-              title="Cartes interactives"
-              subtitle="Flashcards à retourner, pour ancrer les points clés."
+              title={tr.interactiveCards}
+              subtitle={tr.interactiveCardsSubtitle}
             />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {training.flashcards.map((f, i) => (
-                <Flashcard key={i} index={i} question={f.question} answer={f.answer} category={f.category} />
+                <Flashcard
+                  key={i}
+                  index={i}
+                  question={f.question}
+                  answer={f.answer}
+                  category={f.category}
+                  tapToReveal={tr.tapToReveal}
+                />
               ))}
             </div>
           </div>
           <div className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Quiz de validation</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{tr.validationQuiz}</h2>
               {quizAnswered > 0 && (
                 <span className="text-xs font-semibold text-accent-strong">
-                  {quizScore}/{quizAnswered} correct{quizAnswered === totalQuestions ? " — terminé" : ""}
+                  {quizScore}/{quizAnswered} {tr.correct}
+                  {quizAnswered === totalQuestions ? ` ${tr.completed}` : ""}
                 </span>
               )}
             </div>
@@ -305,7 +332,7 @@ export function TrainingView({ training }: { training: Training }) {
               ))}
             </div>
           </div>
-          <QualiopiBadge />
+          <QualiopiBadge label={tr.qualiopiCheckmark} />
         </div>
       )}
 
@@ -314,8 +341,8 @@ export function TrainingView({ training }: { training: Training }) {
           <FormatTile
             icon="🎬"
             gradient="linear-gradient(135deg, #fb923c, #ea580c)"
-            title="Script vidéo"
-            subtitle="Storyboard scène par scène, prêt à filmer ou à passer à un outil de génération vidéo."
+            title={tr.videoScript}
+            subtitle={tr.videoScriptSubtitle}
           />
           <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
             <h2 className="font-display text-lg text-ink">{training.video_script.title}</h2>
@@ -325,7 +352,7 @@ export function TrainingView({ training }: { training: Training }) {
               <div key={scene.sceneNumber} className="rounded-xl border border-border bg-surface p-4">
                 <div className="flex items-baseline justify-between">
                   <span className="text-xs font-semibold uppercase tracking-wide text-accent-strong">
-                    Scène {scene.sceneNumber}
+                    {tr.scene} {scene.sceneNumber}
                   </span>
                   <span className="text-xs text-muted">{scene.durationSeconds}s</span>
                 </div>
@@ -339,25 +366,23 @@ export function TrainingView({ training }: { training: Training }) {
 
       {tab === "qualiopi" && (
         <div className="flex flex-col gap-4">
-          <p className="text-xs text-muted">
-            Généré automatiquement à partir du contenu — sert de preuve pour les critères Qualiopi C1 à C4 et C7.
-          </p>
+          <p className="text-xs text-muted">{tr.qualiopiIntro}</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="rounded-lg border border-border bg-surface p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Public visé</p>
-              <p className="mt-1 text-sm text-ink">{training.audience || "Non précisé"}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{tr.targetAudience}</p>
+              <p className="mt-1 text-sm text-ink">{training.audience || t.common.notSpecified}</p>
             </div>
             <div className="rounded-lg border border-border bg-surface p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Durée</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{tr.duration}</p>
               <p className="mt-1 text-sm text-ink">{training.duration_minutes ?? "—"} min</p>
             </div>
             <div className="rounded-lg border border-border bg-surface p-3 sm:col-span-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Prérequis</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{tr.prerequisites}</p>
               <p className="mt-1 text-sm text-ink">{training.prerequisites}</p>
             </div>
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Objectifs pédagogiques</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{tr.pedagogicalObjectives}</p>
             <ul className="mt-2 flex flex-col gap-1.5">
               {training.objectives.map((o, i) => (
                 <li key={i} className="rounded-lg border border-border bg-surface p-2.5 text-sm text-ink">
@@ -367,9 +392,10 @@ export function TrainingView({ training }: { training: Training }) {
             </ul>
           </div>
           <div className="rounded-lg border border-border bg-surface-2 p-3 text-xs text-muted">
-            Méthode mobilisée : génération IA{training.source_doc_name ? ` à partir du document « ${training.source_doc_name} »` : ""}
-            {training.mode === "diagnostic" ? ", à partir d'un diagnostic Decide existant" : ""}. Preuve d&apos;évaluation
-            des acquis : quiz de {totalQuestions} question{totalQuestions > 1 ? "s" : ""} ci-dessus.
+            {tr.methodUsed}
+            {training.source_doc_name ? ` ${tr.fromDocument} ${training.source_doc_name} »` : ""}
+            {training.mode === "diagnostic" ? tr.fromDiagnostic : ""}. {tr.evaluationProof} {totalQuestions}{" "}
+            {totalQuestions > 1 ? `${tr.question}s` : tr.question} {tr.questionsAbove}
           </div>
         </div>
       )}

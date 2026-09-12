@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getLanguage } from "@/lib/i18n/language";
+import { getDictionary } from "@/lib/i18n/dictionary";
 import { LearnFlow } from "./learn-flow";
 
 export default async function LearnPage({
@@ -17,6 +19,9 @@ export default async function LearnPage({
     redirect("/login?next=/learn");
   }
 
+  const language = await getLanguage();
+  const t = getDictionary(language);
+
   const { data: orgs } = await supabase.from("organizations").select("id").eq("owner_id", user.id);
   const orgIds = (orgs ?? []).map((o) => o.id);
 
@@ -28,11 +33,11 @@ export default async function LearnPage({
       .in("organization_id", orgIds)
       .order("created_at", { ascending: false });
 
-    existingProjects = (transformations ?? []).map((t) => ({
-      id: t.id,
+    existingProjects = (transformations ?? []).map((tr) => ({
+      id: tr.id,
       title:
-        (t.challenges?.trim() ? t.challenges.trim().slice(0, 60) : t.objectives?.trim()?.slice(0, 60)) ||
-        "Projet sans titre",
+        (tr.challenges?.trim() ? tr.challenges.trim().slice(0, 60) : tr.objectives?.trim()?.slice(0, 60)) ||
+        t.common.untitledProject,
     }));
   }
 

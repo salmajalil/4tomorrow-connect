@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import { LearnHeader } from "@/components/learn/learn-header";
 import { extractFileText } from "@/lib/extract-file-text";
+import { useLanguage } from "@/components/language-provider";
+import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { TrainingMode } from "@/lib/learn";
 
 export interface LearnIntakeState {
@@ -16,29 +18,37 @@ export interface LearnIntakeState {
   industry: string;
 }
 
-const MODE_OPTIONS: { id: TrainingMode; icon: string; gradient: string; label: string; description: string }[] = [
-  {
-    id: "rapide",
-    icon: "⚡",
-    gradient: "linear-gradient(135deg, #f472b6, #db2777)",
-    label: "Rapide",
-    description: "Sujet en texte libre, génération directe avec exemples réels trouvés sur le web.",
-  },
-  {
-    id: "document",
-    icon: "📄",
-    gradient: "linear-gradient(135deg, #60a5fa, #2563eb)",
-    label: "Document joint",
-    description: "Un support existant (procédure, brief) devient la base factuelle du contenu.",
-  },
-  {
-    id: "diagnostic",
-    icon: "🎯",
-    gradient: "linear-gradient(135deg, #3fd67a, #059669)",
-    label: "Lié à un projet",
-    description: "S'appuie sur un diagnostic Decide déjà fait — contenu directement pertinent, zéro ressaisie.",
-  },
-];
+function modeOptions(intake: Dictionary["learn"]["intake"]): {
+  id: TrainingMode;
+  icon: string;
+  gradient: string;
+  label: string;
+  description: string;
+}[] {
+  return [
+    {
+      id: "rapide",
+      icon: "⚡",
+      gradient: "linear-gradient(135deg, #f472b6, #db2777)",
+      label: intake.modeRapide,
+      description: intake.modeRapideDesc,
+    },
+    {
+      id: "document",
+      icon: "📄",
+      gradient: "linear-gradient(135deg, #60a5fa, #2563eb)",
+      label: intake.modeDocument,
+      description: intake.modeDocumentDesc,
+    },
+    {
+      id: "diagnostic",
+      icon: "🎯",
+      gradient: "linear-gradient(135deg, #3fd67a, #059669)",
+      label: intake.modeDiagnostic,
+      description: intake.modeDiagnosticDesc,
+    },
+  ];
+}
 
 export function LearnIntakeForm({
   onSubmit,
@@ -51,6 +61,9 @@ export function LearnIntakeForm({
   existingProjects: { id: string; title: string }[];
   initialTransformationId?: string | null;
 }) {
+  const { t } = useLanguage();
+  const intake = t.learn.intake;
+  const MODE_OPTIONS = modeOptions(intake);
   const [state, setState] = useState<LearnIntakeState>({
     transformationId: initialTransformationId,
     topic: "",
@@ -72,7 +85,7 @@ export function LearnIntakeForm({
       const text = await extractFileText(file);
       setState((s) => ({ ...s, sourceDocText: text, sourceDocName: file.name }));
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Extraction impossible.");
+      setUploadError(err instanceof Error ? err.message : intake.uploadError);
     } finally {
       setUploading(false);
     }
@@ -95,17 +108,14 @@ export function LearnIntakeForm({
       <div className="flex flex-col gap-4">
         <LearnHeader />
         <div>
-          <h1 className="font-display text-3xl text-ink">Génère une formation</h1>
-          <p className="mt-1 text-sm text-muted">
-            Objectifs, points clés avec exemples réels, flashcards, quiz de validation et script vidéo — générés
-            ensemble, prêts à servir de preuve Qualiopi.
-          </p>
+          <h1 className="font-display text-3xl text-ink">{intake.title}</h1>
+          <p className="mt-1 text-sm text-muted">{intake.subtitle}</p>
         </div>
       </div>
 
       {existingProjects.length > 0 && (
         <label className="flex flex-col gap-1.5 text-sm">
-          <span className="font-medium text-ink">Projet</span>
+          <span className="font-medium text-ink">{intake.project}</span>
           <select
             value={state.transformationId ?? ""}
             onChange={(e) => {
@@ -114,7 +124,7 @@ export function LearnIntakeForm({
             }}
             className="rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-ink focus:border-accent focus:outline-none"
           >
-            <option value="">Nouveau sujet (pas de projet existant)</option>
+            <option value="">{intake.newTopicNoProject}</option>
             {existingProjects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.title}
@@ -125,28 +135,28 @@ export function LearnIntakeForm({
       )}
 
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-ink">Sujet de la formation</span>
+        <span className="font-medium text-ink">{intake.topic}</span>
         <textarea
           value={state.topic}
           onChange={(e) => setState((s) => ({ ...s, topic: e.target.value }))}
-          placeholder="Ex : Comprendre les niveaux de maturité TRL avant de choisir une techno hydrogène"
+          placeholder={intake.topicPlaceholder}
           rows={3}
           className="resize-none rounded-xl border border-border bg-surface px-3.5 py-3 text-base leading-relaxed text-ink placeholder:text-muted focus:border-accent focus:outline-none"
         />
       </label>
 
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-ink">Public visé</span>
+        <span className="font-medium text-ink">{intake.audience}</span>
         <input
           value={state.audience}
           onChange={(e) => setState((s) => ({ ...s, audience: e.target.value }))}
-          placeholder="Ex : équipe opérationnelle, novice sur le sujet"
+          placeholder={intake.audiencePlaceholder}
           className="rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-ink placeholder:text-muted focus:border-accent focus:outline-none"
         />
       </label>
 
       <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium text-ink">Mode de génération</span>
+        <span className="text-sm font-medium text-ink">{intake.generationMode}</span>
         <div className="flex flex-col gap-2.5">
           {MODE_OPTIONS.map((opt) => {
             const selected = state.mode === opt.id;
@@ -183,13 +193,13 @@ export function LearnIntakeForm({
       </div>
 
       {state.mode === "diagnostic" && existingProjects.length === 0 && (
-        <p className="text-xs text-danger">Aucun projet existant — lance d&apos;abord un diagnostic Decide, ou choisis un autre mode.</p>
+        <p className="text-xs text-danger">{intake.noProjectWarning}</p>
       )}
 
       {state.mode === "document" && (
         <div className="flex flex-col gap-1.5 text-sm">
-          <span className="font-medium text-ink">Document source</span>
-          <span className="text-xs text-muted">.txt, .md ou .docx — le PDF n&apos;est pas pris en charge.</span>
+          <span className="font-medium text-ink">{intake.sourceDoc}</span>
+          <span className="text-xs text-muted">{intake.sourceDocHint}</span>
           <input
             ref={fileInputRef}
             type="file"
@@ -200,10 +210,12 @@ export function LearnIntakeForm({
             }}
             className="mt-1 text-sm text-muted file:mr-3 file:rounded-lg file:border file:border-border file:bg-surface file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink"
           />
-          {uploading && <span className="text-xs text-muted">Extraction en cours...</span>}
+          {uploading && <span className="text-xs text-muted">{intake.extracting}</span>}
           {uploadError && <span className="text-xs text-danger">{uploadError}</span>}
           {state.sourceDocName && !uploading && (
-            <span className="text-xs text-success">✓ {state.sourceDocName} importé ({state.sourceDocText.length} caractères)</span>
+            <span className="text-xs text-success">
+              ✓ {state.sourceDocName} {intake.imported} ({state.sourceDocText.length} {t.common.characters})
+            </span>
           )}
         </div>
       )}
@@ -211,7 +223,7 @@ export function LearnIntakeForm({
       {!state.transformationId && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium text-ink">Organisation (optionnel)</span>
+            <span className="font-medium text-ink">{intake.organizationOptional}</span>
             <input
               value={state.organization}
               onChange={(e) => setState((s) => ({ ...s, organization: e.target.value }))}
@@ -219,7 +231,7 @@ export function LearnIntakeForm({
             />
           </label>
           <label className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium text-ink">Industrie (optionnel)</span>
+            <span className="font-medium text-ink">{intake.industryOptional}</span>
             <input
               value={state.industry}
               onChange={(e) => setState((s) => ({ ...s, industry: e.target.value }))}
@@ -234,7 +246,7 @@ export function LearnIntakeForm({
         disabled={!canSubmit}
         className="self-start rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {submitting ? "Génération..." : "Générer la formation"}
+        {submitting ? intake.submitting : intake.submit}
       </button>
     </form>
   );

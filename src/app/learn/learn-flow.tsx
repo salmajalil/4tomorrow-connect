@@ -6,25 +6,24 @@ import { LearnHeader } from "@/components/learn/learn-header";
 import { LearnThemeWrap } from "@/components/learn/learn-theme";
 import { TrainingView } from "@/components/learn/training-view";
 import { parseJsonResponse } from "@/lib/parse-json-response";
+import { useLanguage } from "@/components/language-provider";
 import type { Training } from "@/types/database";
 
 type Phase = "intake" | "loading" | "result";
 
-function LoadingBlock() {
+function LoadingBlock({ label, hint }: { label: string; hint: string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
       <div className="h-10 w-10 animate-spin rounded-full border-4 border-surface-2 border-t-accent" />
       <div>
-        <p className="font-display text-xl text-ink">Génération de la formation...</p>
-        <p className="mt-2 max-w-xs text-sm text-muted">
-          Recherche d&apos;exemples réels + construction du contenu — ça peut prendre 1 à 2 minutes.
-        </p>
+        <p className="font-display text-xl text-ink">{label}</p>
+        <p className="mt-2 max-w-xs text-sm text-muted">{hint}</p>
       </div>
     </div>
   );
 }
 
-function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void }) {
+function ErrorBlock({ message, onRetry, retryLabel }: { message: string; onRetry: () => void; retryLabel: string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-danger/40 bg-danger/10 px-6 py-12 text-center">
       <p className="max-w-sm text-sm text-ink">{message}</p>
@@ -33,7 +32,7 @@ function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void
         onClick={onRetry}
         className="rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
       >
-        Réessayer
+        {retryLabel}
       </button>
     </div>
   );
@@ -46,6 +45,7 @@ export function LearnFlow({
   existingProjects: { id: string; title: string }[];
   initialTransformationId: string | null;
 }) {
+  const { t } = useLanguage();
   const [phase, setPhase] = useState<Phase>("intake");
   const [error, setError] = useState("");
   const [lastIntake, setLastIntake] = useState<LearnIntakeState | null>(null);
@@ -68,7 +68,7 @@ export function LearnFlow({
           body: JSON.stringify(intake),
         });
         const { data } = await parseJsonResponse(res);
-        if (!res.ok) throw new Error((data.error as string) || "Une erreur est survenue.");
+        if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
         setTraining(data.training as Training);
         setPhase("result");
         return;
@@ -77,10 +77,10 @@ export function LearnFlow({
         if (isNetworkError && attempt < maxAttempts) continue;
         setError(
           isNetworkError
-            ? "La connexion a été coupée pendant la génération (réseau mobile instable sur une requête longue). Réessaie, idéalement en Wi-Fi."
+            ? t.decide.networkErrorRetry
             : err instanceof Error
               ? err.message
-              : "Une erreur est survenue."
+              : t.common.anErrorOccurred
         );
         setPhase("loading");
         return;
@@ -110,10 +110,14 @@ export function LearnFlow({
           <LearnHeader />
           {error ? (
             <div className="mt-6">
-              <ErrorBlock message={error} onRetry={() => lastIntake && runGenerate(lastIntake)} />
+              <ErrorBlock
+                message={error}
+                onRetry={() => lastIntake && runGenerate(lastIntake)}
+                retryLabel={t.common.retry}
+              />
             </div>
           ) : (
-            <LoadingBlock />
+            <LoadingBlock label={t.learn.loading.title} hint={t.learn.loading.hint} />
           )}
         </div>
       </LearnThemeWrap>
@@ -129,7 +133,7 @@ export function LearnFlow({
             onClick={() => setPhase("intake")}
             className="mb-4 text-sm text-muted underline underline-offset-2 hover:text-accent"
           >
-            ← Nouvelle formation
+            {t.learn.training.newTraining}
           </button>
           <TrainingView training={training} />
         </div>

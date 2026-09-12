@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Eyebrow } from "@/components/eyebrow";
 import { getLanguage } from "@/lib/i18n/language";
 import { getDictionary } from "@/lib/i18n/dictionary";
+import { ManualStartForm } from "@/components/deliver/manual-start-form";
 import { DeliverFlow } from "./deliver-flow";
 import type { DeliverableKind, Deliverable } from "@/types/database";
 import type { Domain } from "@/lib/decide";
@@ -21,6 +22,9 @@ function EmptyState({ title, message, ctaHref, ctaLabel }: { title: string; mess
         >
           {ctaLabel}
         </Link>
+        <div>
+          <ManualStartForm />
+        </div>
       </div>
     </div>
   );

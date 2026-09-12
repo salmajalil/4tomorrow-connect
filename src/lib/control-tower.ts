@@ -23,6 +23,8 @@ export type ControlTowerProject = {
   keyMetrics: { key: string; value: string | number }[];
   pendingValidationCount: number;
   matchesCount: number;
+  progressPercent: number; // modules done / 4
+  targetDate: string | null; // furthest roadmap_phases.end_date, if a roadmap exists
 };
 
 // One aggregate fetch, called both for the initial server render and again
@@ -47,22 +49,31 @@ export async function fetchControlTowerProjects(
   if (!transformations || transformations.length === 0) return [];
   const txIds = transformations.map((t) => t.id);
 
-  const [{ data: statuses }, { data: recommendations }, { data: priorities }, { data: risks }, { data: opportunities }, { data: trajectories }, { data: matches }] =
-    await Promise.all([
-      supabase.from("module_status").select("transformation_id, module, status").in("transformation_id", txIds),
-      supabase
-        .from("module_recommendations")
-        .select("transformation_id, module, relevance, reason")
-        .in("transformation_id", txIds),
-      supabase.from("priorities").select("transformation_id, name, reason").in("transformation_id", txIds),
-      supabase.from("risks").select("id, transformation_id, name, reason").in("transformation_id", txIds),
-      supabase
-        .from("opportunities")
-        .select("id, transformation_id, name, reason")
-        .in("transformation_id", txIds),
-      supabase.from("trajectories").select("transformation_id, indicators").in("transformation_id", txIds),
-      supabase.from("matches").select("id, transformation_id").in("transformation_id", txIds),
-    ]);
+  const [
+    { data: statuses },
+    { data: recommendations },
+    { data: priorities },
+    { data: risks },
+    { data: opportunities },
+    { data: trajectories },
+    { data: matches },
+    { data: roadmapPhases },
+  ] = await Promise.all([
+    supabase.from("module_status").select("transformation_id, module, status").in("transformation_id", txIds),
+    supabase
+      .from("module_recommendations")
+      .select("transformation_id, module, relevance, reason")
+      .in("transformation_id", txIds),
+    supabase.from("priorities").select("transformation_id, name, reason").in("transformation_id", txIds),
+    supabase.from("risks").select("id, transformation_id, name, reason").in("transformation_id", txIds),
+    supabase
+      .from("opportunities")
+      .select("id, transformation_id, name, reason")
+      .in("transformation_id", txIds),
+    supabase.from("trajectories").select("transformation_id, indicators").in("transformation_id", txIds),
+    supabase.from("matches").select("id, transformation_id").in("transformation_id", txIds),
+    supabase.from("roadmap_phases").select("transformation_id, end_date").in("transformation_id", txIds),
+  ]);
 
   return transformations.map((t) => {
     const moduleStatus = Object.fromEntries(MODULE_ORDER.map((m) => [m, "not_started" as ModuleStatusValue])) as Record<
@@ -86,6 +97,14 @@ export async function fetchControlTowerProjects(
       }
     }
 
+    const progressPercent = Math.round(
+      (MODULE_ORDER.filter((m) => moduleStatus[m] === "done").length / MODULE_ORDER.length) * 100
+    );
+
+    const targetDate = (roadmapPhases ?? [])
+      .filter((r) => r.transformation_id === t.id)
+      .reduce<string | null>((max, r) => (!max || r.end_date > max ? r.end_date : max), null);
+
     const title = t.challenges?.trim()
       ? t.challenges.trim().slice(0, 72) + (t.challenges.trim().length > 72 ? "…" : "")
       : t.objectives?.trim()
@@ -108,6 +127,8 @@ export async function fetchControlTowerProjects(
       keyMetrics,
       pendingValidationCount,
       matchesCount: (matches ?? []).filter((m) => m.transformation_id === t.id).length,
+      progressPercent,
+      targetDate,
     };
   });
 }

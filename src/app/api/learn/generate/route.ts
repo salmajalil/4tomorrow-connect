@@ -249,8 +249,12 @@ export async function POST(request: Request) {
 function handleAnthropicError(err: unknown) {
   if (err instanceof Anthropic.APIError) {
     const status = err.status === 401 || err.status === 403 ? 502 : (err.status ?? 502);
+    // Include the real status/message in the user-facing error — the app
+    // has no admin log viewer, so a screenshot of this is the only way to
+    // diagnose a production failure without a Vercel dashboard detour.
+    const detail = `${err.status ?? "réseau"} — ${err.message ?? "erreur inconnue"}`.slice(0, 200);
     return NextResponse.json(
-      { error: "Le moteur de formation n'a pas pu répondre. Réessaie dans un instant." },
+      { error: `Le moteur de formation n'a pas pu répondre (${detail}). Réessaie dans un instant.` },
       { status }
     );
   }

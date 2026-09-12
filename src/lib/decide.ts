@@ -345,9 +345,12 @@ export interface RoadmapGenerationInput {
 const roadmapPhaseSchema = z.object({
   name: z.string().min(1),
   durationWeeks: z.number().min(1).max(52),
+  // Max kept a couple items above the prompt's stated target (4/4/3) — same
+  // slack rationale as the scenarios schema: the model overshot exact caps
+  // in production even once told the target count in prose.
   deliverables: z.array(z.string().min(1)).min(1).max(6),
   actions: z.array(z.string().min(1)).min(1).max(6),
-  kpis: z.array(z.string().min(1)).min(1).max(4),
+  kpis: z.array(z.string().min(1)).min(1).max(6),
 });
 
 const roadmapOutputSchema = z.object({
@@ -368,6 +371,8 @@ Never reuse an industrial phase template for a digital or commercial project, or
 How sliders influence the roadmap: a higher "speed" priority should compress timelines and front-load quick wins; a higher "risk mitigation" priority should add or lengthen validation/testing phases; a higher "cost control" priority should favor phased, lower-commitment steps over big upfront investment; a higher "CO2/sustainability" priority should foreground phases that de-risk or prove the sustainability angle early. Let the sliders actually reorder or resize phases, not just decorate them.
 
 Each phase needs: name, durationWeeks (a whole number of weeks for THIS phase, sequential — phase 2 starts the week phase 1 ends), deliverables (concrete outputs), actions (concrete steps), kpis (phase-exit indicators, specific to this phase and this project, never generic like "on time and on budget").
+
+HARD ARRAY LIMITS — never exceed these, the response is rejected otherwise: deliverables ≤4 items, actions ≤4 items, kpis ≤3 items, per phase. Pick the most important entries rather than listing everything you can think of.
 
 CORE RULE — NEVER GENERIC: same standard as the rest of Decide — every deliverable/action/kpi must contain something specific to this scenario.
 

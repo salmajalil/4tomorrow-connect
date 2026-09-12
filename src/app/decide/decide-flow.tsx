@@ -220,10 +220,11 @@ export function DecideFlow() {
         </div>
 
         <div className="mt-6 flex flex-col gap-6">
-          {scenarios.map((s) => (
+          {scenarios.map((s, i) => (
             <ScenarioCard
               key={s.trajectoryId}
               scenario={s}
+              index={i}
               selected={selectedTrajectoryId === s.trajectoryId}
               onSelect={() => {
                 setSelectedTrajectoryId(s.trajectoryId);

@@ -192,11 +192,23 @@ const regulationSchema = z.object({
   sourceUrl: z.string().nullable().optional(),
 });
 
+// Every indicator carries its own confidence instead of being presented as
+// a flat fact — a raw "+35% cost" with no signal of how sure the model is
+// about that number is a credibility risk once someone acts on it.
+// "verified": found with a source (web search). "estimate": the model's
+// best reasoning, no source — shown but flagged for the user to confirm.
+// "unknown": genuinely not estimable from the intake — value MUST be null,
+// never a plausible-looking number, and the UI invites a human to fill it in.
+const indicatorEntrySchema = z.object({
+  value: z.union([z.string(), z.number()]).nullable(),
+  confidence: z.enum(["verified", "estimate", "unknown"]),
+});
+
 const scenarioSchema = z.object({
   name: z.string().min(1),
   stance: z.string().min(1),
   description: z.string().min(1),
-  indicators: z.record(z.string(), z.union([z.string(), z.number()])),
+  indicators: z.record(z.string(), indicatorEntrySchema),
   radarScores: z.record(z.string(), z.number()),
   techStack: z.array(techStackItemSchema).min(1).max(4),
   // Max kept a couple items above what the prompt asks for (4/4/3/3) — the
@@ -256,7 +268,7 @@ You have a web_search tool (max 2 uses). Use it efficiently — batch what you n
 
 PRINCIPE DIRECTEUR — everything adapts to the actual subject, nothing is templated:
 - Choose scenario postures that fit the detected domain(s) — e.g. for digitalization: deployment speed vs integration depth vs legacy resilience; for go-to-market: fast penetration vs brand-building vs distribution partnerships; for product development: build vs partner vs acquire; for technical modernization: full replacement vs progressive migration vs hybrid; for heavy industrial transformation: operational efficiency vs technology balance vs environmental leadership. Pick whichever framing actually fits this challenge — never force a "cost vs CO2 vs physical tech" frame on a non-industrial subject.
-- indicators: choose the KPIs that make sense for this type of challenge (e.g. cost delta, CO2 reduction, ROI in years for an industrial/physical transformation; cost delta, time-to-market, ROI in months, acquisition/retention impact for a digital, product, or commercial one). Never force the same three metrics onto every subject.
+- indicators: choose the KPIs that make sense for this type of challenge (e.g. cost delta, CO2 reduction, ROI in years for an industrial/physical transformation; cost delta, time-to-market, ROI in months, acquisition/retention impact for a digital, product, or commercial one). Never force the same three metrics onto every subject. Every indicator needs an honest "confidence": "verified" ONLY if you found this specific number via web search with a source; "estimate" if it's your best professional reasoning from the intake with no source (this is the common case — say so, don't dress it up as fact); "unknown" — with value set to null, never a plausible-looking number — when you genuinely cannot ground even a rough estimate. A wall of confident-looking numbers with no basis is a credibility risk for whoever acts on this; an honest "estimate" or "unknown" is not a weaker answer.
 - techStack: up to 4 elements — physical technologies, software components, distribution channels, or skills to acquire, whichever fits the scenario. maturityScale must itself be adapted: "TRL 1-9" only for a physical or mature technology; "validated / pilot / hypothesis" for a commercial or organizational approach; another scale if that fits better. Always state in "detail" whether the maturity level comes from a verified source or is an estimate — never imply a false precision.
 - suppliers: the type of actor searched for (technical supplier, distributor, marketing partner, integrator, investor...) must be determined by the nature of THIS scenario, not fixed in advance. Every supplier must be a real, specific, verifiable organization or named person — NEVER something generic. Only include website/contactEmail when reasonably confident it is real; omit rather than invent.
 - regulations: search for and list only regulations/certifications/standards actually relevant to this specific subject and found with a source — industrial/safety standards for a physical subject, sectoral regulation (GDPR, financial compliance, etc.) for a digital or product subject, market standards for a commercialization subject. Never invent a reference; if none found, return an empty array.
@@ -276,7 +288,7 @@ Schema (a single scenario object, not an array):
   "name": string,
   "stance": string,
   "description": string,
-  "indicators": { [key: string]: string | number },
+  "indicators": { [key: string]: { "value": string | number | null, "confidence": "verified" | "estimate" | "unknown" } },
   "radarScores": { "cost": number, "risk": number, "roi": number, "feasibility": number, [fifthAxis: string]: number },
   "techStack": [{ "name": string, "maturity": string, "maturityScale": string, "detail": string, "benefit": string }],
   "suppliers": [{ "category": "technology"|"startup"|"expert"|"partner"|"funding", "name": string, "reason": string, "website": string|null, "contactEmail": string|null, "source": "registry"|"web_search", "ecosystemMemberId": string|null }],

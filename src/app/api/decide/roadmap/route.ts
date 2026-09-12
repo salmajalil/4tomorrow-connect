@@ -11,6 +11,19 @@ import {
   type Domain,
 } from "@/lib/decide";
 import { setModuleStatus } from "@/lib/module-status";
+import type { TrajectoryIndicators } from "@/types/database";
+
+// The roadmap prompt just needs human-readable indicator text, not the
+// {value, confidence} structure scenario generation stores — flatten it
+// here rather than teaching the roadmap prompt builder about confidence.
+function flattenIndicators(indicators: TrajectoryIndicators): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(indicators).map(([key, entry]) => [
+      key,
+      entry.value === null ? "non estimé" : `${entry.value} (${entry.confidence})`,
+    ])
+  );
+}
 
 // No web_search — pure reasoning over an already-chosen scenario, so this
 // stays fast; the ceiling here is a safety net, not an expected duration.
@@ -79,7 +92,7 @@ export async function POST(request: Request) {
             scenarioName: trajectory.name,
             scenarioStance: trajectory.stance ?? "",
             scenarioDescription: trajectory.description ?? "",
-            indicators: (trajectory.indicators as Record<string, string | number>) ?? {},
+            indicators: flattenIndicators((trajectory.indicators as TrajectoryIndicators) ?? {}),
             priorityCost: body.priorityCost,
             priorityCo2OrEquivalent: body.priorityCo2,
             priorityRisk: body.priorityRisk,

@@ -96,7 +96,17 @@ export type TrajectoryScores = {
   [axis: string]: number | undefined; // 5th axis adapts per domain (e.g. speed, scalability)
 };
 
-export type TrajectoryIndicators = Record<string, string | number>;
+export type IndicatorConfidence = "verified" | "estimate" | "unknown";
+
+export type IndicatorEntry = {
+  value: string | number | null; // null when confidence is "unknown" — never a fabricated number
+  confidence: IndicatorConfidence;
+};
+
+export type TrajectoryIndicators = Record<string, IndicatorEntry>;
+
+export type IndicatorFeedbackValue = "confirmed" | "disputed";
+export type IndicatorFeedback = Record<string, IndicatorFeedbackValue>;
 
 export type RegulationEntry = {
   name: string;
@@ -116,6 +126,7 @@ export type Trajectory = {
   tech_stack: TechStackEntry[];
   scores: TrajectoryScores;
   indicators: TrajectoryIndicators;
+  indicators_feedback: IndicatorFeedback;
   regulations: RegulationEntry[];
   executive_briefing: string | null;
   roadmap_start_date: string | null;

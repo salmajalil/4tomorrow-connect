@@ -25,9 +25,10 @@ function flattenIndicators(indicators: TrajectoryIndicators): Record<string, str
   );
 }
 
-// No web_search — pure reasoning over an already-chosen scenario, so this
-// stays fast; the ceiling here is a safety net, not an expected duration.
-export const maxDuration = 60;
+// No web_search, but max_tokens was raised to 4500 to stop truncated JSON
+// (see the max_tokens comment below) — a 60s ceiling then genuinely got hit
+// in production (FUNCTION_INVOCATION_TIMEOUT), not just as a safety net.
+export const maxDuration = 120;
 
 const requestSchema = z.object({
   trajectoryId: z.string().uuid("Scénario invalide."),

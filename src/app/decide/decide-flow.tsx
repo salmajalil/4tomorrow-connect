@@ -38,6 +38,24 @@ function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void
   );
 }
 
+// A timed-out or crashed function returns a plain-text/HTML body, not JSON
+// (Vercel's FUNCTION_INVOCATION_TIMEOUT page, for instance). res.json() then
+// throws — on Safari with the cryptic "The string did not match the
+// expected pattern.", which is really just JSON.parse choking on non-JSON.
+// Give the user something they can act on instead of that raw message.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches the untyped res.json() this replaces; each caller casts its own shape.
+async function parseJsonResponse(res: Response): Promise<{ data: any }> {
+  try {
+    return { data: await res.json() };
+  } catch {
+    throw new Error(
+      res.status === 504 || !res.ok
+        ? "Le serveur a mis trop de temps à répondre (délai dépassé). Réessaie."
+        : "Réponse du serveur illisible. Réessaie."
+    );
+  }
+}
+
 // Picks a human label for the "5th" radar/slider axis based on detected
 // domains, since the brief explicitly forbids hard-coding "CO2" for
 // non-industrial subjects.
@@ -72,8 +90,8 @@ export function DecideFlow() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(intake),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
+      const { data } = await parseJsonResponse(res);
+      if (!res.ok) throw new Error((data.error as string) || "Une erreur est survenue.");
       setDiagnostic(data as DiagnosticResult);
       setPhase("diagnostic");
     } catch (err) {
@@ -103,8 +121,8 @@ export function DecideFlow() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ transformationId: diagnostic.transformationId }),
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
+        const { data } = await parseJsonResponse(res);
+        if (!res.ok) throw new Error((data.error as string) || "Une erreur est survenue.");
         setScenarios(data.scenarios as ScenarioWithId[]);
         if (data.warning) setScenariosWarning(data.warning as string);
         setPhase("scenarios");
@@ -141,8 +159,8 @@ export function DecideFlow() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
+      const { data } = await parseJsonResponse(res);
+      if (!res.ok) throw new Error((data.error as string) || "Une erreur est survenue.");
       setRoadmapPhases(data.phases as RoadmapPhase[]);
     } catch (err) {
       setRoadmapError(err instanceof Error ? err.message : "Une erreur est survenue.");

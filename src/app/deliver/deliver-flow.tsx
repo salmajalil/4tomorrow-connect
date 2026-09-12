@@ -6,15 +6,20 @@ import { InputsTab } from "@/components/deliver/inputs-tab";
 import { DeliverablesTab } from "@/components/deliver/deliverables-tab";
 import { ControlTowerTab } from "@/components/deliver/control-tower-tab";
 import { DELIVERABLE_KINDS, type DeliverableKind } from "@/lib/deliver";
+import { useLanguage } from "@/components/language-provider";
+import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Deliverable, RoadmapPhaseEntry } from "@/types/database";
 import type { Domain } from "@/lib/decide";
 
-const TABS = [
-  { id: "inputs", label: "Inputs" },
-  { id: "deliverables", label: "Deliverables" },
-  { id: "control-tower", label: "Control Tower" },
-] as const;
-type Tab = (typeof TABS)[number]["id"];
+type Tab = "inputs" | "deliverables" | "control-tower";
+
+function tabs(t: Dictionary["deliver"]["tabs"]): { id: Tab; label: string }[] {
+  return [
+    { id: "inputs", label: t.inputs },
+    { id: "deliverables", label: t.deliverables },
+    { id: "control-tower", label: t.controlTower },
+  ];
+}
 
 function missionPhase(readyCount: number): MissionPhase {
   if (readyCount === 0) return "DISCOVERY";
@@ -45,6 +50,8 @@ export function DeliverFlow({
   roadmapPhases: RoadmapPhaseEntry[];
   priorities: { id: string; name: string; reason: string | null }[];
 }) {
+  const { t } = useLanguage();
+  const TABS = tabs(t.deliver.tabs);
   const [tab, setTab] = useState<Tab>("inputs");
   const [deliverables, setDeliverables] = useState(initialDeliverables);
   const [sourceDocText, setSourceDocText] = useState("");
@@ -63,16 +70,16 @@ export function DeliverFlow({
       />
 
       <div className="mt-6 flex gap-1 overflow-x-auto border-b border-border pb-2">
-        {TABS.map((t) => (
+        {TABS.map((tabDef) => (
           <button
-            key={t.id}
+            key={tabDef.id}
             type="button"
-            onClick={() => setTab(t.id)}
+            onClick={() => setTab(tabDef.id)}
             className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-              tab === t.id ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
+              tab === tabDef.id ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
             }`}
           >
-            {t.label}
+            {tabDef.label}
           </button>
         ))}
       </div>

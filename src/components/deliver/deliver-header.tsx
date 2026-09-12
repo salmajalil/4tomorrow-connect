@@ -1,4 +1,7 @@
+"use client";
+
 import { Eyebrow } from "@/components/eyebrow";
+import { useLanguage } from "@/components/language-provider";
 
 export type MissionPhase = "DISCOVERY" | "EXECUTION" | "COMPLETE";
 
@@ -16,14 +19,22 @@ export function DeliverHeader({
   industry: string;
   phase: MissionPhase;
 }) {
+  const { t } = useLanguage();
+  const header = t.deliver.header;
+  const phaseLabels: Record<MissionPhase, string> = {
+    DISCOVERY: header.phaseDiscovery,
+    EXECUTION: header.phaseExecution,
+    COMPLETE: header.phaseComplete,
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <Eyebrow>DELIVER · CONTROL CENTER</Eyebrow>
+        <Eyebrow>{header.controlCenter}</Eyebrow>
         <h1 className="mt-3 font-display text-3xl text-ink">{projectTitle}</h1>
       </div>
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">DELIVER · COCKPIT</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">{header.cockpit}</span>
         <span className="font-semibold text-ink">{projectTitle}</span>
         {(organization || industry) && (
           <span className="text-sm text-muted">
@@ -33,7 +44,7 @@ export function DeliverHeader({
           </span>
         )}
         <span className="ml-auto rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-accent-strong">
-          {phase}
+          {phaseLabels[phase]}
         </span>
       </div>
     </div>

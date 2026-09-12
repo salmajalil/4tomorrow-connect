@@ -4,6 +4,8 @@ import { useState } from "react";
 import { DELIVERABLE_KINDS, DELIVERABLE_LABELS, type DeliverableKind } from "@/lib/deliver";
 import { ExecutionGantt } from "@/components/deliver/execution-gantt";
 import { parseJsonResponse } from "@/lib/parse-json-response";
+import { useLanguage } from "@/components/language-provider";
+import type { Dictionary } from "@/lib/i18n/dictionary";
 import type {
   Deliverable,
   DeliverableActionPlanContent,
@@ -32,11 +34,13 @@ function DeliverableContentView({
   deliverable,
   roadmapPhases,
   transformationId,
+  d,
 }: {
   kind: DeliverableKind;
   deliverable: Deliverable;
   roadmapPhases: RoadmapPhaseEntry[];
   transformationId: string;
+  d: Dictionary["deliver"]["deliverables"];
 }) {
   if (kind === "roadmap") {
     return <ExecutionGantt transformationId={transformationId} initialPhases={roadmapPhases} />;
@@ -72,15 +76,15 @@ function DeliverableContentView({
                   k.source === "trajectory" ? "text-success" : "text-accent-strong"
                 }`}
               >
-                {k.source === "trajectory" ? "Décide" : "Estimation"}
+                {k.source === "trajectory" ? d.decideSource : d.estimateSource}
               </span>
             </div>
             <p className="mt-1 text-ink">
-              Cible : {k.target} {k.unit}
+              {d.target} {k.target} {k.unit}
             </p>
             {k.current && (
               <p className="text-xs text-muted">
-                Actuel : {k.current} {k.unit}
+                {d.current} {k.current} {k.unit}
               </p>
             )}
           </div>
@@ -98,11 +102,11 @@ function DeliverableContentView({
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <p className="font-semibold text-ink">{r.name}</p>
               <span className="text-xs text-muted">
-                Probabilité {r.likelihood} · Impact {r.impact}
+                {d.likelihood} {r.likelihood} · {d.impact} {r.impact}
               </span>
             </div>
             <p className="mt-1 text-muted">{r.description}</p>
-            <p className="mt-1 text-xs text-ink">Mitigation : {r.mitigation}</p>
+            <p className="mt-1 text-xs text-ink">{d.mitigation} {r.mitigation}</p>
           </div>
         ))}
       </div>
@@ -152,6 +156,8 @@ export function DeliverablesTab({
   roadmapPhases: RoadmapPhaseEntry[];
   sourceDocText: string;
 }) {
+  const { t } = useLanguage();
+  const d = t.deliver.deliverables;
   const [generatingKind, setGeneratingKind] = useState<DeliverableKind | null>(null);
   const [boosting, setBoosting] = useState(false);
   const [openKind, setOpenKind] = useState<DeliverableKind | null>(null);
@@ -169,11 +175,11 @@ export function DeliverablesTab({
         body: JSON.stringify({ transformationId, kind, sourceDocText }),
       });
       const { data } = await parseJsonResponse(res);
-      if (!res.ok) throw new Error((data.error as string) || "Une erreur est survenue.");
+      if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
       onDeliverablesChange({ ...deliverables, [kind]: data.deliverable as Deliverable });
       setOpenKind(kind);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Une erreur est survenue.");
+      setError(err instanceof Error ? err.message : t.common.anErrorOccurred);
     } finally {
       setGeneratingKind(null);
     }
@@ -189,13 +195,13 @@ export function DeliverablesTab({
         body: JSON.stringify({ transformationId, sourceDocText }),
       });
       const { data } = await parseJsonResponse(res);
-      if (!res.ok) throw new Error((data.error as string) || "Une erreur est survenue.");
+      if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
       const next = { ...deliverables };
-      for (const d of (data.deliverables as Deliverable[]) ?? []) next[d.kind] = d;
+      for (const gen of (data.deliverables as Deliverable[]) ?? []) next[gen.kind] = gen;
       onDeliverablesChange(next);
       if (data.warning) setError(data.warning as string);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Une erreur est survenue.");
+      setError(err instanceof Error ? err.message : t.common.anErrorOccurred);
     } finally {
       setBoosting(false);
     }
@@ -204,8 +210,8 @@ export function DeliverablesTab({
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
-        <h3 className="font-semibold text-ink">Smart Deliverables Booster</h3>
-        <p className="mt-1 text-xs text-muted">Generate your full deliverable pack in one click with AI</p>
+        <h3 className="font-semibold text-ink">{d.boosterTitle}</h3>
+        <p className="mt-1 text-xs text-muted">{d.boosterSubtitle}</p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <button
             type="button"
@@ -213,10 +219,10 @@ export function DeliverablesTab({
             disabled={boosting || readyCount === DELIVERABLE_KINDS.length}
             className="rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-accent-ink hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {boosting ? "Génération..." : "Boost All"}
+            {boosting ? d.generating : d.boostAll}
           </button>
           <span className="text-xs font-semibold text-muted">
-            {readyCount}/{DELIVERABLE_KINDS.length} ready · {DELIVERABLE_KINDS.length - readyCount} remaining
+            {readyCount}/{DELIVERABLE_KINDS.length} {d.ready} · {DELIVERABLE_KINDS.length - readyCount} {d.remaining}
           </span>
         </div>
       </div>
@@ -237,7 +243,7 @@ export function DeliverablesTab({
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-ink">{DELIVERABLE_LABELS[kind]}</p>
-                  <p className="text-xs text-muted">{deliverable ? "Generated · click to view" : "Not generated"}</p>
+                  <p className="text-xs text-muted">{deliverable ? d.generated : d.notGenerated}</p>
                 </div>
                 {deliverable ? (
                   <button
@@ -245,7 +251,7 @@ export function DeliverablesTab({
                     onClick={() => setOpenKind(isOpen ? null : kind)}
                     className="shrink-0 rounded-lg border border-accent px-4 py-1.5 text-xs font-semibold text-accent hover:bg-accent hover:text-accent-ink"
                   >
-                    {isOpen ? "Fermer" : "View"}
+                    {isOpen ? d.close : d.view}
                   </button>
                 ) : (
                   <button
@@ -254,7 +260,7 @@ export function DeliverablesTab({
                     disabled={generatingKind === kind}
                     className="shrink-0 rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-accent-ink hover:bg-accent-strong disabled:opacity-50"
                   >
-                    {generatingKind === kind ? "..." : "Generate"}
+                    {generatingKind === kind ? "..." : d.generate}
                   </button>
                 )}
               </div>
@@ -266,6 +272,7 @@ export function DeliverablesTab({
                     deliverable={deliverable}
                     roadmapPhases={roadmapPhases}
                     transformationId={transformationId}
+                    d={d}
                   />
                 </div>
               )}

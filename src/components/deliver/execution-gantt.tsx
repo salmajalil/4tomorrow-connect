@@ -3,14 +3,10 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { parseJsonResponse } from "@/lib/parse-json-response";
+import { useLanguage } from "@/components/language-provider";
 import type { RoadmapExecutionStatus, RoadmapPhaseEntry } from "@/types/database";
 
 const GANTT_COLORS = ["#c9a256", "#7c93ad", "#c9713f", "#7ea88a", "#b98a9a"];
-const STATUS_LABELS: Record<RoadmapExecutionStatus, string> = {
-  upcoming: "À venir",
-  in_progress: "En cours",
-  done: "Terminée",
-};
 
 function daysBetween(a: string, b: string) {
   return (new Date(b).getTime() - new Date(a).getTime()) / 86_400_000;
@@ -48,6 +44,13 @@ export function ExecutionGantt({
   transformationId: string;
   initialPhases: RoadmapPhaseEntry[];
 }) {
+  const { t } = useLanguage();
+  const gantt = t.deliver.gantt;
+  const STATUS_LABELS: Record<RoadmapExecutionStatus, string> = {
+    upcoming: gantt.statusUpcoming,
+    in_progress: gantt.statusInProgress,
+    done: gantt.statusDone,
+  };
   const [phases, setPhases] = useState<RoadmapPhaseEntry[]>(initialPhases);
   const [priorityCost, setPriorityCost] = useState(50);
   const [priorityCo2, setPriorityCo2] = useState(50);
@@ -78,17 +81,17 @@ export function ExecutionGantt({
         body: JSON.stringify({ transformationId, priorityCost, priorityCo2, priorityRisk, prioritySpeed }),
       });
       const { data } = await parseJsonResponse(res);
-      if (!res.ok) throw new Error((data.error as string) || "Une erreur est survenue.");
+      if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
       setPhases(data.phases as RoadmapPhaseEntry[]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Une erreur est survenue.");
+      setError(err instanceof Error ? err.message : t.common.anErrorOccurred);
     } finally {
       setRegenerating(false);
     }
   }
 
   if (sorted.length === 0) {
-    return <p className="text-sm text-muted">Aucune roadmap disponible — génère-en une dans Decide d&apos;abord.</p>;
+    return <p className="text-sm text-muted">{gantt.noRoadmap}</p>;
   }
 
   const rangeStart = sorted[0].start_date;
@@ -160,15 +163,15 @@ export function ExecutionGantt({
             </div>
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Livrables</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{gantt.deliverables}</p>
                 <ul className="mt-1 list-inside list-disc text-xs text-ink">
-                  {phase.deliverables.map((d, j) => (
-                    <li key={j}>{d}</li>
+                  {phase.deliverables.map((item, j) => (
+                    <li key={j}>{item}</li>
                   ))}
                 </ul>
               </div>
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Actions</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{gantt.actions}</p>
                 <ul className="mt-1 list-inside list-disc text-xs text-ink">
                   {phase.actions.map((a, j) => (
                     <li key={j}>{a}</li>
@@ -176,7 +179,7 @@ export function ExecutionGantt({
                 </ul>
               </div>
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">KPIs de sortie</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{gantt.exitKpis}</p>
                 <ul className="mt-1 list-inside list-disc text-xs text-ink">
                   {phase.kpis.map((k, j) => (
                     <li key={j}>{k}</li>
@@ -190,12 +193,12 @@ export function ExecutionGantt({
 
       {hasUpcoming && (
         <div className="rounded-xl border border-border bg-surface p-4">
-          <h3 className="text-sm font-semibold text-ink">Réajuster les phases restantes</h3>
+          <h3 className="text-sm font-semibold text-ink">{gantt.adjustRemaining}</h3>
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <SliderMini label="Maîtrise des coûts" value={priorityCost} onChange={setPriorityCost} />
-            <SliderMini label="CO2 / durabilité" value={priorityCo2} onChange={setPriorityCo2} />
-            <SliderMini label="Réduction des risques" value={priorityRisk} onChange={setPriorityRisk} />
-            <SliderMini label="Rapidité" value={prioritySpeed} onChange={setPrioritySpeed} />
+            <SliderMini label={gantt.costControl} value={priorityCost} onChange={setPriorityCost} />
+            <SliderMini label={gantt.co2} value={priorityCo2} onChange={setPriorityCo2} />
+            <SliderMini label={gantt.riskReduction} value={priorityRisk} onChange={setPriorityRisk} />
+            <SliderMini label={gantt.speed} value={prioritySpeed} onChange={setPrioritySpeed} />
           </div>
           <button
             type="button"
@@ -203,7 +206,7 @@ export function ExecutionGantt({
             disabled={regenerating}
             className="mt-3 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink hover:bg-accent-strong disabled:opacity-50"
           >
-            {regenerating ? "Réajustement..." : "Regenerate"}
+            {regenerating ? gantt.adjusting : gantt.regenerate}
           </button>
           {error && <p className="mt-2 text-xs text-danger">{error}</p>}
         </div>

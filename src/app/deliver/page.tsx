@@ -2,15 +2,17 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Eyebrow } from "@/components/eyebrow";
+import { getLanguage } from "@/lib/i18n/language";
+import { getDictionary } from "@/lib/i18n/dictionary";
 import { DeliverFlow } from "./deliver-flow";
 import type { DeliverableKind, Deliverable } from "@/types/database";
 import type { Domain } from "@/lib/decide";
 
-function EmptyState({ message, ctaHref, ctaLabel }: { message: string; ctaHref: string; ctaLabel: string }) {
+function EmptyState({ title, message, ctaHref, ctaLabel }: { title: string; message: string; ctaHref: string; ctaLabel: string }) {
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-10">
       <Eyebrow>Deliver</Eyebrow>
-      <h1 className="mt-3 font-display text-3xl text-ink">Passer en exécution</h1>
+      <h1 className="mt-3 font-display text-3xl text-ink">{title}</h1>
       <div className="mt-6 rounded-xl border border-dashed border-border bg-surface p-8 text-center">
         <p className="text-sm text-muted">{message}</p>
         <Link
@@ -39,15 +41,20 @@ export default async function DeliverPage({
     redirect("/login?next=/deliver");
   }
 
+  const language = await getLanguage();
+  const t = getDictionary(language);
+  const empty = t.deliver.empty;
+
   const { data: orgs } = await supabase.from("organizations").select("id, name, industry").eq("owner_id", user.id);
   const orgIds = (orgs ?? []).map((o) => o.id);
 
   if (orgIds.length === 0) {
     return (
       <EmptyState
-        message="Aucun projet pour l'instant — lance d'abord un diagnostic dans Decide, choisis une trajectoire, puis reviens ici pour l'exécuter."
+        title={empty.title}
+        message={empty.noOrgMessage}
         ctaHref="/decide"
-        ctaLabel="Aller à Decide"
+        ctaLabel={empty.goToDecide}
       />
     );
   }
@@ -62,9 +69,10 @@ export default async function DeliverPage({
   if (!candidates || candidates.length === 0) {
     return (
       <EmptyState
-        message="Aucune trajectoire choisie pour l'instant — Deliver prend le relais une fois qu'un scénario a été choisi dans Decide."
+        title={empty.title}
+        message={empty.noTrajectoryMessage}
         ctaHref="/decide"
-        ctaLabel="Aller à Decide"
+        ctaLabel={empty.goToDecide}
       />
     );
   }
@@ -73,7 +81,7 @@ export default async function DeliverPage({
   // eligible projects (RLS-derived list above) — never pass through an
   // arbitrary id from the URL unchecked.
   const transformation =
-    candidates.find((t) => t.id === requestedTransformationId) ?? candidates[0];
+    candidates.find((c) => c.id === requestedTransformationId) ?? candidates[0];
   const org = (orgs ?? []).find((o) => o.id === transformation.organization_id);
   const trajectoryId = transformation.selected_trajectory_id as string;
 
@@ -98,7 +106,7 @@ export default async function DeliverPage({
 
   const projectTitle = transformation.challenges?.trim()
     ? transformation.challenges.trim().slice(0, 72)
-    : transformation.objectives?.trim()?.slice(0, 72) || org?.name || "Projet sans titre";
+    : transformation.objectives?.trim()?.slice(0, 72) || org?.name || t.common.untitledProject;
 
   return (
     <DeliverFlow

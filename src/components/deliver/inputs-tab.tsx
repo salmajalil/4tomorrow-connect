@@ -4,8 +4,9 @@ import { useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { extractFileText } from "@/lib/extract-file-text";
 import { DOMAIN_LABELS, type Domain } from "@/lib/decide";
+import { useLanguage } from "@/components/language-provider";
 
-function StatusBadge({ done, doneLabel = "Fait", todoLabel = "TO DO" }: { done: boolean; doneLabel?: string; todoLabel?: string }) {
+function StatusBadge({ done, doneLabel, todoLabel }: { done: boolean; doneLabel: string; todoLabel: string }) {
   return (
     <span
       className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
@@ -34,6 +35,8 @@ export function InputsTab({
   documentCount: number;
   onDocumentAdded: (text: string) => void;
 }) {
+  const { t } = useLanguage();
+  const inputs = t.deliver.inputs;
   const [constraints, setConstraints] = useState(initialConstraints);
   const [editingConstraints, setEditingConstraints] = useState(false);
   const [savingConstraints, setSavingConstraints] = useState(false);
@@ -67,7 +70,7 @@ export function InputsTab({
       const text = await extractFileText(file);
       onDocumentAdded(text);
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Extraction impossible.");
+      setUploadError(err instanceof Error ? err.message : t.decide.intake.uploadError);
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -78,19 +81,17 @@ export function InputsTab({
     <div className="flex flex-col gap-4">
       <div className="rounded-xl border border-border bg-surface p-4">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold text-ink">Diagnostic Assessment</h3>
-          <StatusBadge done={constraints.trim().length > 0} />
+          <h3 className="font-semibold text-ink">{inputs.diagnosticAssessment}</h3>
+          <StatusBadge done={constraints.trim().length > 0} doneLabel={inputs.done} todoLabel={inputs.todo} />
         </div>
-        <p className="mt-1 text-xs text-muted">
-          Answer the unified adaptive quest... — contraintes d&apos;implémentation non couvertes par le diagnostic Decide.
-        </p>
+        <p className="mt-1 text-xs text-muted">{inputs.diagnosticAssessmentDesc}</p>
         {editingConstraints ? (
           <div className="mt-3 flex flex-col gap-2">
             <textarea
               value={constraints}
               onChange={(e) => setConstraints(e.target.value)}
               rows={4}
-              placeholder="Contraintes réelles d'exécution : ressources disponibles, délais imposés, dépendances externes..."
+              placeholder={inputs.constraintsPlaceholder}
               className="resize-none rounded-lg border border-border bg-surface-2 px-3 py-2.5 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
             />
             <button
@@ -99,7 +100,7 @@ export function InputsTab({
               disabled={savingConstraints}
               className="self-start rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-accent-ink hover:bg-accent-strong disabled:opacity-50"
             >
-              {savingConstraints ? "Enregistrement..." : "Enregistrer"}
+              {savingConstraints ? inputs.saving : inputs.save}
             </button>
           </div>
         ) : (
@@ -110,7 +111,7 @@ export function InputsTab({
               onClick={() => setEditingConstraints(true)}
               className="mt-3 text-xs font-semibold text-accent underline underline-offset-2"
             >
-              {constraints.trim() ? "Modifier →" : "Répondre →"}
+              {constraints.trim() ? inputs.edit : inputs.answer}
             </button>
           </>
         )}
@@ -118,14 +119,12 @@ export function InputsTab({
 
       <div className="rounded-xl border border-border bg-surface p-4">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold text-ink">Project Documents</h3>
+          <h3 className="font-semibold text-ink">{inputs.projectDocuments}</h3>
           <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[10px] font-semibold text-muted">
-            {documentCount} document{documentCount > 1 ? "s" : ""}
+            {documentCount} {documentCount > 1 ? inputs.documents : inputs.document}
           </span>
         </div>
-        <p className="mt-1 text-xs text-muted">
-          Upload your documents (.txt, .md, .docx) — utilisés comme contexte pour la génération des livrables.
-        </p>
+        <p className="mt-1 text-xs text-muted">{inputs.projectDocumentsDesc}</p>
         <input
           ref={fileInputRef}
           type="file"
@@ -136,14 +135,14 @@ export function InputsTab({
           }}
           className="mt-3 text-xs text-muted file:mr-3 file:rounded-lg file:border file:border-border file:bg-surface-2 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-ink"
         />
-        {uploading && <p className="mt-1 text-xs text-muted">Extraction en cours...</p>}
+        {uploading && <p className="mt-1 text-xs text-muted">{inputs.extracting}</p>}
         {uploadError && <p className="mt-1 text-xs text-danger">{uploadError}</p>}
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-4">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold text-ink">Industry Context</h3>
-          <StatusBadge done={industry.trim().length > 0} doneLabel="Précisé" todoLabel="TO REFINE" />
+          <h3 className="font-semibold text-ink">{inputs.industryContext}</h3>
+          <StatusBadge done={industry.trim().length > 0} doneLabel={inputs.specified} todoLabel={inputs.toRefine} />
         </div>
         {domains.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -162,7 +161,7 @@ export function InputsTab({
             <input
               value={industry}
               onChange={(e) => setIndustry(e.target.value)}
-              placeholder="Ex : aéronautique"
+              placeholder={inputs.industryPlaceholder}
               className="min-w-0 flex-1 rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
             />
             <button
@@ -180,7 +179,7 @@ export function InputsTab({
             onClick={() => setEditingIndustry(true)}
             className="mt-3 text-xs font-semibold text-accent underline underline-offset-2"
           >
-            {industry.trim() ? `${industry} — modifier` : "Préciser le secteur →"}
+            {industry.trim() ? `${industry} — ${inputs.editSector}` : inputs.specifySector}
           </button>
         )}
       </div>

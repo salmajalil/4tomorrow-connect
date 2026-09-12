@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { parseJsonResponse } from "@/lib/parse-json-response";
 import { DELIVERABLE_KINDS } from "@/lib/deliver";
+import { useLanguage } from "@/components/language-provider";
 import type { MissionFeedback } from "@/types/database";
 
 function StatTile({ label, value }: { label: string; value: string | number }) {
@@ -27,6 +28,8 @@ export function ControlTowerTab({
   priorities: { id: string; name: string; reason: string | null }[];
   milestonesCount: number;
 }) {
+  const { t } = useLanguage();
+  const ct = t.deliver.controlTower;
   const [feedbackText, setFeedbackText] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -45,11 +48,11 @@ export function ControlTowerTab({
         body: JSON.stringify({ transformationId, feedbackText }),
       });
       const { data } = await parseJsonResponse(res);
-      if (!res.ok) throw new Error((data.error as string) || "Une erreur est survenue.");
+      if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
       setProposal(data.feedback as MissionFeedback);
       setApplied(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Une erreur est survenue.");
+      setError(err instanceof Error ? err.message : t.common.anErrorOccurred);
     } finally {
       setSending(false);
     }
@@ -66,10 +69,10 @@ export function ControlTowerTab({
         body: JSON.stringify({ feedbackId: proposal.id, applyRoadmapAdjustment: applyRoadmap }),
       });
       const { data } = await parseJsonResponse(res);
-      if (!res.ok) throw new Error((data.error as string) || "Une erreur est survenue.");
+      if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
       setApplied(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Une erreur est survenue.");
+      setError(err instanceof Error ? err.message : t.common.anErrorOccurred);
     } finally {
       setApplying(false);
     }
@@ -78,16 +81,16 @@ export function ControlTowerTab({
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3">
-        <StatTile label="READINESS" value={`${readinessPercent}%`} />
-        <StatTile label="DELIVERABLES" value={`${deliverablesReady}/${DELIVERABLE_KINDS.length}`} />
-        <StatTile label="PRIORITIES" value={priorities.length} />
-        <StatTile label="MILESTONES" value={milestonesCount} />
+        <StatTile label={ct.readiness} value={`${readinessPercent}%`} />
+        <StatTile label={ct.deliverablesStat} value={`${deliverablesReady}/${DELIVERABLE_KINDS.length}`} />
+        <StatTile label={ct.priorities} value={priorities.length} />
+        <StatTile label={ct.milestones} value={milestonesCount} />
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-4">
-        <h3 className="font-semibold text-ink">Execution Priorities</h3>
+        <h3 className="font-semibold text-ink">{ct.executionPriorities}</h3>
         {priorities.length === 0 ? (
-          <p className="mt-2 text-sm text-muted">No priorities yet. Complete the inputs, then boost your deliverables.</p>
+          <p className="mt-2 text-sm text-muted">{ct.noPriorities}</p>
         ) : (
           <div className="mt-2 flex flex-col gap-2">
             {priorities.map((p) => (
@@ -101,13 +104,13 @@ export function ControlTowerTab({
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-4">
-        <h3 className="font-semibold text-ink">Feedback &amp; Recalibration</h3>
-        <p className="mt-1 text-xs text-muted">Enter actual progress, delays, and risks — AI recalibrates the plan.</p>
+        <h3 className="font-semibold text-ink">{ct.feedbackTitle}</h3>
+        <p className="mt-1 text-xs text-muted">{ct.feedbackSubtitle}</p>
         <textarea
           value={feedbackText}
           onChange={(e) => setFeedbackText(e.target.value)}
           rows={3}
-          placeholder="Ex : la phase 1 a pris 2 semaines de retard à cause de..."
+          placeholder={ct.feedbackPlaceholder}
           className="mt-3 w-full resize-none rounded-lg border border-border bg-surface-2 px-3 py-2.5 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
         />
         <button
@@ -116,7 +119,7 @@ export function ControlTowerTab({
           disabled={sending || !feedbackText.trim()}
           className="mt-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {sending ? "Analyse..." : "Enter Feedback"}
+          {sending ? ct.analyzing : ct.enterFeedback}
         </button>
 
         {error && <p className="mt-2 text-xs text-danger">{error}</p>}
@@ -124,11 +127,11 @@ export function ControlTowerTab({
         {proposal && (
           <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted">Recommandation</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">{ct.recommendation}</p>
               <p className="mt-1 text-sm text-ink">{proposal.ai_summary.recommendation}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted">Priorités mises à jour</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">{ct.updatedPriorities}</p>
               <div className="mt-1 flex flex-col gap-1.5">
                 {proposal.ai_summary.updatedPriorities.map((p, i) => (
                   <div key={i} className="rounded-lg border border-border bg-surface-2 p-2 text-xs">
@@ -140,7 +143,7 @@ export function ControlTowerTab({
             {proposal.ai_summary.roadmapAdjustment?.proposed && (
               <div className="rounded-lg border border-accent/40 bg-accent/5 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-accent-strong">
-                  Ajustement de roadmap proposé
+                  {ct.roadmapAdjustmentProposed}
                 </p>
                 <p className="mt-1 text-sm text-ink">{proposal.ai_summary.roadmapAdjustment.note}</p>
                 <label className="mt-2 flex items-center gap-2 text-xs text-ink">
@@ -149,12 +152,12 @@ export function ControlTowerTab({
                     checked={applyRoadmap}
                     onChange={(e) => setApplyRoadmap(e.target.checked)}
                   />
-                  Appliquer aussi l&apos;ajustement de roadmap
+                  {ct.alsoApplyRoadmap}
                 </label>
               </div>
             )}
             {applied ? (
-              <p className="text-sm font-semibold text-success">✓ Appliqué</p>
+              <p className="text-sm font-semibold text-success">{ct.applied}</p>
             ) : (
               <button
                 type="button"
@@ -162,7 +165,7 @@ export function ControlTowerTab({
                 disabled={applying}
                 className="self-start rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink hover:bg-accent-strong disabled:opacity-50"
               >
-                {applying ? "Application..." : "Appliquer"}
+                {applying ? ct.applying : ct.apply}
               </button>
             )}
           </div>

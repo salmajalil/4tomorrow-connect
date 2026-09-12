@@ -33,7 +33,8 @@ export type ControlTowerProject = {
 // incrementally per event type.
 export async function fetchControlTowerProjects(
   supabase: SupabaseClient<Database>,
-  userId: string
+  userId: string,
+  untitledProjectLabel = "Projet sans titre"
 ): Promise<ControlTowerProject[]> {
   const { data: orgs } = await supabase.from("organizations").select("id, name").eq("owner_id", userId);
   const orgIds = (orgs ?? []).map((o) => o.id);
@@ -109,7 +110,7 @@ export async function fetchControlTowerProjects(
       ? t.challenges.trim().slice(0, 72) + (t.challenges.trim().length > 72 ? "…" : "")
       : t.objectives?.trim()
         ? t.objectives.trim().slice(0, 72)
-        : orgNameById.get(t.organization_id) || "Projet sans titre";
+        : orgNameById.get(t.organization_id) || untitledProjectLabel;
 
     return {
       transformationId: t.id,

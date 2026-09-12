@@ -7,14 +7,9 @@ import { fetchControlTowerProjects, MODULE_ORDER, type ControlTowerProject } fro
 import { Eyebrow } from "@/components/eyebrow";
 import { ExportPdfButton } from "@/components/export-pdf-button";
 import { DOMAIN_LABELS, type Domain } from "@/lib/decide";
+import { useLanguage } from "@/components/language-provider";
+import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { ModuleName, ModuleStatusValue } from "@/types/database";
-
-const MODULE_LABELS: Record<ModuleName, string> = {
-  decide: "Decide",
-  connect: "Connect",
-  learn: "Learn",
-  deliver: "Deliver",
-};
 
 function moduleHref(module: ModuleName, transformationId: string): string | null {
   if (module === "decide") return "/decide";
@@ -24,20 +19,17 @@ function moduleHref(module: ModuleName, transformationId: string): string | null
   return null;
 }
 
-const STATUS_LABELS: Record<ModuleStatusValue, string> = {
-  not_started: "Non démarré",
-  in_progress: "En cours",
-  done: "Terminé",
-};
-
-function LivePulse({ lastSync }: { lastSync: Date | null }) {
+function LivePulse({ lastSync, t }: { lastSync: Date | null; t: Dictionary }) {
+  const language = useLanguage().language;
   return (
     <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-live">
       <span className="relative flex h-2 w-2">
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-live opacity-60" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-live" />
       </span>
-      {lastSync ? `Synchronisé à ${lastSync.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` : "En direct"}
+      {lastSync
+        ? `${t.controlTower.syncedAt} ${lastSync.toLocaleTimeString(language === "fr" ? "fr-FR" : "en-US", { hour: "2-digit", minute: "2-digit" })}`
+        : t.controlTower.live}
     </span>
   );
 }
@@ -89,7 +81,15 @@ function ProgressRing({ percent }: { percent: number }) {
   );
 }
 
-function ModuleDots({ moduleStatus }: { moduleStatus: Record<ModuleName, ModuleStatusValue> }) {
+function ModuleDots({
+  moduleStatus,
+  moduleLabels,
+  statusLabels,
+}: {
+  moduleStatus: Record<ModuleName, ModuleStatusValue>;
+  moduleLabels: Record<ModuleName, string>;
+  statusLabels: Record<ModuleStatusValue, string>;
+}) {
   const dotStyles: Record<ModuleStatusValue, string> = {
     not_started: "bg-border",
     in_progress: "bg-accent animate-pulse",
@@ -98,9 +98,9 @@ function ModuleDots({ moduleStatus }: { moduleStatus: Record<ModuleName, ModuleS
   return (
     <div className="flex items-center gap-2">
       {MODULE_ORDER.map((m) => (
-        <span key={m} title={`${MODULE_LABELS[m]} — ${STATUS_LABELS[moduleStatus[m]]}`} className="flex flex-col items-center gap-1">
+        <span key={m} title={`${moduleLabels[m]} — ${statusLabels[moduleStatus[m]]}`} className="flex flex-col items-center gap-1">
           <span className={`h-2.5 w-2.5 rounded-full ${dotStyles[moduleStatus[m]]}`} />
-          <span className="text-[9px] uppercase tracking-wide text-muted">{MODULE_LABELS[m].slice(0, 3)}</span>
+          <span className="text-[9px] uppercase tracking-wide text-muted">{moduleLabels[m].slice(0, 3)}</span>
         </span>
       ))}
     </div>
@@ -141,14 +141,31 @@ function BadgeButton({
   );
 }
 
-function formatTargetDate(iso: string | null): string {
-  if (!iso) return "à définir";
-  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
+function formatTargetDate(iso: string | null, t: Dictionary, language: "fr" | "en"): string {
+  if (!iso) return t.controlTower.toBeDefined;
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString(language === "fr" ? "fr-FR" : "en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 type Panel = "hot" | "win" | "recs" | null;
 
-function ProjectCard({ project }: { project: ControlTowerProject }) {
+function ProjectCard({ project, t }: { project: ControlTowerProject; t: Dictionary }) {
+  const { language } = useLanguage();
+  const ct = t.controlTower;
+  const MODULE_LABELS: Record<ModuleName, string> = {
+    decide: t.nav.decide,
+    connect: t.nav.connect,
+    learn: t.nav.learn,
+    deliver: t.nav.deliver,
+  };
+  const STATUS_LABELS: Record<ModuleStatusValue, string> = {
+    not_started: ct.statusNotStarted,
+    in_progress: ct.statusInProgress,
+    done: ct.statusDone,
+  };
   const [panel, setPanel] = useState<Panel>(null);
   const domains = project.domains as Domain[];
   const relevantRecs = project.moduleRecommendations.filter((r) => r.relevance !== "not_relevant");
@@ -180,10 +197,10 @@ function ProjectCard({ project }: { project: ControlTowerProject }) {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <ModuleDots moduleStatus={project.moduleStatus} />
+        <ModuleDots moduleStatus={project.moduleStatus} moduleLabels={MODULE_LABELS} statusLabels={STATUS_LABELS} />
         <span className="flex items-center gap-1.5 text-xs text-muted">
           <span aria-hidden>📅</span>
-          Cible : {formatTargetDate(project.targetDate)}
+          {ct.target} {formatTargetDate(project.targetDate, t, language)}
         </span>
       </div>
 
@@ -198,7 +215,7 @@ function ProjectCard({ project }: { project: ControlTowerProject }) {
               panel === "recs" ? "border-accent bg-accent/15 text-accent-strong" : "border-accent/30 bg-accent/5 text-accent-strong"
             }`}
           >
-            → {relevantRecs.length} module{relevantRecs.length > 1 ? "s" : ""} recommandé{relevantRecs.length > 1 ? "s" : ""}
+            → {relevantRecs.length} {ct.recommendedModules}
           </button>
         )}
       </div>
@@ -207,8 +224,7 @@ function ProjectCard({ project }: { project: ControlTowerProject }) {
         <div className="flex flex-col gap-2 border-t border-border pt-4">
           {project.pendingValidationCount > 0 && (
             <p className="rounded-lg border border-danger/30 bg-danger/5 p-2.5 text-xs text-ink">
-              ⚠ {project.pendingValidationCount} donnée{project.pendingValidationCount > 1 ? "s" : ""} financière
-              {project.pendingValidationCount > 1 ? "s" : ""} en attente de validation
+              ⚠ {project.pendingValidationCount} {ct.pendingValidation}
             </p>
           )}
           {project.risks.map((r) => (
@@ -222,7 +238,7 @@ function ProjectCard({ project }: { project: ControlTowerProject }) {
 
       {panel === "win" && (
         <div className="flex flex-col gap-2 border-t border-border pt-4">
-          <p className="text-xs text-muted">{doneCount}/{MODULE_ORDER.length} modules terminés</p>
+          <p className="text-xs text-muted">{doneCount}/{MODULE_ORDER.length} {ct.modulesCompleted}</p>
           {project.keyMetrics.map((m) => (
             <div key={m.key} className="flex items-center justify-between rounded-lg border border-success/30 bg-success/5 p-2.5 text-xs">
               <span className="text-muted">{m.key}</span>
@@ -250,10 +266,10 @@ function ProjectCard({ project }: { project: ControlTowerProject }) {
                 </div>
                 {href ? (
                   <Link href={href} className="shrink-0 font-semibold text-accent underline underline-offset-2">
-                    Ouvrir →
+                    {ct.open}
                   </Link>
                 ) : (
-                  <span className="shrink-0 text-muted">Bientôt</span>
+                  <span className="shrink-0 text-muted">{ct.soon}</span>
                 )}
               </div>
             );
@@ -271,15 +287,17 @@ export function ControlTowerView({
   userId: string;
   initialProjects: ControlTowerProject[];
 }) {
+  const { t } = useLanguage();
+  const ct = t.controlTower;
   const [projects, setProjects] = useState(initialProjects);
   const [lastSync, setLastSync] = useState<Date | null>(null);
 
   const refresh = useCallback(async () => {
     const supabase = createClient();
-    const next = await fetchControlTowerProjects(supabase, userId);
+    const next = await fetchControlTowerProjects(supabase, userId, t.common.untitledProject);
     setProjects(next);
     setLastSync(new Date());
-  }, [userId]);
+  }, [userId, t.common.untitledProject]);
 
   // All these tables are already in the supabase_realtime publication
   // (migration 0002) and RLS-scoped, so subscribing without a per-row
@@ -312,25 +330,26 @@ export function ControlTowerView({
     <div className="mx-auto w-full max-w-3xl px-4 py-10">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Eyebrow>Tour de contrôle</Eyebrow>
-          <h1 className="mt-3 font-display text-3xl text-ink">Vue d&apos;ensemble de tes projets</h1>
+          <Eyebrow>{ct.eyebrow}</Eyebrow>
+          <h1 className="mt-3 font-display text-3xl text-ink">{ct.title}</h1>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <LivePulse lastSync={lastSync} />
+          <LivePulse lastSync={lastSync} t={t} />
           {projects.length > 0 && (
             <ExportPdfButton
               kind="control-tower"
               payload={{ projects }}
               filename="4tomorrow-tour-de-controle.pdf"
+              label={ct.exportPdf}
             />
           )}
         </div>
       </div>
 
       <div className="mt-6 grid grid-cols-3 gap-3">
-        <StatTile label="Projets" value={projects.length} />
-        <StatTile label="Points chauds" value={totalHot} tone={totalHot > 0 ? "danger" : undefined} />
-        <StatTile label="Achievements" value={totalWin} />
+        <StatTile label={ct.projects} value={projects.length} />
+        <StatTile label={ct.hotPoints} value={totalHot} tone={totalHot > 0 ? "danger" : undefined} />
+        <StatTile label={ct.achievements} value={totalWin} />
       </div>
 
       <div className="mt-6">
@@ -338,20 +357,18 @@ export function ControlTowerView({
           href="/decide"
           className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong"
         >
-          + Nouveau diagnostic
+          {ct.newDiagnostic}
         </Link>
       </div>
 
       {projects.length === 0 ? (
         <div className="mt-10 rounded-xl border border-dashed border-border bg-surface p-10 text-center">
-          <p className="text-sm text-muted">
-            Aucun projet pour l&apos;instant. Lance un diagnostic pour démarrer ta première transformation.
-          </p>
+          <p className="text-sm text-muted">{ct.emptyMessage}</p>
         </div>
       ) : (
         <div className="mt-8 flex flex-col gap-4">
           {projects.map((p) => (
-            <ProjectCard key={p.transformationId} project={p} />
+            <ProjectCard key={p.transformationId} project={p} t={t} />
           ))}
         </div>
       )}

@@ -45,11 +45,20 @@ export interface LearnGenerationInput {
 
 const quizOptionSchema = z.object({ id: z.string().min(1), text: z.string().min(1) });
 
+// Split in two so the two calls run in parallel (see the API route) —
+// a single call producing all of this (summary + insights + flashcards +
+// quiz + video script) plus web search overshot mobile connections'
+// tolerance in production ("connexion coupée" after ~3 min). Wall-clock
+// time here is bounded by the slower of the two calls, not their sum —
+// same fix DECIDE's scenarios route already proved out for this exact
+// shape of problem. Neither half is optional — the route treats both as
+// required and fails the whole generation if either one does.
+//
 // Slack above the stated prompt targets everywhere below — the model
 // overshot exact array caps in production for DECIDE even once told the
 // target count in prose (scenarios, roadmap), so this module starts with
 // that margin already built in rather than discovering it the same way.
-const trainingOutputSchema = z.object({
+const coreOutputSchema = z.object({
   domains: z.array(z.enum(DOMAINS)).min(1),
   objectives: z.array(z.string().min(1)).min(2).max(5),
   prerequisites: z.string().min(1),
@@ -64,6 +73,11 @@ const trainingOutputSchema = z.object({
     .min(2)
     .max(6),
   businessImplications: z.array(z.object({ text: z.string().min(1) })).min(1).max(5),
+});
+
+export type LearnCoreOutput = z.infer<typeof coreOutputSchema>;
+
+const interactiveOutputSchema = z.object({
   flashcards: z
     .array(z.object({ question: z.string().min(1), answer: z.string().min(1), category: z.string().nullable().optional() }))
     .min(3)
@@ -95,22 +109,30 @@ const trainingOutputSchema = z.object({
   }),
 });
 
-export type TrainingOutput = z.infer<typeof trainingOutputSchema>;
+export type LearnInteractiveOutput = z.infer<typeof interactiveOutputSchema>;
 
-export function buildLearnSystemPrompt(mode: TrainingMode, hasSourceDoc: boolean, hasLinkedDiagnostic: boolean): string {
-  const groundingLine =
-    mode === "document" && hasSourceDoc
-      ? "GROUNDING: a source document is provided below. It is the factual authority — structure and complete it, never contradict or invent facts absent from it. Use web_search only to find 1-2 real external examples that illustrate the document's content."
-      : mode === "diagnostic" && hasLinkedDiagnostic
-        ? "GROUNDING: this training is linked to an already-diagnosed transformation (domains, challenges, objectives given below) — make every example and insight specific to that real context, never generic."
-        : "GROUNDING: no source document or linked diagnostic — rely on the topic description and use web_search to ground key insights and examples in real, specific, verifiable cases.";
+// What the route persists — the two halves merged back together.
+export type TrainingOutput = LearnCoreOutput & LearnInteractiveOutput;
 
-  return `You are the training generation engine for "4 Tomorrow / Learn", producing short professional training content that also has to double as Qualiopi-compliant evidence (the French national training-quality certification) without the user doing any extra paperwork.
+function groundingLine(mode: TrainingMode, hasSourceDoc: boolean, hasLinkedDiagnostic: boolean): string {
+  return mode === "document" && hasSourceDoc
+    ? "GROUNDING: a source document is provided below. It is the factual authority — structure and complete it, never contradict or invent facts absent from it. Use web_search only to find 1-2 real external examples that illustrate the document's content."
+    : mode === "diagnostic" && hasLinkedDiagnostic
+      ? "GROUNDING: this training is linked to an already-diagnosed transformation (domains, challenges, objectives given below) — make every example and insight specific to that real context, never generic."
+      : "GROUNDING: no source document or linked diagnostic — rely on the topic description and use web_search to ground key insights and examples in real, specific, verifiable cases.";
+}
 
-STEP 0 — DOMAIN DETECTION (same classification as the rest of 4 Tomorrow, internal reasoning):
-Classify the topic into one or more of: manufacturing, rd, gtm, strategy, digitalization.
+const DOMAIN_STEP = `STEP 0 — DOMAIN DETECTION (same classification as the rest of 4 Tomorrow, internal reasoning):
+Classify the topic into one or more of: manufacturing, rd, gtm, strategy, digitalization.`;
 
-${groundingLine}
+const NEVER_GENERIC = `CORE RULE — NEVER GENERIC: every sentence must contain something that would only be true for this exact topic — a number, a name, a real detail. If information is insufficient to be specific on a point, say so rather than filling in a plausible generality.`;
+
+export function buildLearnCoreSystemPrompt(mode: TrainingMode, hasSourceDoc: boolean, hasLinkedDiagnostic: boolean): string {
+  return `You are the training generation engine for "4 Tomorrow / Learn" — this call produces the core content (summary + insights) of a short professional training that also has to double as Qualiopi-compliant evidence (the French national training-quality certification) without the user doing any extra paperwork.
+
+${DOMAIN_STEP}
+
+${groundingLine(mode, hasSourceDoc, hasLinkedDiagnostic)}
 
 You have a web_search tool (max 2 uses). Use it to find REAL, specific, verifiable examples, case studies, or figures — never a generic claim. Cite the source in "source" when you use one. Work under a hard time budget: a complete, on-time answer beats an exhaustive but late one.
 
@@ -119,13 +141,10 @@ PRINCIPE DIRECTEUR — everything adapts to the actual topic and domain, nothing
 - prerequisites: state plainly if there truly are none — never invent a prerequisite to sound thorough.
 - keyInsights: facts specific to THIS topic, each with a real source when found via web_search (a real organization, publication, or figure — never invented). This is what makes the training feel alive rather than generic — treat it as the most important field.
 - businessImplications: concrete consequences for an organization acting on this topic — costs, risks, opportunities, never platitudes.
-- flashcards: question/answer pairs testing real understanding, not trivia — vary difficulty.
-- comprehensionCheck: exactly 4 options per question, plausible distractors (not obviously wrong), one correct answer, and an explanation that teaches something even to someone who got it right.
-- videoScript: a scene-by-scene narration + visual suggestion + duration per scene — this is a script/storyboard for someone to film or feed to a video tool, not a finished video. Total duration should roughly match durationMinutes.
 
-CORE RULE — NEVER GENERIC: every sentence must contain something that would only be true for this exact topic — a number, a name, a real detail. If information is insufficient to be specific on a point, say so rather than filling in a plausible generality.
+${NEVER_GENERIC}
 
-HARD ARRAY LIMITS — never exceed these, the response is rejected otherwise: objectives ≤4, executiveSummary.actionPlan ≤5, keyInsights ≤5, businessImplications ≤4, flashcards ≤8, comprehensionCheck ≤5 questions (each with exactly 4 options), videoScript.scenes ≤8. Pick the most important entries rather than listing everything you can think of.
+HARD ARRAY LIMITS — never exceed these, the response is rejected otherwise: objectives ≤4, executiveSummary.actionPlan ≤5, keyInsights ≤5, businessImplications ≤4. Pick the most important entries rather than listing everything you can think of.
 
 Respond in French except JSON keys, which stay in English exactly as specified.
 
@@ -139,7 +158,34 @@ Schema:
   "durationMinutes": number,
   "executiveSummary": { "addressedChallenge": string, "summary": string, "actionPlan": [string] },
   "keyInsights": [{ "text": string, "source": string|null }],
-  "businessImplications": [{ "text": string }],
+  "businessImplications": [{ "text": string }]
+}`;
+}
+
+export function buildLearnInteractiveSystemPrompt(mode: TrainingMode, hasSourceDoc: boolean, hasLinkedDiagnostic: boolean): string {
+  return `You are the training generation engine for "4 Tomorrow / Learn" — this call produces the interactive/media content (flashcards, quiz, video script) of a short professional training. A separate parallel call is producing the summary and key insights for the same topic — your job is only this part, not to reference or restate the other.
+
+${DOMAIN_STEP}
+
+${groundingLine(mode, hasSourceDoc, hasLinkedDiagnostic)}
+
+You have a web_search tool (max 1 use) — only if you need one concrete fact to ground a flashcard or quiz question; don't spend it on exhaustive research. Work under a hard time budget: a complete, on-time answer beats an exhaustive but late one.
+
+PRINCIPE DIRECTEUR — everything adapts to the actual topic and domain, nothing is templated:
+- flashcards: question/answer pairs testing real understanding, not trivia — vary difficulty.
+- comprehensionCheck: exactly 4 options per question, plausible distractors (not obviously wrong), one correct answer, and an explanation that teaches something even to someone who got it right.
+- videoScript: a scene-by-scene narration + visual suggestion + duration per scene — this is a script/storyboard for someone to film or feed to a video tool, not a finished video.
+
+${NEVER_GENERIC}
+
+HARD ARRAY LIMITS — never exceed these, the response is rejected otherwise: flashcards ≤8, comprehensionCheck ≤5 questions (each with exactly 4 options), videoScript.scenes ≤8. Pick the most important entries rather than listing everything you can think of.
+
+Respond in French except JSON keys, which stay in English exactly as specified.
+
+${RESULT_INSTRUCTION}
+
+Schema:
+{
   "flashcards": [{ "question": string, "answer": string, "category": string|null }],
   "comprehensionCheck": [{ "question": string, "options": [{ "id": string, "text": string }] (exactly 4), "correctOptionId": string, "explanation": string }],
   "videoScript": { "title": string, "scenes": [{ "sceneNumber": number, "narration": string, "visualSuggestion": string, "durationSeconds": number }] }
@@ -163,9 +209,20 @@ Objectifs du projet lié : ${input.linkedObjectives || "(non fourni)"}
 }${input.sourceDocText ? `Document source fourni (autorité factuelle) :\n${input.sourceDocText}` : ""}`;
 }
 
-export function parseLearnOutput(rawText: string): TrainingOutput {
+export function parseLearnCoreOutput(rawText: string): LearnCoreOutput {
   const raw = extractJson(rawText);
-  const parsed = trainingOutputSchema.safeParse(raw);
+  const parsed = coreOutputSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new LearnParseError(
+      `Le résultat de la formation ne respecte pas le format attendu : ${parsed.error.message}`
+    );
+  }
+  return parsed.data;
+}
+
+export function parseLearnInteractiveOutput(rawText: string): LearnInteractiveOutput {
+  const raw = extractJson(rawText);
+  const parsed = interactiveOutputSchema.safeParse(raw);
   if (!parsed.success) {
     throw new LearnParseError(
       `Le résultat de la formation ne respecte pas le format attendu : ${parsed.error.message}`

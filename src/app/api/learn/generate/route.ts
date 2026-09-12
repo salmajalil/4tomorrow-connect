@@ -4,11 +4,14 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
 import {
-  buildLearnSystemPrompt,
+  buildLearnCoreSystemPrompt,
+  buildLearnInteractiveSystemPrompt,
   buildLearnUserPrompt,
-  parseLearnOutput,
+  parseLearnCoreOutput,
+  parseLearnInteractiveOutput,
   LearnParseError,
   type TrainingMode,
+  type TrainingOutput,
   type Domain,
 } from "@/lib/learn";
 import { setModuleStatus } from "@/lib/module-status";
@@ -17,6 +20,54 @@ import { setModuleStatus } from "@/lib/module-status";
 // headroom budget the scenarios route settled on after production timeout
 // tuning, not a conservative default to be raised later.
 export const maxDuration = 180;
+
+class LearnMaxTokensError extends Error {}
+
+// One call producing everything (summary + insights + flashcards + quiz +
+// video script) took long enough in production for mobile connections to
+// drop mid-flight ("connexion coupée" after several minutes) — 16000
+// max_tokens fixed the earlier truncation bug but made that worse, since
+// more budget means the model can legitimately spend more time generating.
+// Split into two smaller parallel calls instead (same fix DECIDE's
+// scenarios route already proved for this exact shape of problem): total
+// wall-clock is bounded by the slower of the two, not their sum.
+async function runLearnCompletion(
+  anthropic: Anthropic,
+  system: string,
+  userPrompt: string,
+  maxTokens: number,
+  webSearchMaxUses: number
+): Promise<string> {
+  const createCall = () =>
+    anthropic.messages.create({
+      model: MATCHING_MODEL,
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: "user", content: userPrompt }],
+      tools: [{ type: "web_search_20260318", name: "web_search", max_uses: webSearchMaxUses }],
+    });
+
+  let response;
+  try {
+    response = await createCall();
+  } catch (err) {
+    if (err instanceof Anthropic.APIError && (err.status === 429 || err.status === 529)) {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      response = await createCall();
+    } else {
+      throw err;
+    }
+  }
+
+  if (response.stop_reason === "max_tokens") {
+    throw new LearnMaxTokensError();
+  }
+
+  return response.content
+    .filter((block): block is Anthropic.TextBlock => block.type === "text")
+    .map((block) => block.text)
+    .join("\n");
+}
 
 const requestSchema = z.object({
   transformationId: z.string().uuid().nullable().optional(),
@@ -118,7 +169,9 @@ export async function POST(request: Request) {
 
   const anthropic = getAnthropicClient();
   const mode: TrainingMode = body.mode;
-  const system = buildLearnSystemPrompt(mode, !!body.sourceDocText, !!linkedChallenges);
+  const hasLinkedDiagnostic = !!linkedChallenges;
+  const coreSystem = buildLearnCoreSystemPrompt(mode, !!body.sourceDocText, hasLinkedDiagnostic);
+  const interactiveSystem = buildLearnInteractiveSystemPrompt(mode, !!body.sourceDocText, hasLinkedDiagnostic);
   const userPrompt = buildLearnUserPrompt({
     topic: body.topic,
     organization: organizationName,
@@ -131,57 +184,30 @@ export async function POST(request: Request) {
     linkedDomains: linkedDomains.length > 0 ? (linkedDomains as Domain[]) : undefined,
   });
 
-  const createCall = () =>
-    anthropic.messages.create({
-      model: MATCHING_MODEL,
-      // First attempt at this route used 6500 and truncated in production:
-      // web_search_tool_result blocks (2 rounds) count against max_tokens
-      // just like the JSON answer does, and Learn's schema (insights +
-      // flashcards + quiz + an 8-scene video script) is the largest of any
-      // module's output. 16000 is the documented safe ceiling for a
-      // non-streaming call on this model family — real headroom, not a
-      // guess to be raised again later.
-      max_tokens: 16000,
-      system,
-      messages: [{ role: "user", content: userPrompt }],
-      tools: [{ type: "web_search_20260318", name: "web_search", max_uses: 2 }],
-    });
-
-  let response;
+  let coreRaw: string;
+  let interactiveRaw: string;
   try {
-    response = await createCall();
+    [coreRaw, interactiveRaw] = await Promise.all([
+      runLearnCompletion(anthropic, coreSystem, userPrompt, 6000, 2),
+      runLearnCompletion(anthropic, interactiveSystem, userPrompt, 10000, 1),
+    ]);
   } catch (err) {
-    if (err instanceof Anthropic.APIError && (err.status === 429 || err.status === 529)) {
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-        response = await createCall();
-      } catch (retryErr) {
-        return handleAnthropicError(retryErr);
-      }
-    } else {
-      return handleAnthropicError(err);
+    if (err instanceof LearnMaxTokensError) {
+      // Distinct from a parse failure — the model was cut off mid-answer.
+      // Surfacing this separately (instead of falling into the generic
+      // LearnParseError message below) makes a real future regression
+      // diagnosable from the error text alone, without a Vercel log dive.
+      return NextResponse.json(
+        { error: "La génération a été interrompue avant la fin (contenu trop long). Réessaie, idéalement avec un sujet plus ciblé." },
+        { status: 502 }
+      );
     }
+    return handleAnthropicError(err);
   }
 
-  if (response.stop_reason === "max_tokens") {
-    // Distinct from a parse failure — the model was cut off mid-answer.
-    // Surfacing this separately (instead of falling into the generic
-    // LearnParseError message below) makes a real future regression
-    // diagnosable from the error text alone, without a Vercel log dive.
-    return NextResponse.json(
-      { error: "La génération a été interrompue avant la fin (contenu trop long). Réessaie, idéalement avec un sujet plus ciblé." },
-      { status: 502 }
-    );
-  }
-
-  const rawText = response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("\n");
-
-  let result;
+  let result: TrainingOutput;
   try {
-    result = parseLearnOutput(rawText);
+    result = { ...parseLearnCoreOutput(coreRaw), ...parseLearnInteractiveOutput(interactiveRaw) };
   } catch (err) {
     if (err instanceof LearnParseError) {
       return NextResponse.json({ error: err.message }, { status: 502 });

@@ -63,7 +63,12 @@ const diagnosticSchema = z.object({
   domains: z.array(z.enum(DOMAINS)).min(1),
   maturityReading: z.string().min(1),
   gaps: z.array(z.object({ name: z.string().min(1), reason: z.string().min(1) })).min(1).max(3),
-  priorities: z.array(z.object({ name: z.string().min(1), reason: z.string().min(1) })).min(1).max(3),
+  rootCauses: z.array(z.object({ name: z.string().min(1), reason: z.string().min(1) })).min(1).max(4),
+  decisionCriteria: z.array(z.string().min(1)).min(2).max(5),
+  priorities: z
+    .array(z.object({ name: z.string().min(1), reason: z.string().min(1), weight: z.number().min(0).max(100) }))
+    .min(1)
+    .max(4),
   risks: z.array(z.object({ name: z.string().min(1), reason: z.string().min(1) })).min(1).max(3),
   startingRecommendation: z.string().min(1),
   moduleRecommendations: z.object({
@@ -92,11 +97,13 @@ CORE RULE — NEVER GENERIC: every sentence you write must contain something tha
 Produce:
 1. domains: the detected domain(s) from the list above.
 2. maturityReading: one paragraph reading of the organization's current maturity on this challenge, grounded in what they actually said.
-3. gaps: up to 3 concrete gaps (missing capability, resource, or knowledge) — each tied to something specific in the intake.
-4. priorities: up to 3 priorities — what matters most to address first, and why, specific to this challenge.
-5. risks: up to 3 cross-cutting risks (not yet tied to any specific strategic option).
-6. startingRecommendation: one paragraph — where to start, concretely.
-7. moduleRecommendations: for each of "connect", "learn", "deliver", a relevance ("relevant" | "possible" | "not_relevant") and a one-sentence reason grounded in the actual gaps found:
+3. gaps: up to 3 concrete gaps (missing capability, resource, or knowledge) — WHAT is missing, each tied to something specific in the intake.
+4. rootCauses: up to 4 root causes — WHY those gaps exist (a structural, organizational, or technical reason behind the symptom), distinct from the gaps themselves. Never restate a gap under a different name — a root cause explains it.
+5. decisionCriteria: 2 to 5 criteria that should drive evaluating the strategic options later (e.g. "temps avant retour sur investissement", "% de réduction CO2", "risque d'arrêt de production pendant le déploiement" for an industrial subject; "délai de mise sur le marché", "impact sur la rétention client" for a commercial/digital one) — adapt entirely to the subject, never a fixed list.
+6. priorities: up to 4 priorities — what matters most to address first, and why, specific to this challenge. Each carries a "weight" (0-100) reflecting its relative importance; weights across all returned priorities must sum to 100.
+7. risks: up to 3 cross-cutting risks (not yet tied to any specific strategic option).
+8. startingRecommendation: one paragraph — where to start, concretely.
+9. moduleRecommendations: for each of "connect", "learn", "deliver", a relevance ("relevant" | "possible" | "not_relevant") and a one-sentence reason grounded in the actual gaps found:
    - connect is "relevant" when a gap implies needing something external (a technology, partner, supplier, or skill not held internally).
    - learn is "relevant" when a gap is capability/human in nature (missing internal skills, a team that needs training) rather than purely technical or external.
    - deliver stays "possible" at this stage (no strategic option has been chosen yet to execute) — never "relevant" here, and never "not_relevant" either, since execution is always eventually needed once a path is chosen.
@@ -110,7 +117,9 @@ Schema:
   "domains": ["manufacturing" | "rd" | "gtm" | "strategy" | "digitalization", ...],
   "maturityReading": string,
   "gaps": [{ "name": string, "reason": string }],
-  "priorities": [{ "name": string, "reason": string }],
+  "rootCauses": [{ "name": string, "reason": string }],
+  "decisionCriteria": [string, ...],
+  "priorities": [{ "name": string, "reason": string, "weight": number }],
   "risks": [{ "name": string, "reason": string }],
   "startingRecommendation": string,
   "moduleRecommendations": {

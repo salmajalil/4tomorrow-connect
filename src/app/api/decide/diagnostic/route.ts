@@ -58,7 +58,10 @@ export async function POST(request: Request) {
   try {
     response = await anthropic.messages.create({
       model: MATCHING_MODEL,
-      max_tokens: 3000,
+      // Raised from 3000 pre-emptively: rootCauses/decisionCriteria/weighted
+      // priorities just added the same kind of extra JSON content that
+      // truncated the scenarios/roadmap responses at their original budgets.
+      max_tokens: 4000,
       system: buildDiagnosticSystemPrompt(),
       messages: [{ role: "user", content: buildDiagnosticUserPrompt(body) }],
     });

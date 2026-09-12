@@ -12,7 +12,9 @@ export interface DiagnosticResult {
   domains: Domain[];
   maturityReading: string;
   gaps: { name: string; reason: string }[];
-  priorities: { name: string; reason: string }[];
+  rootCauses: { name: string; reason: string }[];
+  decisionCriteria: string[];
+  priorities: { name: string; reason: string; weight: number }[];
   risks: { name: string; reason: string }[];
   startingRecommendation: string;
   moduleRecommendations: Record<RecommendableModule, { relevance: ModuleRelevance; reason: string }>;
@@ -127,7 +129,7 @@ export function DiagnosticView({
 
       <p className="text-base leading-relaxed text-ink">{result.maturityReading}</p>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Gaps</h2>
           <ul className="mt-2 flex flex-col gap-2">
@@ -140,12 +142,29 @@ export function DiagnosticView({
           </ul>
         </div>
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Priorités</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Causes racines</h2>
+          <ul className="mt-2 flex flex-col gap-2">
+            {result.rootCauses.map((c, i) => (
+              <li key={i} className="rounded-lg border border-border bg-surface p-3 text-sm">
+                <p className="font-medium text-ink">{c.name}</p>
+                <p className="mt-1 text-muted">{c.reason}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Priorités (pondérées)</h2>
           <ul className="mt-2 flex flex-col gap-2">
             {result.priorities.map((p, i) => (
               <li key={i} className="rounded-lg border border-border bg-surface p-3 text-sm">
-                <p className="font-medium text-ink">{p.name}</p>
-                <p className="mt-1 text-muted">{p.reason}</p>
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="font-medium text-ink">{p.name}</p>
+                  <span className="text-xs font-semibold text-accent">{p.weight}%</span>
+                </div>
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
+                  <div className="h-full rounded-full bg-accent" style={{ width: `${p.weight}%` }} />
+                </div>
+                <p className="mt-1.5 text-muted">{p.reason}</p>
               </li>
             ))}
           </ul>
@@ -160,6 +179,22 @@ export function DiagnosticView({
               </li>
             ))}
           </ul>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+          Critères de décision retenus
+        </h2>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {result.decisionCriteria.map((c, i) => (
+            <span
+              key={i}
+              className="rounded-full border border-border bg-surface-2 px-3 py-1 text-xs font-medium text-ink"
+            >
+              {c}
+            </span>
+          ))}
         </div>
       </div>
 

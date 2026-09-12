@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Eyebrow } from "@/components/eyebrow";
 import { createClient } from "@/lib/supabase/client";
 import { DOMAIN_LABELS, type Domain } from "@/lib/decide";
+import { useLanguage } from "@/components/language-provider";
+import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { ModuleRelevance, RecommendableModule } from "@/types/database";
 
 export interface DiagnosticResult {
@@ -20,12 +22,6 @@ export interface DiagnosticResult {
   moduleRecommendations: Record<RecommendableModule, { relevance: ModuleRelevance; reason: string }>;
 }
 
-const MODULE_LABELS: Record<RecommendableModule, string> = {
-  connect: "Connect",
-  learn: "Learn",
-  deliver: "Deliver",
-};
-
 function moduleHref(module: RecommendableModule, transformationId: string): string | null {
   if (module === "connect") return "/connect";
   if (module === "learn") return `/learn?transformationId=${transformationId}`;
@@ -33,26 +29,28 @@ function moduleHref(module: RecommendableModule, transformationId: string): stri
   return null;
 }
 
-const RELEVANCE_LABELS: Record<ModuleRelevance, string> = {
-  relevant: "Pertinent",
-  possible: "Possible",
-  not_relevant: "Pas pertinent maintenant",
-};
-
 function ModuleRecommendationCard({
   module,
   relevance,
   reason,
   transformationId,
+  t,
 }: {
   module: RecommendableModule;
   relevance: ModuleRelevance;
   reason: string;
   transformationId: string;
+  t: Dictionary;
 }) {
   const [checked, setChecked] = useState(relevance === "relevant");
   const [saving, setSaving] = useState(false);
   const href = moduleHref(module, transformationId);
+  const moduleLabel = t.nav[module];
+  const relevanceLabels: Record<ModuleRelevance, string> = {
+    relevant: t.decide.diagnostic.relevanceRelevant,
+    possible: t.decide.diagnostic.relevancePossible,
+    not_relevant: t.decide.diagnostic.relevanceNotRelevant,
+  };
 
   async function toggle() {
     const next = !checked;
@@ -78,7 +76,7 @@ function ModuleRecommendationCard({
             disabled={saving}
             className="h-4 w-4 accent-[var(--accent)]"
           />
-          {MODULE_LABELS[module]}
+          {moduleLabel}
         </label>
         <span
           className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
@@ -89,16 +87,16 @@ function ModuleRecommendationCard({
                 : "bg-surface-2 text-muted"
           }`}
         >
-          {RELEVANCE_LABELS[relevance]}
+          {relevanceLabels[relevance]}
         </span>
       </div>
       <p className="text-sm text-muted">{reason}</p>
       {href ? (
         <Link href={href} className="text-xs font-medium text-accent underline underline-offset-2">
-          Ouvrir {MODULE_LABELS[module]} ↗
+          {t.decide.diagnostic.open} {moduleLabel} ↗
         </Link>
       ) : (
-        <span className="text-xs text-muted">Bientôt disponible</span>
+        <span className="text-xs text-muted">{t.decide.diagnostic.comingSoon}</span>
       )}
     </div>
   );
@@ -113,11 +111,14 @@ export function DiagnosticView({
   onGenerateScenarios: () => void;
   generating: boolean;
 }) {
+  const { t } = useLanguage();
+  const diagnostic = t.decide.diagnostic;
+
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <Eyebrow>Diagnostic</Eyebrow>
-        <h1 className="mt-3 font-display text-3xl text-ink">Lecture de la situation</h1>
+        <Eyebrow>{diagnostic.eyebrow}</Eyebrow>
+        <h1 className="mt-3 font-display text-3xl text-ink">{diagnostic.title}</h1>
         <div className="mt-3 flex flex-wrap gap-2">
           {result.domains.map((d) => (
             <span
@@ -134,7 +135,7 @@ export function DiagnosticView({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Gaps</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{diagnostic.gaps}</h2>
           <ul className="mt-2 flex flex-col gap-2">
             {result.gaps.map((g, i) => (
               <li key={i} className="rounded-lg border border-border bg-surface p-3 text-sm">
@@ -145,7 +146,7 @@ export function DiagnosticView({
           </ul>
         </div>
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Causes racines</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{diagnostic.rootCauses}</h2>
           <ul className="mt-2 flex flex-col gap-2">
             {result.rootCauses.map((c, i) => (
               <li key={i} className="rounded-lg border border-border bg-surface p-3 text-sm">
@@ -156,7 +157,7 @@ export function DiagnosticView({
           </ul>
         </div>
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Priorités (pondérées)</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{diagnostic.priorities}</h2>
           <ul className="mt-2 flex flex-col gap-2">
             {result.priorities.map((p, i) => (
               <li key={i} className="rounded-lg border border-border bg-surface p-3 text-sm">
@@ -173,7 +174,7 @@ export function DiagnosticView({
           </ul>
         </div>
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Risques</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{diagnostic.risks}</h2>
           <ul className="mt-2 flex flex-col gap-2">
             {result.risks.map((r, i) => (
               <li key={i} className="rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm">
@@ -186,9 +187,7 @@ export function DiagnosticView({
       </div>
 
       <div>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
-          Critères de décision retenus
-        </h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{diagnostic.decisionCriteria}</h2>
         <div className="mt-2 flex flex-wrap gap-2">
           {result.decisionCriteria.map((c, i) => (
             <span
@@ -203,16 +202,14 @@ export function DiagnosticView({
 
       <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-accent-strong">
-          Recommandation de démarrage
+          {diagnostic.startingRecommendation}
         </h2>
         <p className="mt-2 text-sm text-ink">{result.startingRecommendation}</p>
       </div>
 
       <div>
-        <Eyebrow>Modules recommandés pour cette transformation</Eyebrow>
-        <p className="mt-2 text-xs text-muted">
-          Pré-coché selon l&apos;analyse IA — librement modifiable, aucune activation automatique.
-        </p>
+        <Eyebrow>{diagnostic.recommendedModules}</Eyebrow>
+        <p className="mt-2 text-xs text-muted">{diagnostic.recommendedModulesHint}</p>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           {(Object.keys(result.moduleRecommendations) as RecommendableModule[]).map((module) => (
             <ModuleRecommendationCard
@@ -221,6 +218,7 @@ export function DiagnosticView({
               relevance={result.moduleRecommendations[module].relevance}
               reason={result.moduleRecommendations[module].reason}
               transformationId={result.transformationId}
+              t={t}
             />
           ))}
         </div>
@@ -232,7 +230,7 @@ export function DiagnosticView({
         disabled={generating}
         className="self-start rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {generating ? "Génération des scénarios..." : "Générer les 3 scénarios stratégiques"}
+        {generating ? diagnostic.generating : diagnostic.generateScenarios}
       </button>
     </div>
   );

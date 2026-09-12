@@ -11,6 +11,8 @@ import { ExportPdfButton } from "@/components/export-pdf-button";
 import { createClient } from "@/lib/supabase/client";
 import { parseJsonResponse } from "@/lib/parse-json-response";
 import type { Domain } from "@/lib/decide";
+import { useLanguage } from "@/components/language-provider";
+import type { Dictionary } from "@/lib/i18n/dictionary";
 
 type Phase = "intake" | "diagnostic-loading" | "diagnostic" | "scenarios-loading" | "scenarios" | "scenario-detail";
 
@@ -26,7 +28,7 @@ function LoadingBlock({ label, hint }: { label: string; hint: string }) {
   );
 }
 
-function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void }) {
+function ErrorBlock({ message, onRetry, retryLabel }: { message: string; onRetry: () => void; retryLabel: string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-danger/40 bg-danger/10 px-6 py-12 text-center">
       <p className="max-w-sm text-sm text-ink">{message}</p>
@@ -35,7 +37,7 @@ function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void
         onClick={onRetry}
         className="rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
       >
-        Réessayer
+        {retryLabel}
       </button>
     </div>
   );
@@ -44,14 +46,15 @@ function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void
 // Picks a human label for the "5th" radar/slider axis based on detected
 // domains, since the brief explicitly forbids hard-coding "CO2" for
 // non-industrial subjects.
-function fifthAxisLabel(domains: Domain[]): string {
-  if (domains.includes("manufacturing") || domains.includes("strategy")) return "CO2 / durabilité";
-  if (domains.includes("digitalization")) return "Rapidité";
-  if (domains.includes("gtm")) return "Scalabilité";
-  return "CO2 / durabilité (ou équivalent)";
+function fifthAxisLabel(domains: Domain[], axisLabels: Dictionary["decide"]["axisLabels"]): string {
+  if (domains.includes("manufacturing") || domains.includes("strategy")) return axisLabels.co2;
+  if (domains.includes("digitalization")) return axisLabels.speed;
+  if (domains.includes("gtm")) return axisLabels.scalability;
+  return axisLabels.co2Fallback;
 }
 
 export function DecideFlow() {
+  const { t } = useLanguage();
   const [phase, setPhase] = useState<Phase>("intake");
   const [diagnosticError, setDiagnosticError] = useState("");
   const [scenariosError, setScenariosError] = useState("");
@@ -86,11 +89,11 @@ export function DecideFlow() {
         body: JSON.stringify(intake),
       });
       const { data } = await parseJsonResponse(res);
-      if (!res.ok) throw new Error((data.error as string) || "Une erreur est survenue.");
+      if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
       setDiagnostic(data as DiagnosticResult);
       setPhase("diagnostic");
     } catch (err) {
-      setDiagnosticError(err instanceof Error ? err.message : "Une erreur est survenue.");
+      setDiagnosticError(err instanceof Error ? err.message : t.common.anErrorOccurred);
       setPhase("diagnostic-loading"); // stay, error block replaces spinner below
     }
   }
@@ -117,7 +120,7 @@ export function DecideFlow() {
           body: JSON.stringify({ transformationId: diagnostic.transformationId }),
         });
         const { data } = await parseJsonResponse(res);
-        if (!res.ok) throw new Error((data.error as string) || "Une erreur est survenue.");
+        if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
         setScenarios(data.scenarios as ScenarioWithId[]);
         if (data.warning) setScenariosWarning(data.warning as string);
         setPhase("scenarios");
@@ -127,10 +130,10 @@ export function DecideFlow() {
         if (isNetworkError && attempt < maxAttempts) continue;
         setScenariosError(
           isNetworkError
-            ? "La connexion a été coupée pendant la génération (réseau mobile instable sur une requête longue). Réessaie, idéalement en Wi-Fi."
+            ? t.decide.networkErrorRetry
             : err instanceof Error
               ? err.message
-              : "Une erreur est survenue."
+              : t.common.anErrorOccurred
         );
         setPhase("scenarios-loading");
         return;
@@ -150,12 +153,13 @@ export function DecideFlow() {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-10">
         {diagnosticError ? (
-          <ErrorBlock message={diagnosticError} onRetry={() => lastIntake && runDiagnostic(lastIntake)} />
-        ) : (
-          <LoadingBlock
-            label="Diagnostic en cours..."
-            hint="Détection du type de défi et lecture de maturité — quelques secondes."
+          <ErrorBlock
+            message={diagnosticError}
+            onRetry={() => lastIntake && runDiagnostic(lastIntake)}
+            retryLabel={t.common.retry}
           />
+        ) : (
+          <LoadingBlock label={t.decide.diagnostic.loadingLabel} hint={t.decide.diagnostic.loadingHint} />
         )}
       </div>
     );
@@ -173,12 +177,9 @@ export function DecideFlow() {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-10">
         {scenariosError ? (
-          <ErrorBlock message={scenariosError} onRetry={runScenarios} />
+          <ErrorBlock message={scenariosError} onRetry={runScenarios} retryLabel={t.common.retry} />
         ) : (
-          <LoadingBlock
-            label="Construction des 3 scénarios..."
-            hint="Recherche de fournisseurs et régulations réels — ça peut prendre 1 à 2 minutes."
-          />
+          <LoadingBlock label={t.decide.scenarios.loadingLabel} hint={t.decide.scenarios.loadingHint} />
         )}
       </div>
     );
@@ -195,8 +196,8 @@ export function DecideFlow() {
       <div className="mx-auto w-full max-w-4xl px-4 py-10">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <Eyebrow>Scénarios stratégiques</Eyebrow>
-            <h1 className="mt-3 font-display text-3xl text-ink">Trois trajectoires possibles</h1>
+            <Eyebrow>{t.decide.scenarios.eyebrow}</Eyebrow>
+            <h1 className="mt-3 font-display text-3xl text-ink">{t.decide.scenarios.title}</h1>
           </div>
           <ExportPdfButton
             kind="decide"
@@ -213,12 +214,12 @@ export function DecideFlow() {
 
         {selectedTrajectoryId && (
           <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-accent/40 bg-accent/10 px-4 py-3">
-            <p className="text-sm text-ink">Trajectoire choisie — prête à passer en exécution.</p>
+            <p className="text-sm text-ink">{t.decide.scenarios.trajectoryChosen}</p>
             <Link
               href={`/deliver?transformationId=${diagnostic.transformationId}`}
               className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong"
             >
-              Ouvrir Deliver →
+              {t.decide.scenarios.openDeliver}
             </Link>
           </div>
         )}
@@ -233,7 +234,7 @@ export function DecideFlow() {
               key={s.trajectoryId}
               scenario={s}
               index={i}
-              co2SliderLabel={fifthAxisLabel(diagnostic.domains)}
+              co2SliderLabel={fifthAxisLabel(diagnostic.domains, t.decide.axisLabels)}
               selected={selectedTrajectoryId === s.trajectoryId}
               onSelect={() => selectTrajectory(s.trajectoryId)}
               onOpenDetail={() => {
@@ -262,12 +263,12 @@ export function DecideFlow() {
           onClick={() => setPhase("scenarios")}
           className="mb-4 text-sm text-muted underline underline-offset-2 hover:text-accent"
         >
-          ← Retour aux scénarios
+          {t.decide.scenarios.backToScenarios}
         </button>
         <ScenarioCard
           scenario={scenario}
           index={index}
-          co2SliderLabel={fifthAxisLabel(diagnostic.domains)}
+          co2SliderLabel={fifthAxisLabel(diagnostic.domains, t.decide.axisLabels)}
           selected={selectedTrajectoryId === scenario.trajectoryId}
           onSelect={() => selectTrajectory(scenario.trajectoryId)}
           detail

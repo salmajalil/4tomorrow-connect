@@ -1,38 +1,29 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Eyebrow } from "@/components/eyebrow";
+import { getLanguage } from "@/lib/i18n/language";
+import { getDictionary, type Dictionary } from "@/lib/i18n/dictionary";
 
-const MODULES = [
-  {
-    key: "decide",
-    label: "Decide",
-    blurb: "Diagnostic et scénarios stratégiques.",
-    href: "/decide",
-    active: true,
-    icon: <path d="M4 20V10m6 10V4m6 16v-7" />,
-  },
+type ModuleDef = {
+  key: "decide" | "connect" | "learn" | "deliver";
+  href: string;
+  active: boolean;
+  icon: React.ReactNode;
+};
+
+const MODULE_DEFS: ModuleDef[] = [
+  { key: "decide", href: "/decide", active: true, icon: <path d="M4 20V10m6 10V4m6 16v-7" /> },
   {
     key: "connect",
-    label: "Connect",
-    blurb: "Partenaires, technologies, financement.",
     href: "/connect",
     active: true,
     icon: (
       <path d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM2 20c0-3 3-5 6-5s6 2 6 5M14 15c3 0 6 2 6 5" />
     ),
   },
-  {
-    key: "learn",
-    label: "Learn",
-    blurb: "Former les équipes sur les bons sujets.",
-    href: "/learn",
-    active: true,
-    icon: <path d="M2 8l10-5 10 5-10 5-10-5Zm4 2v6c0 1.5 3 3 6 3s6-1.5 6-3v-6" />,
-  },
+  { key: "learn", href: "/learn", active: true, icon: <path d="M2 8l10-5 10 5-10 5-10-5Zm4 2v6c0 1.5 3 3 6 3s6-1.5 6-3v-6" /> },
   {
     key: "deliver",
-    label: "Deliver",
-    blurb: "Exécuter et suivre les livrables.",
     href: "/deliver",
     active: true,
     icon: (
@@ -52,9 +43,14 @@ const DIAGRAM_CENTER = DIAGRAM_SIZE / 2;
 const NODE_RADIUS = 118;
 const NODE_R = 40;
 
-function ModuleNetwork() {
-  const positions = MODULES.map((mod, i) => {
-    const angle = -90 + (360 / MODULES.length) * i;
+function ModuleNetwork({ t }: { t: Dictionary }) {
+  const modules = MODULE_DEFS.map((mod) => ({
+    ...mod,
+    label: t.nav[mod.key],
+    blurb: t.home.moduleBlurbs[mod.key],
+  }));
+  const positions = modules.map((mod, i) => {
+    const angle = -90 + (360 / modules.length) * i;
     const rad = (angle * Math.PI) / 180;
     return {
       ...mod,
@@ -65,7 +61,12 @@ function ModuleNetwork() {
 
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
-      <svg viewBox={`0 0 ${DIAGRAM_SIZE} ${DIAGRAM_SIZE}`} role="img" aria-label="Les 4 modules connectés de 4 Tomorrow" className="mx-auto block w-full max-w-xs">
+      <svg
+        viewBox={`0 0 ${DIAGRAM_SIZE} ${DIAGRAM_SIZE}`}
+        role="img"
+        aria-label={t.home.platformLabel}
+        className="mx-auto block w-full max-w-xs"
+      >
         {positions.map((node) => (
           <line key={`spoke-${node.key}`} x1={DIAGRAM_CENTER} y1={DIAGRAM_CENTER} x2={node.x} y2={node.y} stroke="var(--border)" strokeWidth={1.5} />
         ))}
@@ -108,14 +109,14 @@ function ModuleNetwork() {
               {node.label}
             </text>
             <text x={node.x} y={node.y + 13} textAnchor="middle" fill="var(--muted)" fontSize={7.5}>
-              {node.active ? "" : "bientôt"}
+              {node.active ? "" : t.home.comingSoon}
             </text>
           </g>
         ))}
       </svg>
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {MODULES.map((mod) =>
+        {modules.map((mod) =>
           mod.href ? (
             <Link
               key={mod.key}
@@ -142,6 +143,8 @@ export default async function Home() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const language = await getLanguage();
+  const t = getDictionary(language);
 
   return (
     <div className="relative mx-auto flex w-full max-w-4xl flex-1 flex-col items-center px-4 py-16 text-center">
@@ -155,28 +158,26 @@ export default async function Home() {
       />
 
       <div className="flex w-full items-center justify-between">
-        <Eyebrow>4 Tomorrow</Eyebrow>
+        <Eyebrow>{t.home.brandEyebrow}</Eyebrow>
         {user && (
           <Link
             href="/control-tower"
             className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-accent hover:text-ink"
           >
             <span aria-hidden>📡</span>
-            Tour de contrôle
+            {t.nav.controlTower}
           </Link>
         )}
       </div>
 
       <h1 className="mt-5 font-display text-4xl text-ink sm:text-5xl">
-        Un seul projet, <span className="text-accent">quatre leviers connectés.</span>
+        {t.home.heroTitlePrefix} <span className="text-accent">{t.home.heroTitleAccent}</span>
       </h1>
       <p className="mt-4 max-w-xl text-balance text-muted">
-        4 Tomorrow diagnostique ta transformation une fois — <span className="text-ink">Decide</span> détecte les
-        enjeux réels, puis recommande précisément où{" "}
-        <span className="text-ink">Connect</span> (partenaires, technologies, financement),{" "}
-        <span className="text-ink">Learn</span> (formations ciblées) et{" "}
-        <span className="text-ink">Deliver</span> (exécution) doivent intervenir. La donnée circule d&apos;un module
-        à l&apos;autre — tu ne redécris jamais deux fois le même projet.
+        {t.home.heroIntro} <span className="text-ink">Decide</span> {t.home.heroDecideAction}{" "}
+        <span className="text-ink">Connect</span> {t.home.heroConnectParenthetical}{" "}
+        <span className="text-ink">Learn</span> {t.home.heroLearnParenthetical}{" "}
+        <span className="text-ink">Deliver</span> {t.home.heroDeliverParenthetical} {t.home.heroOutro}
       </p>
 
       <div className="mt-8 flex flex-col items-center gap-3">
@@ -184,40 +185,32 @@ export default async function Home() {
           href={user ? "/decide" : "/login?next=/decide"}
           className="rounded-xl bg-accent px-6 py-3 text-base font-semibold text-accent-ink shadow-[0_0_30px_-8px_var(--accent)] transition hover:bg-accent-strong"
         >
-          Lancer le diagnostic
+          {t.home.launchDiagnostic}
         </Link>
         <Link href="/ecosystem/join" className="text-sm text-muted underline underline-offset-2 hover:text-accent">
-          Ou rejoindre l&apos;écosystème en tant que partenaire
+          {t.home.joinAsPartner}
         </Link>
       </div>
 
       <div className="mt-16 w-full text-left">
-        <Eyebrow>La plateforme</Eyebrow>
+        <Eyebrow>{t.home.platformLabel}</Eyebrow>
         <div className="mt-4">
-          <ModuleNetwork />
+          <ModuleNetwork t={t} />
         </div>
       </div>
 
       <div className="mt-12 grid w-full grid-cols-1 gap-4 text-left sm:grid-cols-3">
         <div className="rounded-xl border border-border bg-surface p-4">
-          <p className="text-sm font-semibold text-accent">01 — Diagnostic</p>
-          <p className="mt-1 text-sm text-muted">
-            Décris ta transformation une fois — Decide détecte le domaine, les enjeux et lit ta maturité réelle.
-          </p>
+          <p className="text-sm font-semibold text-accent">{t.home.step1Title}</p>
+          <p className="mt-1 text-sm text-muted">{t.home.step1Body}</p>
         </div>
         <div className="rounded-xl border border-border bg-surface p-4">
-          <p className="text-sm font-semibold text-accent">02 — Recommandations connectées</p>
-          <p className="mt-1 text-sm text-muted">
-            Chaque module pertinent se propose automatiquement, avec le contexte déjà rempli — recherche web en
-            temps réel + répertoire vivant de l&apos;écosystème.
-          </p>
+          <p className="text-sm font-semibold text-accent">{t.home.step2Title}</p>
+          <p className="mt-1 text-sm text-muted">{t.home.step2Body}</p>
         </div>
         <div className="rounded-xl border border-border bg-surface p-4">
-          <p className="text-sm font-semibold text-accent">03 — Passe à l&apos;action</p>
-          <p className="mt-1 text-sm text-muted">
-            Scénarios chiffrés, roadmap, partenaires contactables, formations ciblées — un seul projet suivi de
-            bout en bout dans la tour de contrôle.
-          </p>
+          <p className="text-sm font-semibold text-accent">{t.home.step3Title}</p>
+          <p className="mt-1 text-sm text-muted">{t.home.step3Body}</p>
         </div>
       </div>
     </div>

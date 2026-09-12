@@ -1,12 +1,17 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/sign-out-button";
+import { LanguageToggle } from "@/components/language-toggle";
+import { getLanguage } from "@/lib/i18n/language";
+import { getDictionary } from "@/lib/i18n/dictionary";
 
 export async function Nav() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const language = await getLanguage();
+  const t = getDictionary(language);
 
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-bg/90 backdrop-blur">
@@ -16,35 +21,36 @@ export async function Nav() {
         </Link>
         <nav className="ml-auto flex shrink-0 items-center gap-4 whitespace-nowrap text-sm">
           <Link href="/ecosystem/join" className="text-muted hover:text-ink">
-            Rejoindre l&apos;écosystème
+            {t.nav.joinEcosystem}
           </Link>
           {user ? (
             <>
               <Link href="/control-tower" className="font-medium text-ink hover:text-accent">
-                Tour de contrôle
+                {t.nav.controlTower}
               </Link>
               <Link href="/decide" className="font-medium text-ink hover:text-accent">
-                Decide
+                {t.nav.decide}
               </Link>
               <Link href="/connect" className="font-medium text-ink hover:text-accent">
-                Connect
+                {t.nav.connect}
               </Link>
               <Link href="/learn" className="font-medium text-ink hover:text-accent">
-                Learn
+                {t.nav.learn}
               </Link>
               <Link href="/deliver" className="font-medium text-ink hover:text-accent">
-                Deliver
+                {t.nav.deliver}
               </Link>
-              <SignOutButton />
+              <SignOutButton label={t.nav.signOut} />
             </>
           ) : (
             <Link
               href="/login"
               className="rounded-lg bg-accent px-3 py-1.5 font-medium text-accent-ink hover:bg-accent-strong"
             >
-              Se connecter
+              {t.nav.login}
             </Link>
           )}
+          <LanguageToggle userId={user?.id ?? null} />
         </nav>
       </div>
     </header>

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export function SignOutButton() {
+export function SignOutButton({ label }: { label: string }) {
   const router = useRouter();
 
   return (
@@ -17,7 +17,7 @@ export function SignOutButton() {
       }}
       className="text-muted hover:text-ink"
     >
-      Se déconnecter
+      {label}
     </button>
   );
 }

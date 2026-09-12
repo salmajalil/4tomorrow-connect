@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/components/language-provider";
 
 type Mode = "password" | "magic-link";
 
@@ -10,6 +11,7 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/connect";
+  const { t } = useLanguage();
 
   const [mode, setMode] = useState<Mode>("password");
   const [isSignUp, setIsSignUp] = useState(false);
@@ -36,7 +38,7 @@ export default function LoginPage() {
           },
         });
         if (signUpError) throw signUpError;
-        setMessage("Compte créé. Vérifie ta boîte mail pour confirmer ton adresse, puis connecte-toi.");
+        setMessage(t.login.signUpSuccess);
         setIsSignUp(false);
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
@@ -45,7 +47,7 @@ export default function LoginPage() {
         router.refresh();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Une erreur est survenue. Réessaie.");
+      setError(err instanceof Error ? err.message : t.login.genericError);
     } finally {
       setLoading(false);
     }
@@ -66,9 +68,9 @@ export default function LoginPage() {
         },
       });
       if (otpError) throw otpError;
-      setMessage("Lien envoyé. Ouvre l'email reçu pour te connecter.");
+      setMessage(t.login.magicLinkSent);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Une erreur est survenue. Réessaie.");
+      setError(err instanceof Error ? err.message : t.login.genericError);
     } finally {
       setLoading(false);
     }
@@ -77,11 +79,9 @@ export default function LoginPage() {
   return (
     <div className="mx-auto flex min-h-[calc(100vh-64px)] w-full max-w-sm flex-col justify-center px-4 py-12">
       <h1 className="font-display text-3xl text-ink">
-        {isSignUp ? "Créer un compte" : "Se connecter"}
+        {isSignUp ? t.login.signUpTitle : t.login.signInTitle}
       </h1>
-      <p className="mt-1 text-sm text-muted">
-        Accède à tes transformations et contribue à l&apos;écosystème 4 Tomorrow.
-      </p>
+      <p className="mt-1 text-sm text-muted">{t.login.subtitle}</p>
 
       <div className="mt-6 flex gap-1 rounded-lg bg-surface-2 p-1 text-sm">
         <button
@@ -91,7 +91,7 @@ export default function LoginPage() {
             mode === "password" ? "bg-surface text-ink shadow-sm" : "text-muted"
           }`}
         >
-          Mot de passe
+          {t.login.modePassword}
         </button>
         <button
           type="button"
@@ -100,7 +100,7 @@ export default function LoginPage() {
             mode === "magic-link" ? "bg-surface text-ink shadow-sm" : "text-muted"
           }`}
         >
-          Lien magique
+          {t.login.modeMagicLink}
         </button>
       </div>
 
@@ -109,7 +109,7 @@ export default function LoginPage() {
         className="mt-6 flex flex-col gap-3"
       >
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-ink">Email</span>
+          <span className="font-medium text-ink">{t.login.emailLabel}</span>
           <input
             type="email"
             required
@@ -122,7 +122,7 @@ export default function LoginPage() {
 
         {mode === "password" && (
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-ink">Mot de passe</span>
+            <span className="font-medium text-ink">{t.login.passwordLabel}</span>
             <input
               type="password"
               required
@@ -150,12 +150,12 @@ export default function LoginPage() {
           className="mt-1 rounded-lg bg-accent py-2.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong disabled:opacity-50"
         >
           {loading
-            ? "Un instant..."
+            ? t.login.submitting
             : mode === "magic-link"
-              ? "Envoyer le lien"
+              ? t.login.sendLink
               : isSignUp
-                ? "Créer mon compte"
-                : "Se connecter"}
+                ? t.login.createAccount
+                : t.login.signIn}
         </button>
       </form>
 
@@ -169,7 +169,7 @@ export default function LoginPage() {
           }}
           className="mt-4 text-sm text-muted underline underline-offset-2 hover:text-accent"
         >
-          {isSignUp ? "Déjà un compte ? Se connecter" : "Pas encore de compte ? En créer un"}
+          {isSignUp ? t.login.alreadyHaveAccount : t.login.noAccountYet}
         </button>
       )}
     </div>

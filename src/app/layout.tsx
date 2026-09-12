@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/nav";
+import { LanguageProvider } from "@/components/language-provider";
+import { getLanguage } from "@/lib/i18n/language";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,15 +33,18 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const language = await getLanguage();
   return (
     <html
-      lang="fr"
+      lang={language}
       className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-bg text-ink">
-        <Nav />
-        <main className="flex flex-1 flex-col">{children}</main>
+        <LanguageProvider initialLanguage={language}>
+          <Nav />
+          <main className="flex flex-1 flex-col">{children}</main>
+        </LanguageProvider>
       </body>
     </html>
   );

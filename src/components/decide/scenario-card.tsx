@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/client";
 import type { ScenarioOutput } from "@/lib/decide";
 import type { IndicatorEntry, IndicatorFeedback, TrajectoryIndicators } from "@/types/database";
 import { RoadmapView } from "@/components/decide/roadmap-view";
+import { useLanguage } from "@/components/language-provider";
+import type { Dictionary } from "@/lib/i18n/dictionary";
+import type { Language } from "@/types/database";
 
 export type ScenarioWithId = ScenarioOutput & { trajectoryId: string };
 
@@ -12,40 +15,33 @@ const SLOT_LABELS = ["A", "B", "C"];
 
 type DetailTab = "brief" | "techno" | "roadmap" | "suppliers";
 
-const TABS: { id: DetailTab; label: string }[] = [
-  { id: "brief", label: "Brief stratégique" },
-  { id: "techno", label: "Solutions & techno" },
-  { id: "roadmap", label: "Roadmap" },
-  { id: "suppliers", label: "Fournisseurs & partenaires" },
-];
-
-const CATEGORY_LABELS: Record<string, string> = {
-  technology: "Technologie",
-  startup: "Startup",
-  expert: "Expert",
-  partner: "Partenaire",
-  funding: "Financement",
-};
-
-function SourceBadge({ source }: { source: "registry" | "web_search" }) {
+function SourceBadge({ source, t }: { source: "registry" | "web_search"; t: Dictionary }) {
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
         source === "registry" ? "bg-success/15 text-success" : "bg-accent/15 text-accent-strong"
       }`}
     >
-      {source === "registry" ? "Répertoire" : "Recherche web"}
+      {source === "registry" ? t.decide.scenarios.registrySource : t.decide.scenarios.webSource}
     </span>
   );
 }
 
 // A validated indicator (confidence "verified") displays as a plain fact.
-function ValidatedIndicatorChip({ indicatorKey, entry }: { indicatorKey: string; entry: IndicatorEntry }) {
+function ValidatedIndicatorChip({
+  indicatorKey,
+  entry,
+  t,
+}: {
+  indicatorKey: string;
+  entry: IndicatorEntry;
+  t: Dictionary;
+}) {
   return (
     <div className="flex min-w-[7rem] flex-col items-center gap-0.5 rounded-lg border border-border bg-surface-2 px-3 py-2 text-center">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{indicatorKey}</p>
       <p className="mt-0.5 text-sm font-semibold text-ink">{String(entry.value)}</p>
-      <span className="text-[10px] text-success">Validé ✓</span>
+      <span className="text-[10px] text-success">{t.decide.scenarios.validated}</span>
     </div>
   );
 }
@@ -66,6 +62,8 @@ function IndicatorReview({
   feedbackSnapshot,
   onIndicatorsChange,
   onFeedbackChange,
+  t,
+  language,
 }: {
   trajectoryId: string;
   indicatorKey: string;
@@ -75,10 +73,13 @@ function IndicatorReview({
   feedbackSnapshot: IndicatorFeedback;
   onIndicatorsChange: (next: TrajectoryIndicators) => void;
   onFeedbackChange: (next: IndicatorFeedback) => void;
+  t: Dictionary;
+  language: Language;
 }) {
   const [revealed, setRevealed] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const scenarios = t.decide.scenarios;
 
   async function send() {
     const trimmed = draft.trim();
@@ -107,16 +108,16 @@ function IndicatorReview({
       <div className="flex items-baseline justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted">{indicatorKey}</p>
         <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent-strong">
-          Non validé
+          {t.common.unvalidated}
         </span>
       </div>
 
       {entry.confidence === "estimate" ? (
         revealed ? (
           <p className="text-sm text-muted">
-            Estimation IA (sans source) : <span className="font-medium text-ink">{String(entry.value)}</span>{" "}
+            {scenarios.aiEstimateNoSource} <span className="font-medium text-ink">{String(entry.value)}</span>{" "}
             <button type="button" onClick={() => setRevealed(false)} className="text-xs text-accent underline underline-offset-2">
-              masquer
+              {scenarios.hide}
             </button>
           </p>
         ) : (
@@ -125,11 +126,11 @@ function IndicatorReview({
             onClick={() => setRevealed(true)}
             className="self-start text-xs font-medium text-accent underline underline-offset-2"
           >
-            Afficher l&apos;estimation IA (non validée)
+            {scenarios.showAiEstimate}
           </button>
         )
       ) : (
-        <p className="text-sm text-muted">Non estimable par l&apos;IA à partir des informations fournies.</p>
+        <p className="text-sm text-muted">{scenarios.notEstimable}</p>
       )}
 
       {notes.length > 0 && (
@@ -137,7 +138,9 @@ function IndicatorReview({
           {notes.map((n, i) => (
             <li key={i}>
               <span className="font-medium text-ink">{n.note}</span>{" "}
-              <span className="text-[10px]">— {new Date(n.at).toLocaleDateString("fr-FR")}</span>
+              <span className="text-[10px]">
+                — {new Date(n.at).toLocaleDateString(language === "fr" ? "fr-FR" : "en-US")}
+              </span>
             </li>
           ))}
         </ul>
@@ -147,7 +150,7 @@ function IndicatorReview({
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Confirmer ou indiquer la vraie valeur"
+          placeholder={scenarios.confirmOrCorrect}
           className="min-w-0 flex-1 rounded border border-border bg-surface px-2 py-1.5 text-xs text-ink focus:border-accent focus:outline-none"
         />
         <button
@@ -156,14 +159,14 @@ function IndicatorReview({
           disabled={sending || !draft.trim()}
           className="shrink-0 rounded bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Envoyer
+          {scenarios.send}
         </button>
       </div>
     </div>
   );
 }
 
-function TechStackRow({ item }: { item: ScenarioOutput["techStack"][number] }) {
+function TechStackRow({ item, t }: { item: ScenarioOutput["techStack"][number]; t: Dictionary }) {
   const maturityMatch = /(\d+)\s*\/?\s*(?:-|à|to)?\s*(\d+)?/.exec(item.maturity);
   const level = maturityMatch ? Number(maturityMatch[1]) : null;
   return (
@@ -185,7 +188,7 @@ function TechStackRow({ item }: { item: ScenarioOutput["techStack"][number] }) {
         </div>
       )}
       <p className="mt-1.5 text-xs text-muted">{item.detail}</p>
-      <p className="mt-1 text-xs text-ink">Bénéfice : {item.benefit}</p>
+      <p className="mt-1 text-xs text-ink">{t.common.benefit} : {item.benefit}</p>
     </div>
   );
 }
@@ -211,9 +214,26 @@ export function ScenarioCard({
   detail?: boolean;
   onOpenDetail?: () => void;
 }) {
+  const { t, language } = useLanguage();
+  const scenarios = t.decide.scenarios;
   const [activeTab, setActiveTab] = useState<DetailTab>("brief");
   const [indicators, setIndicators] = useState<TrajectoryIndicators>(scenario.indicators);
   const [feedback, setFeedback] = useState<IndicatorFeedback>({});
+
+  const CATEGORY_LABELS: Record<string, string> = {
+    technology: t.connect.results.categoryTechnology,
+    startup: t.connect.results.categoryStartup,
+    expert: t.connect.results.categoryExpert,
+    partner: t.connect.results.categoryPartner,
+    funding: t.connect.results.categoryFunding,
+  };
+
+  const TABS: { id: DetailTab; label: string }[] = [
+    { id: "brief", label: scenarios.tabBrief },
+    { id: "techno", label: scenarios.tabTechno },
+    { id: "roadmap", label: scenarios.tabRoadmap },
+    { id: "suppliers", label: scenarios.tabSuppliers },
+  ];
 
   const indicatorEntries = Object.entries(indicators);
   const validatedEntries = indicatorEntries.filter(([, entry]) => entry.confidence === "verified");
@@ -240,16 +260,14 @@ export function ScenarioCard({
       {validatedEntries.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {validatedEntries.map(([key, entry]) => (
-            <ValidatedIndicatorChip key={key} indicatorKey={key} entry={entry} />
+            <ValidatedIndicatorChip key={key} indicatorKey={key} entry={entry} t={t} />
           ))}
         </div>
       )}
 
       {unvalidatedEntries.length > 0 && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-            Données financières à valider — jamais affichées comme un fait tant que non confirmées
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">{scenarios.unvalidatedTitle}</p>
           {unvalidatedEntries.map(([key, entry]) => (
             <IndicatorReview
               key={key}
@@ -261,6 +279,8 @@ export function ScenarioCard({
               feedbackSnapshot={feedback}
               onIndicatorsChange={setIndicators}
               onFeedbackChange={setFeedback}
+              t={t}
+              language={language}
             />
           ))}
         </div>
@@ -295,7 +315,7 @@ export function ScenarioCard({
           onClick={onOpenDetail}
           className="self-start text-xs font-semibold text-accent underline underline-offset-2"
         >
-          Voir le détail complet →
+          {scenarios.seeFullDetail}
         </button>
       )}
 
@@ -321,12 +341,12 @@ export function ScenarioCard({
           {activeTab === "brief" && (
             <div className="flex flex-col gap-4">
               <div className="rounded-lg border border-border bg-surface-2 p-3">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">Briefing exécutif</h4>
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">{scenarios.executiveBriefing}</h4>
                 <p className="mt-1 text-sm text-ink">{scenario.executiveBriefing}</p>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">Risques du scénario</h4>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">{scenarios.scenarioRisks}</h4>
                   <ul className="mt-1.5 flex flex-col gap-1 text-xs text-muted">
                     {scenario.risksSpecific.map((r, i) => (
                       <li key={i}>
@@ -337,7 +357,7 @@ export function ScenarioCard({
                 </div>
                 <div>
                   <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
-                    Opportunités du scénario
+                    {scenarios.scenarioOpportunities}
                   </h4>
                   <ul className="mt-1.5 flex flex-col gap-1 text-xs text-muted">
                     {scenario.opportunitiesSpecific.map((o, i) => (
@@ -354,17 +374,17 @@ export function ScenarioCard({
           {activeTab === "techno" && (
             <div className="flex flex-col gap-4">
               <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">Stack / solutions</h4>
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">{scenarios.stackSolutions}</h4>
                 <div className="mt-2 flex flex-col gap-2">
                   {scenario.techStack.map((item, i) => (
-                    <TechStackRow key={i} item={item} />
+                    <TechStackRow key={i} item={item} t={t} />
                   ))}
                 </div>
               </div>
               {scenario.regulations.length > 0 && (
                 <div>
                   <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
-                    Régulations / standards applicables
+                    {scenarios.applicableRegulations}
                   </h4>
                   <ul className="mt-2 flex flex-col gap-1.5 text-xs text-muted">
                     {scenario.regulations.map((r, i) => (
@@ -379,7 +399,7 @@ export function ScenarioCard({
                               rel="noopener noreferrer"
                               className="text-accent underline underline-offset-2"
                             >
-                              source ↗
+                              {scenarios.source}
                             </a>
                           </>
                         )}
@@ -407,7 +427,7 @@ export function ScenarioCard({
                           ({CATEGORY_LABELS[s.category] ?? s.category})
                         </span>
                       </p>
-                      <SourceBadge source={s.source} />
+                      <SourceBadge source={s.source} t={t} />
                     </div>
                     <p className="mt-1 text-xs text-muted">{s.reason}</p>
                     {(s.website || s.contactEmail) && (
@@ -419,7 +439,7 @@ export function ScenarioCard({
                             rel="noopener noreferrer"
                             className="font-medium text-accent underline underline-offset-2"
                           >
-                            Site ↗
+                            {scenarios.site}
                           </a>
                         )}
                         {s.contactEmail && (
@@ -436,7 +456,7 @@ export function ScenarioCard({
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-muted">Aucun fournisseur identifié pour ce scénario.</p>
+              <p className="text-xs text-muted">{scenarios.noSuppliers}</p>
             ))}
         </div>
       )}
@@ -450,7 +470,7 @@ export function ScenarioCard({
             : "border border-accent text-accent hover:bg-accent hover:text-accent-ink"
         }`}
       >
-        {selected ? "Scénario choisi ✓" : "Choisir ce scénario"}
+        {selected ? scenarios.chosen : scenarios.chooseThis}
       </button>
     </div>
   );

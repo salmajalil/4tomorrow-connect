@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import { Eyebrow } from "@/components/eyebrow";
 import { extractFileText } from "@/lib/extract-file-text";
+import { useLanguage } from "@/components/language-provider";
+import type { Dictionary } from "@/lib/i18n/dictionary";
 
 export type RiskTolerance = "low" | "medium" | "high";
 export type ProjectScope = "local" | "national" | "global";
@@ -27,46 +29,33 @@ export interface IntakeState {
   organizationSize: OrganizationSize;
 }
 
-const RISK_TOLERANCE_LABELS: Record<RiskTolerance, string> = {
-  low: "Faible",
-  medium: "Moyenne",
-  high: "Élevée",
-};
-
-const SCOPE_LABELS: Record<ProjectScope, string> = {
-  local: "Locale",
-  national: "Nationale",
-  global: "Globale / internationale",
-};
-
-const URGENCY_LABELS: Record<Urgency, string> = {
-  immediate: "Immédiat (0-6 mois)",
-  planned: "Planifié (6-18 mois)",
-  long_term: "Long terme (18 mois et plus)",
-};
-
-const ORGANIZATION_SIZE_LABELS: Record<OrganizationSize, string> = {
-  small: "Petite (< 50 personnes)",
-  medium: "Moyenne (50-500)",
-  large: "Grande (500-5000)",
-  enterprise: "Très grande (5000+)",
-};
-
 // Folded into the free-text "constraints" sent to the diagnostic/scenario
 // prompts (both already read transformation.constraints) — no schema or
 // server-side change needed to get this structured context to the AI.
-function formatStructuredContext(state: IntakeState): string {
-  return `Contexte structuré (renseigné via curseurs/menus) :
-- Flexibilité budgétaire : ${state.budgetFlexibility}% (0 = serré, 100 = flexible)
-- Priorité CO2 / durabilité : ${state.co2Priority}%
-- Tolérance au risque : ${RISK_TOLERANCE_LABELS[state.riskTolerance]}
-- Portée du projet : ${SCOPE_LABELS[state.scope]}
-- Urgence : ${URGENCY_LABELS[state.urgency]}
-- Horizon envisagé : ${state.horizonYears} an${state.horizonYears > 1 ? "s" : ""}
-- Taille de l'organisation : ${ORGANIZATION_SIZE_LABELS[state.organizationSize]}`;
-}
+function formatStructuredContext(state: IntakeState, t: Dictionary["decide"]["intake"]): string {
+  const riskLabels: Record<RiskTolerance, string> = { low: t.riskLow, medium: t.riskMedium, high: t.riskHigh };
+  const scopeLabels: Record<ProjectScope, string> = { local: t.scopeLocal, national: t.scopeNational, global: t.scopeGlobal };
+  const urgencyLabels: Record<Urgency, string> = {
+    immediate: t.urgencyImmediate,
+    planned: t.urgencyPlanned,
+    long_term: t.urgencyLongTerm,
+  };
+  const sizeLabels: Record<OrganizationSize, string> = {
+    small: t.sizeSmall,
+    medium: t.sizeMedium,
+    large: t.sizeLarge,
+    enterprise: t.sizeEnterprise,
+  };
 
-const CHALLENGES_PLACEHOLDER = `Ex : On veut digitaliser notre suivi de production, aujourd'hui géré sur Excel par 3 personnes à temps plein. Erreurs fréquentes de saisie, pas de visibilité temps réel pour la direction. Contrainte : l'ERP actuel a 12 ans et personne en interne ne sait le modifier.`;
+  return `${t.projectContext} :
+- ${t.budgetFlexibility} : ${state.budgetFlexibility}% (0 = ${t.tight}, 100 = ${t.flexible})
+- ${t.co2Priority} : ${state.co2Priority}%
+- ${t.riskTolerance} : ${riskLabels[state.riskTolerance]}
+- ${t.scope} : ${scopeLabels[state.scope]}
+- ${t.urgency} : ${urgencyLabels[state.urgency]}
+- ${t.horizon} : ${state.horizonYears} ${state.horizonYears > 1 ? t.years : t.year}
+- ${t.organizationSize} : ${sizeLabels[state.organizationSize]}`;
+}
 
 export function IntakeForm({
   onSubmit,
@@ -75,6 +64,9 @@ export function IntakeForm({
   onSubmit: (state: IntakeState) => void;
   submitting: boolean;
 }) {
+  const { t } = useLanguage();
+  const intake = t.decide.intake;
+
   const [state, setState] = useState<IntakeState>({
     organization: "",
     industry: "",
@@ -96,6 +88,28 @@ export function IntakeForm({
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const RISK_TOLERANCE_LABELS: Record<RiskTolerance, string> = {
+    low: intake.riskLow,
+    medium: intake.riskMedium,
+    high: intake.riskHigh,
+  };
+  const SCOPE_LABELS: Record<ProjectScope, string> = {
+    local: intake.scopeLocal,
+    national: intake.scopeNational,
+    global: intake.scopeGlobal,
+  };
+  const URGENCY_LABELS: Record<Urgency, string> = {
+    immediate: intake.urgencyImmediate,
+    planned: intake.urgencyPlanned,
+    long_term: intake.urgencyLongTerm,
+  };
+  const ORGANIZATION_SIZE_LABELS: Record<OrganizationSize, string> = {
+    small: intake.sizeSmall,
+    medium: intake.sizeMedium,
+    large: intake.sizeLarge,
+    enterprise: intake.sizeEnterprise,
+  };
+
   async function handleFile(file: File) {
     setUploadError("");
     setUploading(true);
@@ -103,7 +117,7 @@ export function IntakeForm({
       const text = await extractFileText(file);
       setState((s) => ({ ...s, uploadedDocText: text, uploadedDocName: file.name }));
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Extraction impossible.");
+      setUploadError(err instanceof Error ? err.message : intake.uploadError);
     } finally {
       setUploading(false);
     }
@@ -116,7 +130,7 @@ export function IntakeForm({
       onSubmit={(e) => {
         e.preventDefault();
         if (!canSubmit) return;
-        const structured = formatStructuredContext(state);
+        const structured = formatStructuredContext(state, intake);
         onSubmit({
           ...state,
           constraints: state.constraints.trim() ? `${structured}\n\n${state.constraints}` : structured,
@@ -125,85 +139,79 @@ export function IntakeForm({
       className="flex flex-col gap-8"
     >
       <div>
-        <Eyebrow>Intake</Eyebrow>
-        <h1 className="mt-3 font-display text-3xl text-ink">Décris ta transformation</h1>
-        <p className="mt-1 text-sm text-muted">
-          Réponses libres — plus c&apos;est précis, plus le diagnostic sera pointu. Rien n&apos;est
-          obligatoire sauf les défis ou les objectifs.
-        </p>
+        <Eyebrow>{intake.eyebrow}</Eyebrow>
+        <h1 className="mt-3 font-display text-3xl text-ink">{intake.title}</h1>
+        <p className="mt-1 text-sm text-muted">{intake.subtitle}</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1.5 text-sm">
-          <span className="font-medium text-ink">Organisation</span>
+          <span className="font-medium text-ink">{intake.organization}</span>
           <input
             value={state.organization}
             onChange={(e) => setState((s) => ({ ...s, organization: e.target.value }))}
-            placeholder="Nom de ton organisation"
+            placeholder={intake.organizationPlaceholder}
             className="rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-ink placeholder:text-muted focus:border-accent focus:outline-none"
           />
         </label>
         <label className="flex flex-col gap-1.5 text-sm">
-          <span className="font-medium text-ink">Industrie</span>
+          <span className="font-medium text-ink">{intake.industry}</span>
           <input
             value={state.industry}
             onChange={(e) => setState((s) => ({ ...s, industry: e.target.value }))}
-            placeholder="Ex : Manufacturing, SaaS, Énergie..."
+            placeholder={intake.industryPlaceholder}
             className="rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-ink placeholder:text-muted focus:border-accent focus:outline-none"
           />
         </label>
       </div>
 
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-ink">Défis</span>
+        <span className="font-medium text-ink">{intake.challenges}</span>
         <textarea
           value={state.challenges}
           onChange={(e) => setState((s) => ({ ...s, challenges: e.target.value }))}
-          placeholder={CHALLENGES_PLACEHOLDER}
+          placeholder={intake.challengesPlaceholder}
           rows={6}
           className="resize-none rounded-xl border border-border bg-surface px-3.5 py-3 text-base leading-relaxed text-ink placeholder:text-muted focus:border-accent focus:outline-none"
         />
       </label>
 
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-ink">Objectifs</span>
+        <span className="font-medium text-ink">{intake.objectives}</span>
         <textarea
           value={state.objectives}
           onChange={(e) => setState((s) => ({ ...s, objectives: e.target.value }))}
-          placeholder="Ce que tu veux atteindre, avec un horizon si tu en as un."
+          placeholder={intake.objectivesPlaceholder}
           rows={4}
           className="resize-none rounded-xl border border-border bg-surface px-3.5 py-3 text-base leading-relaxed text-ink placeholder:text-muted focus:border-accent focus:outline-none"
         />
       </label>
 
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-ink">Contraintes</span>
+        <span className="font-medium text-ink">{intake.constraints}</span>
         <textarea
           value={state.constraints}
           onChange={(e) => setState((s) => ({ ...s, constraints: e.target.value }))}
-          placeholder="Budget, délais, ressources, dépendances techniques..."
+          placeholder={intake.constraintsPlaceholder}
           rows={4}
           className="resize-none rounded-xl border border-border bg-surface px-3.5 py-3 text-base leading-relaxed text-ink placeholder:text-muted focus:border-accent focus:outline-none"
         />
       </label>
 
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-ink">Régulations externes applicables (si connues)</span>
+        <span className="font-medium text-ink">{intake.regulations}</span>
         <textarea
           value={state.regulations}
           onChange={(e) => setState((s) => ({ ...s, regulations: e.target.value }))}
-          placeholder="Normes sectorielles, certifications déjà connues du client..."
+          placeholder={intake.regulationsPlaceholder}
           rows={3}
           className="resize-none rounded-xl border border-border bg-surface px-3.5 py-3 text-base leading-relaxed text-ink placeholder:text-muted focus:border-accent focus:outline-none"
         />
       </label>
 
       <div className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-ink">Document de référence (optionnel)</span>
-        <span className="text-xs text-muted">
-          .txt, .md ou .docx — cahier des charges, spécifications... Le PDF n&apos;est pas pris en
-          charge (extraction non fiable).
-        </span>
+        <span className="font-medium text-ink">{intake.referenceDoc}</span>
+        <span className="text-xs text-muted">{intake.referenceDocHint}</span>
         <input
           ref={fileInputRef}
           type="file"
@@ -214,12 +222,13 @@ export function IntakeForm({
           }}
           className="mt-1 text-sm text-muted file:mr-3 file:rounded-lg file:border file:border-border file:bg-surface file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink"
         />
-        {uploading && <span className="text-xs text-muted">Extraction en cours...</span>}
+        {uploading && <span className="text-xs text-muted">{intake.extracting}</span>}
         {uploadError && <span className="text-xs text-danger">{uploadError}</span>}
         {state.uploadedDocName && !uploading && (
           <div className="flex items-center gap-2 text-xs text-success">
             <span>
-              ✓ {state.uploadedDocName} importé ({state.uploadedDocText.length} caractères)
+              ✓ {state.uploadedDocName} {intake.imported} ({state.uploadedDocText.length}{" "}
+              {t.common.characters})
             </span>
             <button
               type="button"
@@ -229,7 +238,7 @@ export function IntakeForm({
               }}
               className="text-muted underline underline-offset-2 hover:text-danger"
             >
-              Retirer
+              {t.common.remove}
             </button>
           </div>
         )}
@@ -237,15 +246,13 @@ export function IntakeForm({
 
       <div className="flex flex-col gap-5 rounded-xl border border-border bg-surface p-4">
         <div>
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted">
-            Contexte du projet (optionnel, mais aide à cadrer le diagnostic)
-          </span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted">{intake.projectContext}</span>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5 text-sm">
             <span className="flex items-center justify-between font-medium text-ink">
-              <span>Flexibilité budgétaire</span>
+              <span>{intake.budgetFlexibility}</span>
               <span className="text-accent">{state.budgetFlexibility}%</span>
             </span>
             <input
@@ -257,14 +264,14 @@ export function IntakeForm({
               className="accent-[var(--accent)]"
             />
             <span className="flex justify-between text-[10px] text-muted">
-              <span>Serré</span>
-              <span>Flexible</span>
+              <span>{intake.tight}</span>
+              <span>{intake.flexible}</span>
             </span>
           </label>
 
           <label className="flex flex-col gap-1.5 text-sm">
             <span className="flex items-center justify-between font-medium text-ink">
-              <span>Priorité CO2 / durabilité</span>
+              <span>{intake.co2Priority}</span>
               <span className="text-accent">{state.co2Priority}%</span>
             </span>
             <input
@@ -279,7 +286,7 @@ export function IntakeForm({
         </div>
 
         <div className="flex flex-col gap-1.5 text-sm">
-          <span className="font-medium text-ink">Tolérance au risque</span>
+          <span className="font-medium text-ink">{intake.riskTolerance}</span>
           <div className="flex gap-2">
             {(Object.keys(RISK_TOLERANCE_LABELS) as RiskTolerance[]).map((level) => (
               <button
@@ -300,7 +307,7 @@ export function IntakeForm({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium text-ink">Portée du projet</span>
+            <span className="font-medium text-ink">{intake.scope}</span>
             <select
               value={state.scope}
               onChange={(e) => setState((s) => ({ ...s, scope: e.target.value as ProjectScope }))}
@@ -315,7 +322,7 @@ export function IntakeForm({
           </label>
 
           <label className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium text-ink">Urgence</span>
+            <span className="font-medium text-ink">{intake.urgency}</span>
             <select
               value={state.urgency}
               onChange={(e) => setState((s) => ({ ...s, urgency: e.target.value as Urgency }))}
@@ -333,9 +340,9 @@ export function IntakeForm({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5 text-sm">
             <span className="flex items-center justify-between font-medium text-ink">
-              <span>Horizon envisagé</span>
+              <span>{intake.horizon}</span>
               <span className="text-accent">
-                {state.horizonYears} an{state.horizonYears > 1 ? "s" : ""}
+                {state.horizonYears} {state.horizonYears > 1 ? intake.years : intake.year}
               </span>
             </span>
             <input
@@ -349,7 +356,7 @@ export function IntakeForm({
           </label>
 
           <label className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium text-ink">Taille de l&apos;organisation</span>
+            <span className="font-medium text-ink">{intake.organizationSize}</span>
             <select
               value={state.organizationSize}
               onChange={(e) => setState((s) => ({ ...s, organizationSize: e.target.value as OrganizationSize }))}
@@ -370,7 +377,7 @@ export function IntakeForm({
         disabled={!canSubmit}
         className="self-start rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {submitting ? "Diagnostic en cours..." : "Lancer le diagnostic"}
+        {submitting ? intake.submitting : intake.submit}
       </button>
     </form>
   );

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/sign-out-button";
 
@@ -9,7 +10,27 @@ export async function Nav() {
   } = await supabase.auth.getUser();
 
   return (
-    <header className="sticky top-0 z-10 border-b border-border bg-bg/90 backdrop-blur">
+    // The "touch of black" against the site's beige body: a self-contained
+    // dark strip using the original dark-theme token values, scoped locally
+    // via CSS custom properties (same mechanism as Learn's own theme wrap)
+    // — every class below (bg-bg, text-ink, text-accent, ...) still reads
+    // through these, so nothing else needs to change.
+    <header
+      className="sticky top-0 z-10 border-b border-border bg-bg/95 backdrop-blur"
+      style={
+        {
+          "--bg": "#14110d",
+          "--surface": "#1c1811",
+          "--surface-2": "#241f16",
+          "--border": "#332b1c",
+          "--ink": "#f3ead8",
+          "--muted": "#a89a7c",
+          "--accent": "#c9a256",
+          "--accent-strong": "#e0bd6e",
+          "--accent-ink": "#14110d",
+        } as CSSProperties
+      }
+    >
       <div className="mx-auto flex max-w-5xl items-center gap-4 overflow-x-auto px-4 py-3">
         <Link href="/" className="shrink-0 font-display text-lg tracking-wide text-ink">
           4 TOMORROW

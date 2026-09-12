@@ -1,22 +1,29 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import type { ReactNode } from "react";
 
-// PDF exports render on plain white paper (print-friendly, ink-light)
-// rather than mirroring each module's dark on-screen theme — a "consulting
-// report" look, matching the reference product's "Download Professional
-// Report" concept, not a screenshot of the app.
+// Same palette as the live platform (src/app/globals.css root tokens) —
+// beige/stone ground, brass gold accent, near-black ink — so a downloaded
+// report reads as the same brand, not a generic "consulting report" grey.
 export const PDF_COLORS = {
-  gold: "#b8863f",
-  ink: "#1c1a17",
-  muted: "#6b6459",
-  border: "#e4e0d8",
-  surface: "#faf9f7",
+  pageBg: "#eee5d3",
+  gold: "#a97731",
+  ink: "#221c14",
+  muted: "#6b5f49",
+  border: "#cdbb95",
+  surface: "#f8f3e8",
   success: "#3f8c5c",
-  danger: "#c14d3a",
+  danger: "#b3402c",
 };
 
 export const pdfStyles = StyleSheet.create({
-  page: { paddingTop: 40, paddingBottom: 48, paddingHorizontal: 40, fontSize: 9.5, color: PDF_COLORS.ink },
+  page: {
+    paddingTop: 40,
+    paddingBottom: 48,
+    paddingHorizontal: 40,
+    fontSize: 9.5,
+    color: PDF_COLORS.ink,
+    backgroundColor: PDF_COLORS.pageBg,
+  },
   brandRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   brand: { fontSize: 10, fontFamily: "Helvetica-Bold", color: PDF_COLORS.gold, letterSpacing: 0.5 },
   moduleTag: { fontSize: 8, color: PDF_COLORS.muted, marginTop: 2 },

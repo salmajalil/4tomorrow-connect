@@ -10,6 +10,7 @@ import {
   DeliverParseError,
 } from "@/lib/deliver";
 import { loadMissionContext } from "@/lib/deliver-context";
+import { getLanguage } from "@/lib/i18n/language";
 
 export const maxDuration = 60;
 
@@ -70,13 +71,14 @@ export async function POST(request: Request) {
     );
   }
 
+  const language = await getLanguage();
   const anthropic = getAnthropicClient();
   let response;
   try {
     response = await anthropic.messages.create({
       model: MATCHING_MODEL,
       max_tokens: 4000,
-      system: buildRoadmapAdjustSystemPrompt(),
+      system: buildRoadmapAdjustSystemPrompt(language),
       messages: [
         {
           role: "user",

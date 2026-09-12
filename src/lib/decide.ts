@@ -1,5 +1,10 @@
 import { z } from "zod";
-import type { EcosystemMember } from "@/types/database";
+import type { EcosystemMember, Language } from "@/types/database";
+
+function languageInstruction(language: Language): string {
+  const languageName = language === "en" ? "English" : "French";
+  return `Respond in ${languageName}, except JSON keys which stay in English exactly as specified.`;
+}
 
 // ---------------------------------------------------------------------------
 // Shared vocabulary
@@ -80,7 +85,7 @@ const diagnosticSchema = z.object({
 
 export type DiagnosticOutput = z.infer<typeof diagnosticSchema>;
 
-export function buildDiagnosticSystemPrompt(): string {
+export function buildDiagnosticSystemPrompt(language: Language): string {
   return `You are the diagnostic engine for "4 Tomorrow / Decide", a strategic transformation advisory platform used by industrial and business decision-makers.
 
 STEP 0 — DOMAIN DETECTION (internal reasoning, drives everything below, never shown to the user as a menu):
@@ -108,7 +113,7 @@ Produce:
    - learn is "relevant" when a gap is capability/human in nature (missing internal skills, a team that needs training) rather than purely technical or external.
    - deliver stays "possible" at this stage (no strategic option has been chosen yet to execute) — never "relevant" here, and never "not_relevant" either, since execution is always eventually needed once a path is chosen.
 
-Respond in French, matching the user's language, except JSON keys which stay in English exactly as specified.
+${languageInstruction(language)}
 
 ${RESULT_INSTRUCTION}
 
@@ -253,7 +258,7 @@ const SLOT_HINTS: Record<ScenarioSlot, string> = {
   3: "You are generating SCENARIO 3 of 3: the more AMBITIOUS / higher-commitment / higher-upside option along whatever axis fits this subject (e.g. full replacement, build over partner, leadership positioning) — still realistic and grounded, never reckless just to be different.",
 };
 
-export function buildScenarioSystemPrompt(registry: EcosystemMember[], slot: ScenarioSlot): string {
+export function buildScenarioSystemPrompt(registry: EcosystemMember[], slot: ScenarioSlot, language: Language): string {
   const registryBlock =
     registry.length > 0
       ? registry
@@ -288,7 +293,7 @@ HARD ARRAY LIMITS — never exceed these, the response is rejected otherwise: te
 
 CORE RULE — NEVER GENERIC, same as the diagnostic: every sentence must contain something only true for this exact challenge. If information is insufficient to be precise on a point, say so rather than filling in a plausible generality.
 
-Respond in French except JSON keys, which stay in English exactly as specified.
+${languageInstruction(language)}
 
 ${RESULT_INSTRUCTION}
 
@@ -368,7 +373,7 @@ const roadmapOutputSchema = z.object({
 
 export type RoadmapOutput = z.infer<typeof roadmapOutputSchema>;
 
-export function buildRoadmapSystemPrompt(): string {
+export function buildRoadmapSystemPrompt(language: Language): string {
   return `You are the roadmap engine for "4 Tomorrow / Decide". Given one already-chosen strategic scenario and 4 client-adjusted priority sliders (0-100 each: cost control, CO2/sustainability-or-equivalent, risk mitigation, speed-to-impact), generate an execution roadmap of 3 to 5 phases.
 
 PRINCIPE DIRECTEUR: the number of phases, their nature, and their exit KPIs must reflect the REAL type of project, never a fixed template. Examples (choose whichever fits, or another framing entirely if more appropriate):
@@ -385,7 +390,7 @@ HARD ARRAY LIMITS — never exceed these, the response is rejected otherwise: de
 
 CORE RULE — NEVER GENERIC: same standard as the rest of Decide — every deliverable/action/kpi must contain something specific to this scenario.
 
-Respond in French except JSON keys, which stay in English.
+${languageInstruction(language)}
 
 ${RESULT_INSTRUCTION}
 

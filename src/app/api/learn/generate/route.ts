@@ -15,6 +15,7 @@ import {
   type Domain,
 } from "@/lib/learn";
 import { setModuleStatus } from "@/lib/module-status";
+import { getLanguage } from "@/lib/i18n/language";
 
 // web_search is used in every mode (real examples/insights) — same
 // headroom budget the scenarios route settled on after production timeout
@@ -167,11 +168,12 @@ export async function POST(request: Request) {
     transformationId = newTransformation.id;
   }
 
+  const language = await getLanguage();
   const anthropic = getAnthropicClient();
   const mode: TrainingMode = body.mode;
   const hasLinkedDiagnostic = !!linkedChallenges;
-  const coreSystem = buildLearnCoreSystemPrompt(mode, !!body.sourceDocText, hasLinkedDiagnostic);
-  const interactiveSystem = buildLearnInteractiveSystemPrompt(mode, !!body.sourceDocText, hasLinkedDiagnostic);
+  const coreSystem = buildLearnCoreSystemPrompt(mode, !!body.sourceDocText, hasLinkedDiagnostic, language);
+  const interactiveSystem = buildLearnInteractiveSystemPrompt(mode, !!body.sourceDocText, hasLinkedDiagnostic, language);
   const userPrompt = buildLearnUserPrompt({
     topic: body.topic,
     organization: organizationName,

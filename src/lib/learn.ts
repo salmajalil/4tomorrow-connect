@@ -1,8 +1,14 @@
 import { z } from "zod";
 import { DOMAINS, DOMAIN_LABELS, type Domain } from "@/lib/decide";
+import type { Language } from "@/types/database";
 
 export { DOMAINS, DOMAIN_LABELS };
 export type { Domain };
+
+function languageInstruction(language: Language): string {
+  const languageName = language === "en" ? "English" : "French";
+  return `Respond in ${languageName}, except JSON keys which stay in English exactly as specified.`;
+}
 
 const RESULT_START = "<RESULT_JSON>";
 const RESULT_END = "</RESULT_JSON>";
@@ -127,7 +133,12 @@ Classify the topic into one or more of: manufacturing, rd, gtm, strategy, digita
 
 const NEVER_GENERIC = `CORE RULE — NEVER GENERIC: every sentence must contain something that would only be true for this exact topic — a number, a name, a real detail. If information is insufficient to be specific on a point, say so rather than filling in a plausible generality.`;
 
-export function buildLearnCoreSystemPrompt(mode: TrainingMode, hasSourceDoc: boolean, hasLinkedDiagnostic: boolean): string {
+export function buildLearnCoreSystemPrompt(
+  mode: TrainingMode,
+  hasSourceDoc: boolean,
+  hasLinkedDiagnostic: boolean,
+  language: Language
+): string {
   return `You are the training generation engine for "4 Tomorrow / Learn" — this call produces the core content (summary + insights) of a short professional training that also has to double as Qualiopi-compliant evidence (the French national training-quality certification) without the user doing any extra paperwork.
 
 ${DOMAIN_STEP}
@@ -146,7 +157,7 @@ ${NEVER_GENERIC}
 
 HARD ARRAY LIMITS — never exceed these, the response is rejected otherwise: objectives ≤4, executiveSummary.actionPlan ≤5, keyInsights ≤5, businessImplications ≤4. Pick the most important entries rather than listing everything you can think of.
 
-Respond in French except JSON keys, which stay in English exactly as specified.
+${languageInstruction(language)}
 
 ${RESULT_INSTRUCTION}
 
@@ -162,7 +173,12 @@ Schema:
 }`;
 }
 
-export function buildLearnInteractiveSystemPrompt(mode: TrainingMode, hasSourceDoc: boolean, hasLinkedDiagnostic: boolean): string {
+export function buildLearnInteractiveSystemPrompt(
+  mode: TrainingMode,
+  hasSourceDoc: boolean,
+  hasLinkedDiagnostic: boolean,
+  language: Language
+): string {
   return `You are the training generation engine for "4 Tomorrow / Learn" — this call produces the interactive/media content (flashcards, quiz, video script) of a short professional training. A separate parallel call is producing the summary and key insights for the same topic — your job is only this part, not to reference or restate the other.
 
 ${DOMAIN_STEP}
@@ -180,7 +196,7 @@ ${NEVER_GENERIC}
 
 HARD ARRAY LIMITS — never exceed these, the response is rejected otherwise: flashcards ≤8, comprehensionCheck ≤5 questions (each with exactly 4 options), videoScript.scenes ≤8. Pick the most important entries rather than listing everything you can think of.
 
-Respond in French except JSON keys, which stay in English exactly as specified.
+${languageInstruction(language)}
 
 ${RESULT_INSTRUCTION}
 

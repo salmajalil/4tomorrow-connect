@@ -13,6 +13,7 @@ import {
   type ScenarioSlot,
 } from "@/lib/decide";
 import { setModuleStatus } from "@/lib/module-status";
+import { getLanguage } from "@/lib/i18n/language";
 import type { EcosystemMember } from "@/types/database";
 
 // Headroom above MATCHING_TIMEOUT_MS (src/lib/anthropic.ts, 170s) — same
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
   ]);
 
   const domains = (transformation.domains as Domain[]) ?? [];
+  const language = await getLanguage();
   const anthropic = getAnthropicClient();
   const userPrompt = buildScenariosUserPrompt({
     domains,
@@ -81,7 +83,7 @@ export async function POST(request: Request) {
   const slots: ScenarioSlot[] = [1, 2, 3];
   const settled = await Promise.allSettled(
     slots.map(async (slot) => {
-      const system = buildScenarioSystemPrompt((registry ?? []) as EcosystemMember[], slot);
+      const system = buildScenarioSystemPrompt((registry ?? []) as EcosystemMember[], slot, language);
       const createCall = () =>
         anthropic.messages.create({
           model: MATCHING_MODEL,

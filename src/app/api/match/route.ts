@@ -12,6 +12,7 @@ import {
 } from "@/lib/matching";
 import type { EcosystemMember } from "@/types/database";
 import { setModuleStatus } from "@/lib/module-status";
+import { getLanguage } from "@/lib/i18n/language";
 
 // Headroom above MATCHING_TIMEOUT_MS (src/lib/anthropic.ts) so our own
 // timeout error fires before Vercel kills the function outright.
@@ -65,8 +66,9 @@ export async function POST(request: Request) {
     );
   }
 
+  const language = await getLanguage();
   const anthropic = getAnthropicClient();
-  const system = buildSystemPrompt((registry ?? []) as EcosystemMember[]);
+  const system = buildSystemPrompt((registry ?? []) as EcosystemMember[], language);
   const userPrompt = buildUserPrompt(body);
 
   let response;

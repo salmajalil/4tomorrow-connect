@@ -1,5 +1,10 @@
 import { z } from "zod";
-import type { EcosystemMember } from "@/types/database";
+import type { EcosystemMember, Language } from "@/types/database";
+
+function languageInstruction(language: Language): string {
+  const languageName = language === "en" ? "English" : "French";
+  return `Respond in ${languageName}, EXCEPT for the JSON keys themselves which must stay in English exactly as specified below.`;
+}
 
 export interface MatchingInput {
   industry: string;
@@ -72,7 +77,7 @@ const RESULT_END = "</RESULT_JSON>";
  * directory both gates and grows from its own past output.
  * ---------------------------------------------------------------------
  */
-export function buildSystemPrompt(registry: EcosystemMember[]): string {
+export function buildSystemPrompt(registry: EcosystemMember[], language: Language): string {
   const registryBlock =
     registry.length > 0
       ? registry
@@ -104,7 +109,7 @@ STRICT RULES:
 9. If the user gave a location, take it into account: prefer matches genuinely relevant to that region, but don't invent a fake local presence for an organization — note in "reason" when a strong match operates outside the stated region rather than silently claiming otherwise.
 10. Never state a specific number (a percentage, a euro amount, a tonnage of CO2) unless you found it from a real, citable source via web_search or the directory — if you don't have a verified figure, describe the opportunity qualitatively instead of inventing one.
 
-Respond in French, matching the user's own language, EXCEPT for the JSON keys themselves which must stay in English exactly as specified below.
+${languageInstruction(language)}
 
 After you finish any research, output your final answer as JSON matching this exact shape, and nothing else after it:
 ${RESULT_START}

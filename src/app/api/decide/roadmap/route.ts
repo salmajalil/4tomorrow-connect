@@ -11,6 +11,7 @@ import {
   type Domain,
 } from "@/lib/decide";
 import { setModuleStatus } from "@/lib/module-status";
+import { getLanguage } from "@/lib/i18n/language";
 import type { TrajectoryIndicators } from "@/types/database";
 
 // The roadmap prompt just needs human-readable indicator text, not the
@@ -74,6 +75,7 @@ export async function POST(request: Request) {
     .eq("id", trajectory.transformation_id)
     .maybeSingle();
 
+  const language = await getLanguage();
   const anthropic = getAnthropicClient();
   let response;
   try {
@@ -84,7 +86,7 @@ export async function POST(request: Request) {
       // 6 deliverables, 6 actions and 4 KPIs (every one a full, specific
       // sentence per the "never generic" rule) adds up past that budget.
       max_tokens: 4500,
-      system: buildRoadmapSystemPrompt(),
+      system: buildRoadmapSystemPrompt(language),
       messages: [
         {
           role: "user",

@@ -10,6 +10,7 @@ import {
   DeliverParseError,
 } from "@/lib/deliver";
 import { loadMissionContext } from "@/lib/deliver-context";
+import { getLanguage } from "@/lib/i18n/language";
 
 export const maxDuration = 60;
 
@@ -41,13 +42,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Aucune trajectoire choisie pour ce projet." }, { status: 404 });
   }
 
+  const language = await getLanguage();
   const anthropic = getAnthropicClient();
   let response;
   try {
     response = await anthropic.messages.create({
       model: MATCHING_MODEL,
       max_tokens: 3000,
-      system: buildRecalibrationSystemPrompt(),
+      system: buildRecalibrationSystemPrompt(language),
       messages: [
         {
           role: "user",

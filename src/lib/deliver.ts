@@ -1,6 +1,17 @@
 import { z } from "zod";
 import { DOMAINS, DOMAIN_LABELS, type Domain } from "@/lib/decide";
-import { DELIVERABLE_KINDS, type DeliverableKind, type DeliverableContent, type RecalibrationSummary } from "@/types/database";
+import {
+  DELIVERABLE_KINDS,
+  type DeliverableKind,
+  type DeliverableContent,
+  type RecalibrationSummary,
+  type Language,
+} from "@/types/database";
+
+function languageInstruction(language: Language): string {
+  const languageName = language === "en" ? "English" : "French";
+  return `Respond in ${languageName}, except JSON keys which stay in English exactly as specified.`;
+}
 
 export { DOMAINS, DOMAIN_LABELS, DELIVERABLE_KINDS };
 export type { Domain, DeliverableKind };
@@ -175,7 +186,7 @@ const KIND_SCHEMA_BLOCK: Record<DeliverableKind, string> = {
   toolkit: `{ "tools": [{ "name": string, "purpose": string, "whyThisProject": string }] }`,
 };
 
-export function buildDeliverableSystemPrompt(kind: DeliverableKind): string {
+export function buildDeliverableSystemPrompt(kind: DeliverableKind, language: Language): string {
   return `You are the execution engine for "4 Tomorrow / Deliver" — this call produces exactly ONE deliverable, "${DELIVERABLE_LABELS[kind]}", for a transformation whose strategic trajectory has already been chosen and diagnosed by an earlier module (Decide). You are NOT choosing a strategy — you are turning an already-chosen one into an executable document.
 
 STEP 0 — DOMAIN AWARENESS (internal reasoning): the domain(s) are given below — adapt vocabulary and content to fit (e.g. production/technical framing for manufacturing, commercial framing for go-to-market), never a generic template.
@@ -186,7 +197,7 @@ CORE RULE — NEVER GENERIC: every sentence must contain something that would on
 
 Also produce a "title" for this deliverable — a short, specific, domain-adapted name for it (e.g. "Go-to-market Plan — Lancement gamme XYZ" for a commercial trajectory rather than a generic "Roadmap"). This title is shown once the deliverable is opened — it is separate from and does not replace the fixed section name.
 
-Respond in French except JSON keys, which stay in English exactly as specified.
+${languageInstruction(language)}
 
 ${RESULT_INSTRUCTION}
 
@@ -256,7 +267,7 @@ const recalibrationSchema = z.object({
     .nullable(),
 });
 
-export function buildRecalibrationSystemPrompt(): string {
+export function buildRecalibrationSystemPrompt(language: Language): string {
   return `You are the recalibration engine for "4 Tomorrow / Deliver". The user reports real execution progress, delays, or risks encountered on an already-running project (context and current priorities given below). Analyze it and propose an updated plan.
 
 Produce:
@@ -268,7 +279,7 @@ CORE RULE — NEVER GENERIC: ground every point in what the user actually report
 
 This is a PROPOSAL ONLY — nothing here is applied automatically; the user reviews and confirms before anything changes.
 
-Respond in French except JSON keys, which stay in English exactly as specified.
+${languageInstruction(language)}
 
 ${RESULT_INSTRUCTION}
 
@@ -316,7 +327,7 @@ const adjustPhaseSchema = z.object({
 const adjustRoadmapSchema = z.object({ phases: z.array(adjustPhaseSchema).min(1).max(6) });
 export type AdjustRoadmapOutput = z.infer<typeof adjustRoadmapSchema>;
 
-export function buildRoadmapAdjustSystemPrompt(): string {
+export function buildRoadmapAdjustSystemPrompt(language: Language): string {
   return `You are the execution roadmap engine for "4 Tomorrow / Deliver". A roadmap for the already-chosen trajectory exists and some of its early phases are already done or in progress (listed below — do not repeat or contradict them). Your job is to REFRESH ONLY THE REMAINING phases, taking into account what has already been executed and updated priority sliders (0-100 each: cost control, CO2/sustainability-or-equivalent, risk mitigation, speed-to-impact).
 
 Keep roughly the same remaining phase names and sequence given below unless the context genuinely calls for a different one — this is a refinement of what's left, not a from-scratch redesign. Each phase needs: name, durationWeeks, deliverables, actions, kpis — same standard as any roadmap: specific to this exact project, never generic.
@@ -327,7 +338,7 @@ HARD ARRAY LIMITS — never exceed these, the response is rejected otherwise: de
 
 CORE RULE — NEVER GENERIC: same standard as the rest of 4 Tomorrow — every deliverable/action/kpi must contain something specific to this project.
 
-Respond in French except JSON keys, which stay in English.
+${languageInstruction(language)}
 
 ${RESULT_INSTRUCTION}
 

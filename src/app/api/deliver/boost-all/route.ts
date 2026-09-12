@@ -12,6 +12,7 @@ import {
 } from "@/lib/deliver";
 import { loadMissionContext } from "@/lib/deliver-context";
 import { setModuleStatus } from "@/lib/module-status";
+import { getLanguage } from "@/lib/i18n/language";
 import type { DeliverableKind, DeliverableContent } from "@/types/database";
 
 // Same "one per call, in parallel" fix already proven by DECIDE's scenarios
@@ -63,6 +64,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ deliverables: [], alreadyComplete: true });
   }
 
+  const language = await getLanguage();
   const anthropic = getAnthropicClient();
   const userPrompt = buildDeliverableUserPrompt({ ...mission.context, sourceDocText: body.sourceDocText || undefined });
 
@@ -72,7 +74,7 @@ export async function POST(request: Request) {
         anthropic.messages.create({
           model: MATCHING_MODEL,
           max_tokens: 4000,
-          system: buildDeliverableSystemPrompt(kind),
+          system: buildDeliverableSystemPrompt(kind, language),
           messages: [{ role: "user", content: userPrompt }],
         });
 

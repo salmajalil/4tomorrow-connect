@@ -11,6 +11,7 @@ import {
   type DiagnosticInput,
 } from "@/lib/decide";
 import { setModuleStatus } from "@/lib/module-status";
+import { getLanguage } from "@/lib/i18n/language";
 import type { RecommendableModule } from "@/types/database";
 
 // No web_search in this call — pure reasoning, so a generous ceiling here
@@ -53,6 +54,7 @@ export async function POST(request: Request) {
     );
   }
 
+  const language = await getLanguage();
   const anthropic = getAnthropicClient();
   let response;
   try {
@@ -62,7 +64,7 @@ export async function POST(request: Request) {
       // priorities just added the same kind of extra JSON content that
       // truncated the scenarios/roadmap responses at their original budgets.
       max_tokens: 4000,
-      system: buildDiagnosticSystemPrompt(),
+      system: buildDiagnosticSystemPrompt(language),
       messages: [{ role: "user", content: buildDiagnosticUserPrompt(body) }],
     });
   } catch (err) {

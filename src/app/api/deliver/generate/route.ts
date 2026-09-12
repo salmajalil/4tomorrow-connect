@@ -12,6 +12,7 @@ import {
 } from "@/lib/deliver";
 import { loadMissionContext } from "@/lib/deliver-context";
 import { setModuleStatus } from "@/lib/module-status";
+import { getLanguage } from "@/lib/i18n/language";
 
 export const maxDuration = 60;
 
@@ -47,13 +48,14 @@ export async function POST(request: Request) {
     );
   }
 
+  const language = await getLanguage();
   const anthropic = getAnthropicClient();
   let response;
   try {
     response = await anthropic.messages.create({
       model: MATCHING_MODEL,
       max_tokens: 4000,
-      system: buildDeliverableSystemPrompt(body.kind),
+      system: buildDeliverableSystemPrompt(body.kind, language),
       messages: [
         { role: "user", content: buildDeliverableUserPrompt({ ...mission.context, sourceDocText: body.sourceDocText || undefined }) },
       ],

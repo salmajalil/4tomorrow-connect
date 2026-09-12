@@ -3,6 +3,11 @@
 import { useRef, useState } from "react";
 import { Eyebrow } from "@/components/eyebrow";
 
+export type RiskTolerance = "low" | "medium" | "high";
+export type ProjectScope = "local" | "national" | "global";
+export type Urgency = "immediate" | "planned" | "long_term";
+export type OrganizationSize = "small" | "medium" | "large" | "enterprise";
+
 export interface IntakeState {
   organization: string;
   industry: string;
@@ -12,6 +17,52 @@ export interface IntakeState {
   regulations: string;
   uploadedDocText: string;
   uploadedDocName: string;
+  budgetFlexibility: number;
+  co2Priority: number;
+  riskTolerance: RiskTolerance;
+  scope: ProjectScope;
+  urgency: Urgency;
+  horizonYears: number;
+  organizationSize: OrganizationSize;
+}
+
+const RISK_TOLERANCE_LABELS: Record<RiskTolerance, string> = {
+  low: "Faible",
+  medium: "Moyenne",
+  high: "Élevée",
+};
+
+const SCOPE_LABELS: Record<ProjectScope, string> = {
+  local: "Locale",
+  national: "Nationale",
+  global: "Globale / internationale",
+};
+
+const URGENCY_LABELS: Record<Urgency, string> = {
+  immediate: "Immédiat (0-6 mois)",
+  planned: "Planifié (6-18 mois)",
+  long_term: "Long terme (18 mois et plus)",
+};
+
+const ORGANIZATION_SIZE_LABELS: Record<OrganizationSize, string> = {
+  small: "Petite (< 50 personnes)",
+  medium: "Moyenne (50-500)",
+  large: "Grande (500-5000)",
+  enterprise: "Très grande (5000+)",
+};
+
+// Folded into the free-text "constraints" sent to the diagnostic/scenario
+// prompts (both already read transformation.constraints) — no schema or
+// server-side change needed to get this structured context to the AI.
+function formatStructuredContext(state: IntakeState): string {
+  return `Contexte structuré (renseigné via curseurs/menus) :
+- Flexibilité budgétaire : ${state.budgetFlexibility}% (0 = serré, 100 = flexible)
+- Priorité CO2 / durabilité : ${state.co2Priority}%
+- Tolérance au risque : ${RISK_TOLERANCE_LABELS[state.riskTolerance]}
+- Portée du projet : ${SCOPE_LABELS[state.scope]}
+- Urgence : ${URGENCY_LABELS[state.urgency]}
+- Horizon envisagé : ${state.horizonYears} an${state.horizonYears > 1 ? "s" : ""}
+- Taille de l'organisation : ${ORGANIZATION_SIZE_LABELS[state.organizationSize]}`;
 }
 
 const CHALLENGES_PLACEHOLDER = `Ex : On veut digitaliser notre suivi de production, aujourd'hui géré sur Excel par 3 personnes à temps plein. Erreurs fréquentes de saisie, pas de visibilité temps réel pour la direction. Contrainte : l'ERP actuel a 12 ans et personne en interne ne sait le modifier.`;
@@ -48,6 +99,13 @@ export function IntakeForm({
     regulations: "",
     uploadedDocText: "",
     uploadedDocName: "",
+    budgetFlexibility: 50,
+    co2Priority: 50,
+    riskTolerance: "medium",
+    scope: "national",
+    urgency: "planned",
+    horizonYears: 3,
+    organizationSize: "medium",
   });
   const [uploadError, setUploadError] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -72,7 +130,12 @@ export function IntakeForm({
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (canSubmit) onSubmit(state);
+        if (!canSubmit) return;
+        const structured = formatStructuredContext(state);
+        onSubmit({
+          ...state,
+          constraints: state.constraints.trim() ? `${structured}\n\n${state.constraints}` : structured,
+        });
       }}
       className="flex flex-col gap-8"
     >
@@ -185,6 +248,136 @@ export function IntakeForm({
             </button>
           </div>
         )}
+      </div>
+
+      <div className="flex flex-col gap-5 rounded-xl border border-border bg-surface p-4">
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+            Contexte du projet (optionnel, mais aide à cadrer le diagnostic)
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="flex items-center justify-between font-medium text-ink">
+              <span>Flexibilité budgétaire</span>
+              <span className="text-accent">{state.budgetFlexibility}%</span>
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={state.budgetFlexibility}
+              onChange={(e) => setState((s) => ({ ...s, budgetFlexibility: Number(e.target.value) }))}
+              className="accent-[var(--accent)]"
+            />
+            <span className="flex justify-between text-[10px] text-muted">
+              <span>Serré</span>
+              <span>Flexible</span>
+            </span>
+          </label>
+
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="flex items-center justify-between font-medium text-ink">
+              <span>Priorité CO2 / durabilité</span>
+              <span className="text-accent">{state.co2Priority}%</span>
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={state.co2Priority}
+              onChange={(e) => setState((s) => ({ ...s, co2Priority: Number(e.target.value) }))}
+              className="accent-[var(--accent)]"
+            />
+          </label>
+        </div>
+
+        <div className="flex flex-col gap-1.5 text-sm">
+          <span className="font-medium text-ink">Tolérance au risque</span>
+          <div className="flex gap-2">
+            {(Object.keys(RISK_TOLERANCE_LABELS) as RiskTolerance[]).map((level) => (
+              <button
+                key={level}
+                type="button"
+                onClick={() => setState((s) => ({ ...s, riskTolerance: level }))}
+                className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                  state.riskTolerance === level
+                    ? "border-accent bg-accent/10 text-accent-strong"
+                    : "border-border text-muted hover:text-ink"
+                }`}
+              >
+                {RISK_TOLERANCE_LABELS[level]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="font-medium text-ink">Portée du projet</span>
+            <select
+              value={state.scope}
+              onChange={(e) => setState((s) => ({ ...s, scope: e.target.value as ProjectScope }))}
+              className="rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-ink focus:border-accent focus:outline-none"
+            >
+              {(Object.keys(SCOPE_LABELS) as ProjectScope[]).map((v) => (
+                <option key={v} value={v}>
+                  {SCOPE_LABELS[v]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="font-medium text-ink">Urgence</span>
+            <select
+              value={state.urgency}
+              onChange={(e) => setState((s) => ({ ...s, urgency: e.target.value as Urgency }))}
+              className="rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-ink focus:border-accent focus:outline-none"
+            >
+              {(Object.keys(URGENCY_LABELS) as Urgency[]).map((v) => (
+                <option key={v} value={v}>
+                  {URGENCY_LABELS[v]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="flex items-center justify-between font-medium text-ink">
+              <span>Horizon envisagé</span>
+              <span className="text-accent">
+                {state.horizonYears} an{state.horizonYears > 1 ? "s" : ""}
+              </span>
+            </span>
+            <input
+              type="range"
+              min={1}
+              max={10}
+              value={state.horizonYears}
+              onChange={(e) => setState((s) => ({ ...s, horizonYears: Number(e.target.value) }))}
+              className="accent-[var(--accent)]"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="font-medium text-ink">Taille de l&apos;organisation</span>
+            <select
+              value={state.organizationSize}
+              onChange={(e) => setState((s) => ({ ...s, organizationSize: e.target.value as OrganizationSize }))}
+              className="rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-ink focus:border-accent focus:outline-none"
+            >
+              {(Object.keys(ORGANIZATION_SIZE_LABELS) as OrganizationSize[]).map((v) => (
+                <option key={v} value={v}>
+                  {ORGANIZATION_SIZE_LABELS[v]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       <button

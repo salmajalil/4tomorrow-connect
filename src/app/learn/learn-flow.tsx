@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { LearnIntakeForm, type LearnIntakeState } from "@/components/learn/learn-intake-form";
+import { LearnHeader } from "@/components/learn/learn-header";
+import { LearnThemeWrap } from "@/components/learn/learn-theme";
 import { TrainingView } from "@/components/learn/training-view";
 import { parseJsonResponse } from "@/lib/parse-json-response";
 import type { Training } from "@/types/database";
@@ -88,37 +90,50 @@ export function LearnFlow({
 
   if (phase === "intake") {
     return (
-      <div className="mx-auto w-full max-w-2xl px-4 py-10">
-        <LearnIntakeForm
-          onSubmit={runGenerate}
-          submitting={false}
-          existingProjects={existingProjects}
-          initialTransformationId={initialTransformationId}
-        />
-      </div>
+      <LearnThemeWrap>
+        <div className="mx-auto w-full max-w-2xl px-4 py-10">
+          <LearnIntakeForm
+            onSubmit={runGenerate}
+            submitting={false}
+            existingProjects={existingProjects}
+            initialTransformationId={initialTransformationId}
+          />
+        </div>
+      </LearnThemeWrap>
     );
   }
 
   if (phase === "loading") {
     return (
-      <div className="mx-auto w-full max-w-2xl px-4 py-10">
-        {error ? <ErrorBlock message={error} onRetry={() => lastIntake && runGenerate(lastIntake)} /> : <LoadingBlock />}
-      </div>
+      <LearnThemeWrap>
+        <div className="mx-auto w-full max-w-2xl px-4 py-10">
+          <LearnHeader />
+          {error ? (
+            <div className="mt-6">
+              <ErrorBlock message={error} onRetry={() => lastIntake && runGenerate(lastIntake)} />
+            </div>
+          ) : (
+            <LoadingBlock />
+          )}
+        </div>
+      </LearnThemeWrap>
     );
   }
 
   if (phase === "result" && training) {
     return (
-      <div className="mx-auto w-full max-w-3xl px-4 py-10">
-        <button
-          type="button"
-          onClick={() => setPhase("intake")}
-          className="mb-4 text-sm text-muted underline underline-offset-2 hover:text-accent"
-        >
-          ← Nouvelle formation
-        </button>
-        <TrainingView training={training} />
-      </div>
+      <LearnThemeWrap>
+        <div className="mx-auto w-full max-w-3xl px-4 py-10">
+          <button
+            type="button"
+            onClick={() => setPhase("intake")}
+            className="mb-4 text-sm text-muted underline underline-offset-2 hover:text-accent"
+          >
+            ← Nouvelle formation
+          </button>
+          <TrainingView training={training} />
+        </div>
+      </LearnThemeWrap>
     );
   }
 

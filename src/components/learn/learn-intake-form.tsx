@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Eyebrow } from "@/components/eyebrow";
+import { LearnHeader } from "@/components/learn/learn-header";
 import { extractFileText } from "@/lib/extract-file-text";
 import type { TrainingMode } from "@/lib/learn";
 
@@ -16,10 +16,28 @@ export interface LearnIntakeState {
   industry: string;
 }
 
-const MODE_OPTIONS: { id: TrainingMode; label: string; description: string }[] = [
-  { id: "rapide", label: "Rapide", description: "Sujet en texte libre, génération directe avec exemples réels trouvés sur le web." },
-  { id: "document", label: "Document joint", description: "Un support existant (procédure, brief) devient la base factuelle du contenu." },
-  { id: "diagnostic", label: "Lié à un projet", description: "S'appuie sur un diagnostic Decide déjà fait — contenu directement pertinent, zéro ressaisie." },
+const MODE_OPTIONS: { id: TrainingMode; icon: string; gradient: string; label: string; description: string }[] = [
+  {
+    id: "rapide",
+    icon: "⚡",
+    gradient: "linear-gradient(135deg, #f472b6, #db2777)",
+    label: "Rapide",
+    description: "Sujet en texte libre, génération directe avec exemples réels trouvés sur le web.",
+  },
+  {
+    id: "document",
+    icon: "📄",
+    gradient: "linear-gradient(135deg, #60a5fa, #2563eb)",
+    label: "Document joint",
+    description: "Un support existant (procédure, brief) devient la base factuelle du contenu.",
+  },
+  {
+    id: "diagnostic",
+    icon: "🎯",
+    gradient: "linear-gradient(135deg, #3fd67a, #059669)",
+    label: "Lié à un projet",
+    description: "S'appuie sur un diagnostic Decide déjà fait — contenu directement pertinent, zéro ressaisie.",
+  },
 ];
 
 export function LearnIntakeForm({
@@ -74,13 +92,15 @@ export function LearnIntakeForm({
       }}
       className="flex flex-col gap-8"
     >
-      <div>
-        <Eyebrow>Learn</Eyebrow>
-        <h1 className="mt-3 font-display text-3xl text-ink">Génère une formation</h1>
-        <p className="mt-1 text-sm text-muted">
-          Objectifs, points clés avec exemples réels, flashcards, quiz de validation et script vidéo — générés
-          ensemble, prêts à servir de preuve Qualiopi.
-        </p>
+      <div className="flex flex-col gap-4">
+        <LearnHeader />
+        <div>
+          <h1 className="font-display text-3xl text-ink">Génère une formation</h1>
+          <p className="mt-1 text-sm text-muted">
+            Objectifs, points clés avec exemples réels, flashcards, quiz de validation et script vidéo — générés
+            ensemble, prêts à servir de preuve Qualiopi.
+          </p>
+        </div>
       </div>
 
       {existingProjects.length > 0 && (
@@ -127,21 +147,38 @@ export function LearnIntakeForm({
 
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium text-ink">Mode de génération</span>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {MODE_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              disabled={opt.id === "diagnostic" && existingProjects.length === 0}
-              onClick={() => setState((s) => ({ ...s, mode: opt.id }))}
-              className={`flex flex-col gap-1 rounded-xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                state.mode === opt.id ? "border-accent bg-accent/10" : "border-border bg-surface hover:border-accent/50"
-              }`}
-            >
-              <span className="text-sm font-semibold text-ink">{opt.label}</span>
-              <span className="text-xs text-muted">{opt.description}</span>
-            </button>
-          ))}
+        <div className="flex flex-col gap-2.5">
+          {MODE_OPTIONS.map((opt) => {
+            const selected = state.mode === opt.id;
+            const disabled = opt.id === "diagnostic" && existingProjects.length === 0;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                disabled={disabled}
+                onClick={() => setState((s) => ({ ...s, mode: opt.id }))}
+                className={`flex items-center gap-3.5 rounded-2xl border p-3.5 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                  selected ? "border-accent bg-accent/10" : "border-border bg-surface hover:border-accent/40"
+                }`}
+              >
+                <span
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl shadow-lg"
+                  style={{ background: opt.gradient }}
+                >
+                  {opt.icon}
+                </span>
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-sm font-semibold text-ink">{opt.label}</span>
+                  <span className="text-xs text-muted">{opt.description}</span>
+                </span>
+                {selected && (
+                  <span className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-ink">
+                    ✓
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 

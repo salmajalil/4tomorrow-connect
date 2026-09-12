@@ -134,12 +134,14 @@ export async function POST(request: Request) {
   const createCall = () =>
     anthropic.messages.create({
       model: MATCHING_MODEL,
-      // Generous from the start: DECIDE's scenarios/roadmap/diagnostic
-      // routes all had to raise this after production truncation — a
-      // training with objectives + summary + up to 5 insights + up to 8
-      // flashcards + up to 5 four-option quiz questions + an 8-scene
-      // video script is comparably large output.
-      max_tokens: 6500,
+      // First attempt at this route used 6500 and truncated in production:
+      // web_search_tool_result blocks (2 rounds) count against max_tokens
+      // just like the JSON answer does, and Learn's schema (insights +
+      // flashcards + quiz + an 8-scene video script) is the largest of any
+      // module's output. 16000 is the documented safe ceiling for a
+      // non-streaming call on this model family — real headroom, not a
+      // guess to be raised again later.
+      max_tokens: 16000,
       system,
       messages: [{ role: "user", content: userPrompt }],
       tools: [{ type: "web_search_20260318", name: "web_search", max_uses: 2 }],
@@ -159,6 +161,17 @@ export async function POST(request: Request) {
     } else {
       return handleAnthropicError(err);
     }
+  }
+
+  if (response.stop_reason === "max_tokens") {
+    // Distinct from a parse failure — the model was cut off mid-answer.
+    // Surfacing this separately (instead of falling into the generic
+    // LearnParseError message below) makes a real future regression
+    // diagnosable from the error text alone, without a Vercel log dive.
+    return NextResponse.json(
+      { error: "La génération a été interrompue avant la fin (contenu trop long). Réessaie, idéalement avec un sujet plus ciblé." },
+      { status: 502 }
+    );
   }
 
   const rawText = response.content

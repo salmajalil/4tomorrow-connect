@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Eyebrow } from "@/components/eyebrow";
+import { LearnHeader } from "@/components/learn/learn-header";
 import { DOMAIN_LABELS, type Domain } from "@/lib/learn";
 import type { Training } from "@/types/database";
 
@@ -41,6 +41,44 @@ function Flashcard({ question, answer, category, index }: { question: string; an
         </span>
       )}
     </button>
+  );
+}
+
+function FormatTile({
+  icon,
+  gradient,
+  title,
+  subtitle,
+}: {
+  icon: string;
+  gradient: string;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <span
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl shadow-lg"
+        style={{ background: gradient }}
+      >
+        {icon}
+      </span>
+      <div>
+        <h2 className="text-sm font-bold text-ink">{title}</h2>
+        <p className="text-xs text-muted">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+function QualiopiBadge() {
+  return (
+    <div className="flex w-fit items-center gap-2 rounded-full border border-accent/30 bg-accent/5 px-3.5 py-1.5 text-xs text-muted">
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-ink">
+        ✓
+      </span>
+      Contenu conforme Qualiopi · Traçabilité automatique
+    </div>
   );
 }
 
@@ -124,10 +162,10 @@ export function TrainingView({ training }: { training: Training }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <Eyebrow>Learn</Eyebrow>
-        <h1 className="mt-3 font-display text-2xl text-ink">{training.topic}</h1>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-4">
+        <LearnHeader />
+        <h1 className="font-display text-2xl text-ink">{training.topic}</h1>
+        <div className="flex flex-wrap items-center gap-2">
           {domains.map((d) => (
             <span key={d} className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent-strong">
               {DOMAIN_LABELS[d] ?? d}
@@ -220,15 +258,20 @@ export function TrainingView({ training }: { training: Training }) {
 
       {tab === "experience" && (
         <div className="flex flex-col gap-6">
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Flashcards</h2>
-            <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-3">
+            <FormatTile
+              icon="🃏"
+              gradient="linear-gradient(135deg, #a78bfa, #7c3aed)"
+              title="Cartes interactives"
+              subtitle="Flashcards à retourner, pour ancrer les points clés."
+            />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {training.flashcards.map((f, i) => (
                 <Flashcard key={i} index={i} question={f.question} answer={f.answer} category={f.category} />
               ))}
             </div>
           </div>
-          <div>
+          <div className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Quiz de validation</h2>
               {quizAnswered > 0 && (
@@ -237,7 +280,7 @@ export function TrainingView({ training }: { training: Training }) {
                 </span>
               )}
             </div>
-            <div className="mt-2 flex flex-col gap-3">
+            <div className="flex flex-col gap-3">
               {training.comprehension_check.map((q, i) => (
                 <QuizQuestion
                   key={i}
@@ -254,16 +297,20 @@ export function TrainingView({ training }: { training: Training }) {
               ))}
             </div>
           </div>
+          <QualiopiBadge />
         </div>
       )}
 
       {tab === "video" && (
         <div className="flex flex-col gap-4">
+          <FormatTile
+            icon="🎬"
+            gradient="linear-gradient(135deg, #fb923c, #ea580c)"
+            title="Script vidéo"
+            subtitle="Storyboard scène par scène, prêt à filmer ou à passer à un outil de génération vidéo."
+          />
           <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
             <h2 className="font-display text-lg text-ink">{training.video_script.title}</h2>
-            <p className="mt-1 text-xs text-muted">
-              Script et storyboard générés — à filmer, faire monter, ou passer à un outil de génération vidéo.
-            </p>
           </div>
           <div className="flex flex-col gap-3">
             {training.video_script.scenes.map((scene) => (

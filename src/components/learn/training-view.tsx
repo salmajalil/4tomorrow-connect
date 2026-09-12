@@ -186,7 +186,7 @@ export function TrainingView({ training }: { training: Training }) {
         <div>
           <ExportPdfButton
             kind="learn"
-            payload={training}
+            payload={{ training }}
             filename={`4tomorrow-learn-${training.id}.pdf`}
           />
         </div>

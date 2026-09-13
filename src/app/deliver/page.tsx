@@ -1,30 +1,29 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Eyebrow } from "@/components/eyebrow";
 import { getLanguage } from "@/lib/i18n/language";
 import { getDictionary } from "@/lib/i18n/dictionary";
-import { ManualStartForm } from "@/components/deliver/manual-start-form";
+import { DeliverStartOptions } from "@/components/deliver/deliver-start-options";
 import { DeliverFlow } from "./deliver-flow";
 import type { DeliverableKind, Deliverable } from "@/types/database";
 import type { Domain } from "@/lib/decide";
 
-function EmptyState({ title, message, ctaHref, ctaLabel }: { title: string; message: string; ctaHref: string; ctaLabel: string }) {
+function EmptyState({
+  title,
+  message,
+  candidates,
+}: {
+  title: string;
+  message: string;
+  candidates: { id: string; title: string }[];
+}) {
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-10">
       <Eyebrow>Deliver</Eyebrow>
       <h1 className="mt-3 font-display text-3xl text-ink">{title}</h1>
-      <div className="mt-6 rounded-xl border border-dashed border-border bg-surface p-8 text-center">
+      <div className="mt-6 flex flex-col items-center rounded-xl border border-dashed border-border bg-surface p-8 text-center">
         <p className="text-sm text-muted">{message}</p>
-        <Link
-          href={ctaHref}
-          className="mt-4 inline-flex rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong"
-        >
-          {ctaLabel}
-        </Link>
-        <div>
-          <ManualStartForm />
-        </div>
+        <DeliverStartOptions candidates={candidates} />
       </div>
     </div>
   );
@@ -53,32 +52,28 @@ export default async function DeliverPage({
   const orgIds = (orgs ?? []).map((o) => o.id);
 
   if (orgIds.length === 0) {
-    return (
-      <EmptyState
-        title={empty.title}
-        message={empty.noOrgMessage}
-        ctaHref="/decide"
-        ctaLabel={empty.goToDecide}
-      />
-    );
+    return <EmptyState title={empty.title} message={empty.noOrgMessage} candidates={[]} />;
   }
 
-  const { data: candidates } = await supabase
+  const { data: allTransformations } = await supabase
     .from("transformations")
     .select("id, organization_id, challenges, objectives, domains, constraints, selected_trajectory_id, created_at")
     .in("organization_id", orgIds)
-    .not("selected_trajectory_id", "is", null)
     .order("created_at", { ascending: false });
 
-  if (!candidates || candidates.length === 0) {
-    return (
-      <EmptyState
-        title={empty.title}
-        message={empty.noTrajectoryMessage}
-        ctaHref="/decide"
-        ctaLabel={empty.goToDecide}
-      />
-    );
+  const candidates = (allTransformations ?? []).filter((tr) => tr.selected_trajectory_id);
+  // "Connect to Decide" candidates — a diagnostic already started in Decide
+  // (a transformation exists) but no trajectory was ever picked there.
+  const connectCandidates = (allTransformations ?? [])
+    .filter((tr) => !tr.selected_trajectory_id)
+    .map((tr) => ({
+      id: tr.id,
+      title:
+        tr.challenges?.trim()?.slice(0, 60) || tr.objectives?.trim()?.slice(0, 60) || t.common.untitledProject,
+    }));
+
+  if (candidates.length === 0) {
+    return <EmptyState title={empty.title} message={empty.noTrajectoryMessage} candidates={connectCandidates} />;
   }
 
   // Only trust the query param if it's actually one of this user's own

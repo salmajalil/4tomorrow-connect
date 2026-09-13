@@ -460,6 +460,10 @@ const fr = {
         manualOption: "Diagnostic Assessment",
         manualOptionDesc: "Renseigne toi-même le contexte de ta transformation, étape par étape.",
         manualOptionStart: "Démarrer",
+        uploadOption: "Importer un document",
+        uploadOptionDesc: "Dépose un document de projet existant (cahier des charges, brief...) — Deliver en extrait le contexte.",
+        uploadButton: "Démarrer avec ce document",
+        uploadStarting: "Démarrage...",
       },
       wizard: {
         title: "Diagnostic Assessment",
@@ -1020,6 +1024,10 @@ const en: Dictionary = {
         manualOption: "Diagnostic Assessment",
         manualOptionDesc: "Fill in your transformation's context yourself, step by step.",
         manualOptionStart: "Start",
+        uploadOption: "Upload a document",
+        uploadOptionDesc: "Drop an existing project document (spec sheet, brief...) — Deliver extracts the context from it.",
+        uploadButton: "Start with this document",
+        uploadStarting: "Starting...",
       },
       wizard: {
         title: "Diagnostic Assessment",

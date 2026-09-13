@@ -5,20 +5,24 @@ import Link from "next/link";
 import { useLanguage } from "@/components/language-provider";
 import { ConnectToDecide } from "@/components/deliver/connect-to-decide";
 import { DiagnosticAssessmentWizard } from "@/components/deliver/diagnostic-assessment-wizard";
+import { UploadDocumentStart } from "@/components/deliver/upload-document-start";
 
-type Panel = "connect" | "manual" | null;
+type Panel = "connect" | "manual" | "upload" | null;
 
-// The three ways to get a Deliver project going, mirroring the reference
+// The ways to get a Deliver project going, mirroring the reference
 // product's Input Hub: go through Decide the normal way, auto-connect an
 // already-started Decide diagnostic that never had a scenario chosen
 // ("Connect to Decide" — candidates is empty when there's nothing to
-// connect, so that option simply doesn't render), or fill in the
-// standalone Diagnostic Assessment wizard when there's no Decide project
-// at all, or the user wants to start fresh.
+// connect, so that option simply doesn't render), fill in the standalone
+// Diagnostic Assessment wizard, or drop a project document directly.
 export function DeliverStartOptions({ candidates }: { candidates: { id: string; title: string }[] }) {
   const { t } = useLanguage();
   const empty = t.deliver.empty;
   const [panel, setPanel] = useState<Panel>(null);
+
+  function toggle(next: Exclude<Panel, null>) {
+    setPanel((p) => (p === next ? null : next));
+  }
 
   return (
     <div className="mt-6 flex w-full flex-col items-center gap-3">
@@ -33,7 +37,7 @@ export function DeliverStartOptions({ candidates }: { candidates: { id: string; 
         {candidates.length > 0 && (
           <button
             type="button"
-            onClick={() => setPanel(panel === "connect" ? null : "connect")}
+            onClick={() => toggle("connect")}
             className={`rounded-lg border px-5 py-2.5 text-sm font-semibold transition ${
               panel === "connect"
                 ? "border-accent bg-accent text-accent-ink"
@@ -45,7 +49,7 @@ export function DeliverStartOptions({ candidates }: { candidates: { id: string; 
         )}
         <button
           type="button"
-          onClick={() => setPanel(panel === "manual" ? null : "manual")}
+          onClick={() => toggle("manual")}
           className={`rounded-lg border px-5 py-2.5 text-sm font-semibold transition ${
             panel === "manual"
               ? "border-accent bg-accent text-accent-ink"
@@ -54,6 +58,17 @@ export function DeliverStartOptions({ candidates }: { candidates: { id: string; 
         >
           {empty.manualOption}
         </button>
+        <button
+          type="button"
+          onClick={() => toggle("upload")}
+          className={`rounded-lg border px-5 py-2.5 text-sm font-semibold transition ${
+            panel === "upload"
+              ? "border-accent bg-accent text-accent-ink"
+              : "border-border text-ink hover:border-accent/60"
+          }`}
+        >
+          {empty.uploadOption}
+        </button>
       </div>
 
       <div className="flex w-full flex-col text-xs text-muted">
@@ -61,6 +76,7 @@ export function DeliverStartOptions({ candidates }: { candidates: { id: string; 
           <span className="max-w-[13rem]">{empty.classicOptionDesc}</span>
           {candidates.length > 0 && <span className="max-w-[13rem]">{empty.connectOptionDesc}</span>}
           <span className="max-w-[13rem]">{empty.manualOptionDesc}</span>
+          <span className="max-w-[13rem]">{empty.uploadOptionDesc}</span>
         </div>
       </div>
 
@@ -68,6 +84,7 @@ export function DeliverStartOptions({ candidates }: { candidates: { id: string; 
         <ConnectToDecide candidates={candidates} onCancel={() => setPanel(null)} />
       )}
       {panel === "manual" && <DiagnosticAssessmentWizard onCancel={() => setPanel(null)} />}
+      {panel === "upload" && <UploadDocumentStart onCancel={() => setPanel(null)} />}
     </div>
   );
 }

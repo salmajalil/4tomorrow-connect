@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Eyebrow } from "@/components/eyebrow";
 import { getLanguage } from "@/lib/i18n/language";
 import { getDictionary, type Dictionary } from "@/lib/i18n/dictionary";
+import { MODULE_COLORS } from "@/lib/module-colors";
 
 type ModuleDef = {
   key: "decide" | "connect" | "learn" | "deliver";
@@ -94,25 +95,28 @@ function ModuleNetwork({ t }: { t: Dictionary }) {
           TOMORROW
         </text>
 
-        {positions.map((node) => (
-          <g key={node.key}>
-            <circle
-              cx={node.x}
-              cy={node.y}
-              r={NODE_R}
-              fill={node.active ? "var(--accent)" : "var(--surface-2)"}
-              fillOpacity={node.active ? 0.12 : 1}
-              stroke={node.active ? "var(--accent)" : "var(--border)"}
-              strokeWidth={1.5}
-            />
-            <text x={node.x} y={node.y - 2} textAnchor="middle" fill={node.active ? "var(--accent-strong)" : "var(--muted)"} fontSize={12} fontWeight={700}>
-              {node.label}
-            </text>
-            <text x={node.x} y={node.y + 13} textAnchor="middle" fill="var(--muted)" fontSize={7.5}>
-              {node.active ? "" : t.home.comingSoon}
-            </text>
-          </g>
-        ))}
+        {positions.map((node) => {
+          const color = MODULE_COLORS[node.key];
+          return (
+            <g key={node.key}>
+              <circle
+                cx={node.x}
+                cy={node.y}
+                r={NODE_R}
+                fill={node.active ? color.accent : "var(--surface-2)"}
+                fillOpacity={node.active ? 0.16 : 1}
+                stroke={node.active ? color.accent : "var(--border)"}
+                strokeWidth={1.5}
+              />
+              <text x={node.x} y={node.y - 2} textAnchor="middle" fill={node.active ? color.strong : "var(--muted)"} fontSize={12} fontWeight={700}>
+                {node.label}
+              </text>
+              <text x={node.x} y={node.y + 13} textAnchor="middle" fill="var(--muted)" fontSize={7.5}>
+                {node.active ? "" : t.home.comingSoon}
+              </text>
+            </g>
+          );
+        })}
       </svg>
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -121,7 +125,8 @@ function ModuleNetwork({ t }: { t: Dictionary }) {
             <Link
               key={mod.key}
               href={mod.href}
-              className="rounded-lg border border-border bg-surface-2 px-2.5 py-2 text-center text-xs text-muted transition hover:border-accent hover:text-ink"
+              style={{ borderTopColor: MODULE_COLORS[mod.key].accent, borderTopWidth: 3 }}
+              className="rounded-lg border border-border bg-surface-2 px-2.5 py-2 text-center text-xs text-muted transition hover:text-ink"
             >
               <span className="block font-semibold text-ink">{mod.label}</span>
               {mod.blurb}
@@ -173,6 +178,7 @@ export default async function Home() {
       <h1 className="mt-5 font-display text-4xl text-ink sm:text-5xl">
         {t.home.heroTitlePrefix} <span className="text-accent">{t.home.heroTitleAccent}</span>
       </h1>
+      <p className="mt-3 text-sm font-semibold uppercase tracking-[0.14em] text-accent-strong">{t.home.tagline}</p>
       <p className="mt-4 max-w-xl text-balance text-muted">
         {t.home.heroIntro} <span className="text-ink">Decide</span> {t.home.heroDecideAction}{" "}
         <span className="text-ink">Connect</span> {t.home.heroConnectParenthetical}{" "}

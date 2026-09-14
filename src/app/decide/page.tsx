@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { DecideThemeWrap } from "@/components/decide/decide-theme";
 import { DecideFlow } from "./decide-flow";
 
 export default async function DecidePage() {
@@ -12,5 +13,9 @@ export default async function DecidePage() {
     redirect("/login?next=/decide");
   }
 
-  return <DecideFlow />;
+  return (
+    <DecideThemeWrap>
+      <DecideFlow />
+    </DecideThemeWrap>
+  );
 }

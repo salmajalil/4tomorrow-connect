@@ -31,8 +31,22 @@ const fr = {
       exportFailed: "Export impossible.",
       untitledProject: "Projet sans titre",
     },
+    assistant: {
+      name: "Tomorrow",
+      openLabel: "Ouvrir Tomorrow, l'assistant IA",
+      closeLabel: "Fermer",
+      title: "Tomorrow",
+      subtitle: "Ton guide IA sur 4 Tomorrow",
+      greeting:
+        "Salut, je suis Tomorrow 👋 Je peux t'aider à t'orienter entre Decide, Connect, Learn et Deliver, répondre à tes questions ou juste t'encourager. Qu'est-ce qui t'amène ?",
+      inputPlaceholder: "Écris ton message...",
+      send: "Envoyer",
+      thinking: "Tomorrow réfléchit...",
+      errorFallback: "Tomorrow n'a pas pu répondre. Réessaie dans un instant.",
+    },
     home: {
       brandEyebrow: "4 Tomorrow",
+      tagline: "Connected operating ecosystem for industrial transformation.",
       heroTitlePrefix: "Un seul projet,",
       heroTitleAccent: "quatre leviers connectés.",
       heroIntro: "4 Tomorrow diagnostique ta transformation une fois —",
@@ -210,6 +224,20 @@ const fr = {
         "La connexion a été coupée pendant la génération (réseau mobile instable sur une requête longue). Réessaie, idéalement en Wi-Fi.",
     },
     connect: {
+      boosters: {
+        eyebrow: "Classement hebdomadaire",
+        title: "Boosters de l'écosystème",
+        subtitle:
+          "Les organisations qui accélèrent le plus vite cette semaine sur chaque levier de transformation, d'après leurs résultats et recommandations.",
+        updatedLabel: "Mis à jour cette semaine",
+        categories: {
+          tech: "Booster Tech",
+          ai: "Booster IA",
+          esg: "Booster ESG",
+          strategy: "Booster Strategy",
+        },
+        exampleDataNote: "Données d'exemple — classement calculé en temps réel bientôt disponible.",
+      },
       onboarding: {
         industryTitle: "Quelle est ton industrie ?",
         industrySubtitle: "Choisis la tuile la plus proche de ton secteur.",
@@ -595,8 +623,22 @@ const en: Dictionary = {
       exportFailed: "Export failed.",
       untitledProject: "Untitled project",
     },
+    assistant: {
+      name: "Tomorrow",
+      openLabel: "Open Tomorrow, the AI assistant",
+      closeLabel: "Close",
+      title: "Tomorrow",
+      subtitle: "Your AI guide across 4 Tomorrow",
+      greeting:
+        "Hey, I'm Tomorrow 👋 I can help you find your way between Decide, Connect, Learn and Deliver, answer questions, or just cheer you on. What's on your mind?",
+      inputPlaceholder: "Type your message...",
+      send: "Send",
+      thinking: "Tomorrow is thinking...",
+      errorFallback: "Tomorrow couldn't reply. Try again in a moment.",
+    },
     home: {
       brandEyebrow: "4 Tomorrow",
+      tagline: "Connected operating ecosystem for industrial transformation.",
       heroTitlePrefix: "One project,",
       heroTitleAccent: "four connected levers.",
       heroIntro: "4 Tomorrow diagnoses your transformation once —",
@@ -774,6 +816,20 @@ const en: Dictionary = {
         "The connection dropped during generation (unstable mobile network on a long request). Try again, ideally on Wi-Fi.",
     },
     connect: {
+      boosters: {
+        eyebrow: "Weekly ranking",
+        title: "Ecosystem Boosters",
+        subtitle:
+          "The organizations accelerating fastest this week on each transformation lever, based on their results and recommendations.",
+        updatedLabel: "Updated this week",
+        categories: {
+          tech: "Tech Booster",
+          ai: "AI Booster",
+          esg: "ESG Booster",
+          strategy: "Strategy Booster",
+        },
+        exampleDataNote: "Example data — real-time ranking coming soon.",
+      },
       onboarding: {
         industryTitle: "What's your industry?",
         industrySubtitle: "Pick the tile closest to your sector.",

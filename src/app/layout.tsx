@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/nav";
 import { LanguageProvider } from "@/components/language-provider";
+import { TomorrowChat } from "@/components/assistant/tomorrow-chat";
 import { getLanguage } from "@/lib/i18n/language";
 
 const geistSans = Geist({
@@ -44,6 +45,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <LanguageProvider initialLanguage={language}>
           <Nav />
           <main className="flex flex-1 flex-col">{children}</main>
+          <TomorrowChat />
         </LanguageProvider>
       </body>
     </html>

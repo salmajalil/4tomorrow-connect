@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { ConnectThemeWrap } from "@/components/connect/connect-theme";
 import { ConnectFlow } from "./connect-flow";
 
 export default async function ConnectPage() {
@@ -12,5 +13,9 @@ export default async function ConnectPage() {
     redirect("/login?next=/connect");
   }
 
-  return <ConnectFlow />;
+  return (
+    <ConnectThemeWrap>
+      <ConnectFlow />
+    </ConnectThemeWrap>
+  );
 }

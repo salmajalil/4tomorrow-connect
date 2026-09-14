@@ -4,6 +4,7 @@ import { Eyebrow } from "@/components/eyebrow";
 import { getLanguage } from "@/lib/i18n/language";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { DeliverStartOptions } from "@/components/deliver/deliver-start-options";
+import { DeliverThemeWrap } from "@/components/deliver/deliver-theme";
 import { DeliverFlow } from "./deliver-flow";
 import type { DeliverableKind, Deliverable } from "@/types/database";
 import type { Domain } from "@/lib/decide";
@@ -18,14 +19,16 @@ function EmptyState({
   candidates: { id: string; title: string }[];
 }) {
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-10">
-      <Eyebrow>Deliver</Eyebrow>
-      <h1 className="mt-3 font-display text-3xl text-ink">{title}</h1>
-      <div className="mt-6 flex flex-col items-center rounded-xl border border-dashed border-border bg-surface p-8 text-center">
-        <p className="text-sm text-muted">{message}</p>
-        <DeliverStartOptions candidates={candidates} />
+    <DeliverThemeWrap>
+      <div className="mx-auto w-full max-w-2xl px-4 py-10">
+        <Eyebrow>Deliver</Eyebrow>
+        <h1 className="mt-3 font-display text-3xl text-ink">{title}</h1>
+        <div className="mt-6 flex flex-col items-center rounded-xl border border-dashed border-border bg-surface p-8 text-center">
+          <p className="text-sm text-muted">{message}</p>
+          <DeliverStartOptions candidates={candidates} />
+        </div>
       </div>
-    </div>
+    </DeliverThemeWrap>
   );
 }
 
@@ -108,17 +111,19 @@ export default async function DeliverPage({
     : transformation.objectives?.trim()?.slice(0, 72) || org?.name || t.common.untitledProject;
 
   return (
-    <DeliverFlow
-      transformationId={transformation.id}
-      organizationId={transformation.organization_id}
-      projectTitle={projectTitle}
-      organization={org?.name ?? ""}
-      industry={org?.industry ?? ""}
-      domains={(transformation.domains as Domain[]) ?? []}
-      initialConstraints={transformation.constraints ?? ""}
-      initialDeliverables={deliverables}
-      roadmapPhases={phases ?? []}
-      priorities={priorities ?? []}
-    />
+    <DeliverThemeWrap>
+      <DeliverFlow
+        transformationId={transformation.id}
+        organizationId={transformation.organization_id}
+        projectTitle={projectTitle}
+        organization={org?.name ?? ""}
+        industry={org?.industry ?? ""}
+        domains={(transformation.domains as Domain[]) ?? []}
+        initialConstraints={transformation.constraints ?? ""}
+        initialDeliverables={deliverables}
+        roadmapPhases={phases ?? []}
+        priorities={priorities ?? []}
+      />
+    </DeliverThemeWrap>
   );
 }

@@ -13,6 +13,7 @@ import {
 } from "@/components/connect/onboarding-steps";
 import { MatchingLoadingState, MatchingErrorState } from "@/components/connect/loading-error";
 import { MatchResults } from "@/components/connect/match-results";
+import { EcosystemBoosters } from "@/components/connect/ecosystem-boosters";
 import { ExportPdfButton } from "@/components/export-pdf-button";
 import { useLanguage } from "@/components/language-provider";
 import type { ModelOutput } from "@/lib/matching";
@@ -127,6 +128,11 @@ export function ConnectFlow() {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-8">
+      {step === 1 && (
+        <div className="mb-8">
+          <EcosystemBoosters />
+        </div>
+      )}
       <ProgressBar step={step} total={TOTAL_STEPS} />
 
       <div className="mt-8">

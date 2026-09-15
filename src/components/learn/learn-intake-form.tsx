@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { LearnHeader } from "@/components/learn/learn-header";
+import { Eyebrow } from "@/components/eyebrow";
 import { extractFileText } from "@/lib/extract-file-text";
 import { useLanguage } from "@/components/language-provider";
 import type { Dictionary } from "@/lib/i18n/dictionary";
@@ -21,32 +21,13 @@ export interface LearnIntakeState {
 function modeOptions(intake: Dictionary["learn"]["intake"]): {
   id: TrainingMode;
   icon: string;
-  gradient: string;
   label: string;
   description: string;
 }[] {
   return [
-    {
-      id: "rapide",
-      icon: "⚡",
-      gradient: "linear-gradient(135deg, #f472b6, #db2777)",
-      label: intake.modeRapide,
-      description: intake.modeRapideDesc,
-    },
-    {
-      id: "document",
-      icon: "📄",
-      gradient: "linear-gradient(135deg, #60a5fa, #2563eb)",
-      label: intake.modeDocument,
-      description: intake.modeDocumentDesc,
-    },
-    {
-      id: "diagnostic",
-      icon: "🎯",
-      gradient: "linear-gradient(135deg, #3fd67a, #059669)",
-      label: intake.modeDiagnostic,
-      description: intake.modeDiagnosticDesc,
-    },
+    { id: "rapide", icon: "⚡", label: intake.modeRapide, description: intake.modeRapideDesc },
+    { id: "document", icon: "📄", label: intake.modeDocument, description: intake.modeDocumentDesc },
+    { id: "diagnostic", icon: "🎯", label: intake.modeDiagnostic, description: intake.modeDiagnosticDesc },
   ];
 }
 
@@ -105,12 +86,10 @@ export function LearnIntakeForm({
       }}
       className="flex flex-col gap-8"
     >
-      <div className="flex flex-col gap-4">
-        <LearnHeader />
-        <div>
-          <h1 className="font-display text-3xl text-ink">{intake.title}</h1>
-          <p className="mt-1 text-sm text-muted">{intake.subtitle}</p>
-        </div>
+      <div>
+        <Eyebrow>Learn</Eyebrow>
+        <h1 className="mt-3 font-display text-3xl text-ink">{intake.title}</h1>
+        <p className="mt-1 text-sm text-muted">{intake.subtitle}</p>
       </div>
 
       {existingProjects.length > 0 && (
@@ -171,10 +150,7 @@ export function LearnIntakeForm({
                   selected ? "border-accent bg-accent/10" : "border-border bg-surface hover:border-accent/40"
                 }`}
               >
-                <span
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl shadow-lg"
-                  style={{ background: opt.gradient }}
-                >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-2 text-xl">
                   {opt.icon}
                 </span>
                 <span className="flex flex-col gap-0.5">

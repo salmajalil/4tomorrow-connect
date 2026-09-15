@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { LearnIntakeForm, type LearnIntakeState } from "@/components/learn/learn-intake-form";
-import { LearnHeader } from "@/components/learn/learn-header";
+import { Eyebrow } from "@/components/eyebrow";
 import { LearnThemeWrap } from "@/components/learn/learn-theme";
 import { TrainingView } from "@/components/learn/training-view";
 import { parseJsonResponse } from "@/lib/parse-json-response";
@@ -107,7 +107,7 @@ export function LearnFlow({
     return (
       <LearnThemeWrap>
         <div className="mx-auto w-full max-w-2xl px-4 py-10">
-          <LearnHeader />
+          <Eyebrow>Learn</Eyebrow>
           {error ? (
             <div className="mt-6">
               <ErrorBlock

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LearnHeader } from "@/components/learn/learn-header";
+import { Eyebrow } from "@/components/eyebrow";
 import { ExportPdfButton } from "@/components/export-pdf-button";
 import { DOMAIN_LABELS, type Domain } from "@/lib/learn";
 import { useLanguage } from "@/components/language-provider";
@@ -61,23 +61,10 @@ function Flashcard({
   );
 }
 
-function FormatTile({
-  icon,
-  gradient,
-  title,
-  subtitle,
-}: {
-  icon: string;
-  gradient: string;
-  title: string;
-  subtitle: string;
-}) {
+function FormatTile({ icon, title, subtitle }: { icon: string; title: string; subtitle: string }) {
   return (
     <div className="flex items-center gap-3">
-      <span
-        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl shadow-lg"
-        style={{ background: gradient }}
-      >
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-2 text-xl">
         {icon}
       </span>
       <div>
@@ -183,7 +170,7 @@ export function TrainingView({ training }: { training: Training }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4">
-        <LearnHeader />
+        <Eyebrow>Learn</Eyebrow>
         <h1 className="font-display text-2xl text-ink">{training.topic}</h1>
         <div className="flex flex-wrap items-center gap-2">
           {domains.map((d) => (
@@ -286,12 +273,7 @@ export function TrainingView({ training }: { training: Training }) {
       {tab === "experience" && (
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-3">
-            <FormatTile
-              icon="🃏"
-              gradient="linear-gradient(135deg, #a78bfa, #7c3aed)"
-              title={tr.interactiveCards}
-              subtitle={tr.interactiveCardsSubtitle}
-            />
+            <FormatTile icon="🃏" title={tr.interactiveCards} subtitle={tr.interactiveCardsSubtitle} />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {training.flashcards.map((f, i) => (
                 <Flashcard
@@ -338,12 +320,7 @@ export function TrainingView({ training }: { training: Training }) {
 
       {tab === "video" && (
         <div className="flex flex-col gap-4">
-          <FormatTile
-            icon="🎬"
-            gradient="linear-gradient(135deg, #fb923c, #ea580c)"
-            title={tr.videoScript}
-            subtitle={tr.videoScriptSubtitle}
-          />
+          <FormatTile icon="🎬" title={tr.videoScript} subtitle={tr.videoScriptSubtitle} />
           <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
             <h2 className="font-display text-lg text-ink">{training.video_script.title}</h2>
           </div>

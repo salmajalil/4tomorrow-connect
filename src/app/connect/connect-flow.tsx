@@ -128,11 +128,6 @@ export function ConnectFlow() {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-8">
-      {step === 1 && (
-        <div className="mb-8">
-          <EcosystemBoosters />
-        </div>
-      )}
       <ProgressBar step={step} total={TOTAL_STEPS} />
 
       <div className="mt-8">
@@ -196,6 +191,12 @@ export function ConnectFlow() {
           </button>
         )}
       </div>
+
+      {step === 1 && (
+        <div className="mt-12">
+          <EcosystemBoosters />
+        </div>
+      )}
     </div>
   );
 }

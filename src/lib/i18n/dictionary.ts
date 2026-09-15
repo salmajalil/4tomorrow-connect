@@ -224,6 +224,11 @@ const fr = {
         "La connexion a été coupée pendant la génération (réseau mobile instable sur une requête longue). Réessaie, idéalement en Wi-Fi.",
     },
     connect: {
+      intro: {
+        title: "Trouve les bons partenaires, pas une liste de plus",
+        subtitle:
+          "Connect cherche pour toi — dans le répertoire vivant de l'écosystème et sur le web — les technologies, startups, experts et financements réels qui répondent aux besoins de ta transformation. Décris ton projet en 5 étapes, on s'occupe du reste.",
+      },
       boosters: {
         eyebrow: "Classement hebdomadaire",
         title: "Boosters de l'écosystème",
@@ -236,6 +241,19 @@ const fr = {
           esg: "Booster ESG",
           strategy: "Booster Strategy",
         },
+        categoryHints: {
+          tech: "Adoption technologique la plus rapide",
+          ai: "Intégration IA la plus avancée",
+          esg: "Meilleure trajectoire environnementale",
+          strategy: "Clarté et exécution stratégique",
+        },
+        topReasons: {
+          tech: "Ligne de production connectée déployée en 6 semaines",
+          ai: "Maintenance prédictive IA sur 3 sites pilotes",
+          esg: "-22% d'émissions CO2 sur le dernier trimestre",
+          strategy: "Roadmap 3 phases livrée et suivie dans les délais",
+        },
+        why: "Pourquoi",
         exampleDataNote: "Données d'exemple — classement calculé en temps réel bientôt disponible.",
       },
       onboarding: {
@@ -816,6 +834,11 @@ const en: Dictionary = {
         "The connection dropped during generation (unstable mobile network on a long request). Try again, ideally on Wi-Fi.",
     },
     connect: {
+      intro: {
+        title: "Find the right partners, not another directory",
+        subtitle:
+          "Connect searches for you — across the ecosystem's living directory and the web — for the real technologies, startups, experts and funding that match your transformation's needs. Describe your project in 5 steps, we handle the rest.",
+      },
       boosters: {
         eyebrow: "Weekly ranking",
         title: "Ecosystem Boosters",
@@ -828,6 +851,19 @@ const en: Dictionary = {
           esg: "ESG Booster",
           strategy: "Strategy Booster",
         },
+        categoryHints: {
+          tech: "Fastest technology adoption",
+          ai: "Most advanced AI integration",
+          esg: "Best environmental trajectory",
+          strategy: "Strategic clarity and execution",
+        },
+        topReasons: {
+          tech: "Connected production line rolled out in 6 weeks",
+          ai: "Predictive AI maintenance across 3 pilot sites",
+          esg: "-22% CO2 emissions over the last quarter",
+          strategy: "3-phase roadmap delivered on schedule",
+        },
+        why: "Why",
         exampleDataNote: "Example data — real-time ranking coming soon.",
       },
       onboarding: {

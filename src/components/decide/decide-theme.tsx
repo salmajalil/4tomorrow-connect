@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { ModuleEcosystemStrip } from "@/components/module-ecosystem-strip";
 
 // Decide's scoped palette (cool blue, strategic/decision-making) —
 // same mechanism as Learn's ThemeWrap: every component under /decide
@@ -26,6 +27,7 @@ export function DecideThemeWrap({ children }: { children: ReactNode }) {
         background: "radial-gradient(circle at 50% -10%, #16294a 0%, #060b14 55%, #030509 100%)",
       }}
     >
+      <ModuleEcosystemStrip current="decide" />
       {children}
     </div>
   );

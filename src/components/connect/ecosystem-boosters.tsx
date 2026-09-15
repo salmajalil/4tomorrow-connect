@@ -65,17 +65,25 @@ export function EcosystemBoosters() {
               <span aria-hidden>{BOOSTER_ICONS[key]}</span>
               {b.categories[key]}
             </p>
+            <p className="mt-0.5 text-[11px] text-muted">{b.categoryHints[key]}</p>
             <ol className="mt-3 space-y-2">
               {BOOSTER_DATA[key].map((entry, i) => (
-                <li key={entry.org} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="flex items-center gap-1.5 truncate text-muted">
-                    <span aria-hidden>{RANK_MEDALS[i]}</span>
-                    <span className="truncate text-ink">{entry.org}</span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-1 font-semibold text-accent-strong">
-                    {entry.score}
-                    <span className="text-[10px] font-medium text-emerald-400">+{entry.deltaPct}%</span>
-                  </span>
+                <li key={entry.org} className={i > 0 ? "border-t border-border/60 pt-2" : undefined}>
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="flex items-center gap-1.5 truncate text-muted">
+                      <span aria-hidden>{RANK_MEDALS[i]}</span>
+                      <span className="truncate text-ink">{entry.org}</span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1 font-semibold text-accent-strong">
+                      {entry.score}
+                      <span className="text-[10px] font-medium text-emerald-400">+{entry.deltaPct}%</span>
+                    </span>
+                  </div>
+                  {i === 0 && (
+                    <p className="mt-1 pl-5 text-[11px] text-muted">
+                      <span className="font-medium text-ink/80">{b.why}:</span> {b.topReasons[key]}
+                    </p>
+                  )}
                 </li>
               ))}
             </ol>

@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { ModuleEcosystemStrip } from "@/components/module-ecosystem-strip";
 
 // Connect's scoped palette (emerald green, ecosystem/growth) — same
 // mechanism as Learn's ThemeWrap: every component under /connect reads
@@ -26,6 +27,7 @@ export function ConnectThemeWrap({ children }: { children: ReactNode }) {
         background: "radial-gradient(circle at 50% -10%, #123321 0%, #050f08 55%, #030805 100%)",
       }}
     >
+      <ModuleEcosystemStrip current="connect" />
       {children}
     </div>
   );

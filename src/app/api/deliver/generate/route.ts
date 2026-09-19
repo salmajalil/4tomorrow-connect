@@ -23,32 +23,39 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const language = await getLanguage();
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Connecte-toi pour générer un livrable." }, { status: 401 });
+    return NextResponse.json(
+      { error: language === "en" ? "Log in to generate a deliverable." : "Connecte-toi pour générer un livrable." },
+      { status: 401 }
+    );
   }
 
   let body: z.infer<typeof requestSchema>;
   try {
     body = requestSchema.parse(await request.json());
-  } catch (err) {
-    const message = err instanceof z.ZodError ? err.issues[0]?.message : "Requête invalide.";
-    return NextResponse.json({ error: message ?? "Requête invalide." }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
 
   const mission = await loadMissionContext(supabase, body.transformationId);
   if (!mission) {
     return NextResponse.json(
-      { error: "Aucune trajectoire choisie pour ce projet — sélectionne un scénario dans Decide avant de générer des livrables." },
+      {
+        error:
+          language === "en"
+            ? "No trajectory chosen for this project — select a scenario in Decide before generating deliverables."
+            : "Aucune trajectoire choisie pour ce projet — sélectionne un scénario dans Decide avant de générer des livrables.",
+      },
       { status: 404 }
     );
   }
 
-  const language = await getLanguage();
   const anthropic = getAnthropicClient();
   let response;
   try {
@@ -61,7 +68,7 @@ export async function POST(request: Request) {
       ],
     });
   } catch (err) {
-    return handleAnthropicError(err);
+    return handleAnthropicError(err, language);
   }
 
   let result;
@@ -94,7 +101,10 @@ export async function POST(request: Request) {
     .single();
 
   if (insertError || !deliverable) {
-    return NextResponse.json({ error: "Impossible d'enregistrer le livrable. Réessaie." }, { status: 500 });
+    return NextResponse.json(
+      { error: language === "en" ? "Couldn't save the deliverable. Try again." : "Impossible d'enregistrer le livrable. Réessaie." },
+      { status: 500 }
+    );
   }
 
   await setModuleStatus(supabase, mission.transformationId, "deliver", "in_progress");
@@ -102,17 +112,30 @@ export async function POST(request: Request) {
   return NextResponse.json({ deliverable });
 }
 
-function handleAnthropicError(err: unknown) {
+function handleAnthropicError(err: unknown, language: "fr" | "en") {
   if (err instanceof Anthropic.APIError) {
     const status = err.status === 401 || err.status === 403 ? 502 : (err.status ?? 502);
-    const detail = `${err.status ?? "réseau"} — ${err.message ?? "erreur inconnue"}`.slice(0, 200);
+    const detail =
+      language === "en"
+        ? `${err.status ?? "network"} — ${err.message ?? "unknown error"}`.slice(0, 200)
+        : `${err.status ?? "réseau"} — ${err.message ?? "erreur inconnue"}`.slice(0, 200);
     return NextResponse.json(
-      { error: `Le moteur de livrables n'a pas pu répondre (${detail}). Réessaie dans un instant.` },
+      {
+        error:
+          language === "en"
+            ? `The deliverables engine couldn't respond (${detail}). Try again in a moment.`
+            : `Le moteur de livrables n'a pas pu répondre (${detail}). Réessaie dans un instant.`,
+      },
       { status }
     );
   }
   return NextResponse.json(
-    { error: "Le moteur de livrables a mis trop de temps à répondre. Réessaie." },
+    {
+      error:
+        language === "en"
+          ? "The deliverables engine took too long to respond. Try again."
+          : "Le moteur de livrables a mis trop de temps à répondre. Réessaie.",
+    },
     { status: 504 }
   );
 }

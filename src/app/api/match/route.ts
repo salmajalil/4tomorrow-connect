@@ -28,6 +28,7 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const language = await getLanguage();
   const supabase = await createClient();
   const {
     data: { user },
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json(
-      { error: "Connecte-toi pour lancer un matching." },
+      { error: language === "en" ? "Log in to launch a matching." : "Connecte-toi pour lancer un matching." },
       { status: 401 }
     );
   }
@@ -44,9 +45,8 @@ export async function POST(request: Request) {
   try {
     const json = await request.json();
     body = requestSchema.parse(json);
-  } catch (err) {
-    const message = err instanceof z.ZodError ? err.issues[0]?.message : "Requête invalide.";
-    return NextResponse.json({ error: message ?? "Requête invalide." }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
 
   // Stage 1/3 of the living-directory mechanism: read the full current
@@ -61,12 +61,16 @@ export async function POST(request: Request) {
 
   if (registryError) {
     return NextResponse.json(
-      { error: "Impossible de lire le répertoire de l'écosystème. Réessaie." },
+      {
+        error:
+          language === "en"
+            ? "Couldn't read the ecosystem directory. Try again."
+            : "Impossible de lire le répertoire de l'écosystème. Réessaie.",
+      },
       { status: 500 }
     );
   }
 
-  const language = await getLanguage();
   const anthropic = getAnthropicClient();
   const system = buildSystemPrompt((registry ?? []) as EcosystemMember[], language);
   const userPrompt = buildUserPrompt(body);
@@ -95,12 +99,22 @@ export async function POST(request: Request) {
     if (err instanceof Anthropic.APIError) {
       const status = err.status === 401 || err.status === 403 ? 502 : (err.status ?? 502);
       return NextResponse.json(
-        { error: "Le moteur de matching n'a pas pu répondre. Réessaie dans un instant." },
+        {
+          error:
+            language === "en"
+              ? "The matching engine couldn't respond. Try again in a moment."
+              : "Le moteur de matching n'a pas pu répondre. Réessaie dans un instant.",
+        },
         { status }
       );
     }
     return NextResponse.json(
-      { error: "Le moteur de matching a mis trop de temps à répondre. Réessaie — une description plus courte peut aussi aider." },
+      {
+        error:
+          language === "en"
+            ? "The matching engine took too long to respond. Try again — a shorter description can also help."
+            : "Le moteur de matching a mis trop de temps à répondre. Réessaie — une description plus courte peut aussi aider.",
+      },
       { status: 504 }
     );
   }

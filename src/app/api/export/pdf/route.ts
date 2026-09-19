@@ -3,6 +3,7 @@ import { z } from "zod";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import type { ReactElement } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { getLanguage } from "@/lib/i18n/language";
 import {
   DecideReportDocument,
   ConnectReportDocument,
@@ -41,13 +42,17 @@ const FILENAMES: Record<Kind, string> = {
 };
 
 export async function POST(request: Request) {
+  const language = await getLanguage();
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Connecte-toi pour exporter un rapport." }, { status: 401 });
+    return NextResponse.json(
+      { error: language === "en" ? "Log in to export a report." : "Connecte-toi pour exporter un rapport." },
+      { status: 401 }
+    );
   }
 
   let body: z.infer<typeof requestSchema>;
@@ -55,7 +60,7 @@ export async function POST(request: Request) {
     const json = await request.json();
     body = requestSchema.parse(json);
   } catch {
-    return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
+    return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
 
   let buffer: Buffer;
@@ -63,7 +68,15 @@ export async function POST(request: Request) {
     const document = BUILDERS[body.kind](body.payload);
     buffer = await renderToBuffer(document);
   } catch {
-    return NextResponse.json({ error: "Données incomplètes pour générer ce rapport." }, { status: 400 });
+    return NextResponse.json(
+      {
+        error:
+          language === "en"
+            ? "Incomplete data to generate this report."
+            : "Données incomplètes pour générer ce rapport.",
+      },
+      { status: 400 }
+    );
   }
 
   return new NextResponse(new Uint8Array(buffer), {

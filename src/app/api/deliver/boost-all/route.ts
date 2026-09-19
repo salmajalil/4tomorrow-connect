@@ -27,27 +27,35 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const language = await getLanguage();
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Connecte-toi pour générer les livrables." }, { status: 401 });
+    return NextResponse.json(
+      { error: language === "en" ? "Log in to generate the deliverables." : "Connecte-toi pour générer les livrables." },
+      { status: 401 }
+    );
   }
 
   let body: z.infer<typeof requestSchema>;
   try {
     body = requestSchema.parse(await request.json());
-  } catch (err) {
-    const message = err instanceof z.ZodError ? err.issues[0]?.message : "Requête invalide.";
-    return NextResponse.json({ error: message ?? "Requête invalide." }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
 
   const mission = await loadMissionContext(supabase, body.transformationId);
   if (!mission) {
     return NextResponse.json(
-      { error: "Aucune trajectoire choisie pour ce projet — sélectionne un scénario dans Decide avant de générer des livrables." },
+      {
+        error:
+          language === "en"
+            ? "No trajectory chosen for this project — select a scenario in Decide before generating deliverables."
+            : "Aucune trajectoire choisie pour ce projet — sélectionne un scénario dans Decide avant de générer des livrables.",
+      },
       { status: 404 }
     );
   }
@@ -64,7 +72,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ deliverables: [], alreadyComplete: true });
   }
 
-  const language = await getLanguage();
   const anthropic = getAnthropicClient();
   const userPrompt = buildDeliverableUserPrompt({ ...mission.context, sourceDocText: body.sourceDocText || undefined });
 
@@ -111,7 +118,12 @@ export async function POST(request: Request) {
     if (firstError instanceof Anthropic.APIError) {
       const status = firstError.status === 401 || firstError.status === 403 ? 502 : (firstError.status ?? 502);
       return NextResponse.json(
-        { error: "Le moteur de livrables n'a pas pu répondre. Réessaie dans un instant." },
+        {
+          error:
+            language === "en"
+              ? "The deliverables engine couldn't respond. Try again in a moment."
+              : "Le moteur de livrables n'a pas pu répondre. Réessaie dans un instant.",
+        },
         { status }
       );
     }
@@ -119,7 +131,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: firstError.message }, { status: 502 });
     }
     return NextResponse.json(
-      { error: "Le moteur de livrables a mis trop de temps à répondre. Réessaie." },
+      {
+        error:
+          language === "en"
+            ? "The deliverables engine took too long to respond. Try again."
+            : "Le moteur de livrables a mis trop de temps à répondre. Réessaie.",
+      },
       { status: 504 }
     );
   }
@@ -150,7 +167,10 @@ export async function POST(request: Request) {
     deliverables: inserted ?? [],
     ...(succeeded.length < missingKinds.length
       ? {
-          warning: `${succeeded.length}/${missingKinds.length} livrable(s) manquant(s) généré(s) — les autres ont échoué, réessaie individuellement.`,
+          warning:
+            language === "en"
+              ? `${succeeded.length}/${missingKinds.length} missing deliverable(s) generated — the others failed, retry them individually.`
+              : `${succeeded.length}/${missingKinds.length} livrable(s) manquant(s) généré(s) — les autres ont échoué, réessaie individuellement.`,
         }
       : {}),
   });

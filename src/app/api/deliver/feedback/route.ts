@@ -20,29 +20,34 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const language = await getLanguage();
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Connecte-toi pour envoyer un feedback." }, { status: 401 });
+    return NextResponse.json(
+      { error: language === "en" ? "Log in to send feedback." : "Connecte-toi pour envoyer un feedback." },
+      { status: 401 }
+    );
   }
 
   let body: z.infer<typeof requestSchema>;
   try {
     body = requestSchema.parse(await request.json());
-  } catch (err) {
-    const message = err instanceof z.ZodError ? err.issues[0]?.message : "Requête invalide.";
-    return NextResponse.json({ error: message ?? "Requête invalide." }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
 
   const mission = await loadMissionContext(supabase, body.transformationId);
   if (!mission) {
-    return NextResponse.json({ error: "Aucune trajectoire choisie pour ce projet." }, { status: 404 });
+    return NextResponse.json(
+      { error: language === "en" ? "No trajectory chosen for this project." : "Aucune trajectoire choisie pour ce projet." },
+      { status: 404 }
+    );
   }
 
-  const language = await getLanguage();
   const anthropic = getAnthropicClient();
   let response;
   try {
@@ -64,14 +69,27 @@ export async function POST(request: Request) {
   } catch (err) {
     if (err instanceof Anthropic.APIError) {
       const status = err.status === 401 || err.status === 403 ? 502 : (err.status ?? 502);
-      const detail = `${err.status ?? "réseau"} — ${err.message ?? "erreur inconnue"}`.slice(0, 200);
+      const detail =
+        language === "en"
+          ? `${err.status ?? "network"} — ${err.message ?? "unknown error"}`.slice(0, 200)
+          : `${err.status ?? "réseau"} — ${err.message ?? "erreur inconnue"}`.slice(0, 200);
       return NextResponse.json(
-        { error: `Le moteur de recalibration n'a pas pu répondre (${detail}). Réessaie.` },
+        {
+          error:
+            language === "en"
+              ? `The recalibration engine couldn't respond (${detail}). Try again.`
+              : `Le moteur de recalibration n'a pas pu répondre (${detail}). Réessaie.`,
+        },
         { status }
       );
     }
     return NextResponse.json(
-      { error: "Le moteur de recalibration a mis trop de temps à répondre. Réessaie." },
+      {
+        error:
+          language === "en"
+            ? "The recalibration engine took too long to respond. Try again."
+            : "Le moteur de recalibration a mis trop de temps à répondre. Réessaie.",
+      },
       { status: 504 }
     );
   }
@@ -102,7 +120,10 @@ export async function POST(request: Request) {
     .single();
 
   if (insertError || !feedback) {
-    return NextResponse.json({ error: "Impossible d'enregistrer le feedback. Réessaie." }, { status: 500 });
+    return NextResponse.json(
+      { error: language === "en" ? "Couldn't save the feedback. Try again." : "Impossible d'enregistrer le feedback. Réessaie." },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ feedback });

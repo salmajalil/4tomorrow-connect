@@ -29,26 +29,29 @@ const requestSchema = z.object({
 // behavior is correct for Decide (comparing scenarios pre-execution) and
 // wrong for Deliver (an execution already underway).
 export async function POST(request: Request) {
+  const language = await getLanguage();
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Connecte-toi." }, { status: 401 });
+    return NextResponse.json({ error: language === "en" ? "Log in." : "Connecte-toi." }, { status: 401 });
   }
 
   let body: z.infer<typeof requestSchema>;
   try {
     body = requestSchema.parse(await request.json());
-  } catch (err) {
-    const message = err instanceof z.ZodError ? err.issues[0]?.message : "Requête invalide.";
-    return NextResponse.json({ error: message ?? "Requête invalide." }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
 
   const mission = await loadMissionContext(supabase, body.transformationId);
   if (!mission) {
-    return NextResponse.json({ error: "Aucune trajectoire choisie pour ce projet." }, { status: 404 });
+    return NextResponse.json(
+      { error: language === "en" ? "No trajectory chosen for this project." : "Aucune trajectoire choisie pour ce projet." },
+      { status: 404 }
+    );
   }
 
   const { data: phases } = await supabase
@@ -58,7 +61,15 @@ export async function POST(request: Request) {
     .order("order_index");
 
   if (!phases || phases.length === 0) {
-    return NextResponse.json({ error: "Aucune roadmap à ajuster — génère d'abord une roadmap dans Decide." }, { status: 404 });
+    return NextResponse.json(
+      {
+        error:
+          language === "en"
+            ? "No roadmap to adjust — generate a roadmap in Decide first."
+            : "Aucune roadmap à ajuster — génère d'abord une roadmap dans Decide.",
+      },
+      { status: 404 }
+    );
   }
 
   const fixed = phases.filter((p) => p.execution_status !== "upcoming");
@@ -66,12 +77,16 @@ export async function POST(request: Request) {
 
   if (upcoming.length === 0) {
     return NextResponse.json(
-      { error: "Toutes les phases sont déjà en cours ou terminées — rien à réajuster." },
+      {
+        error:
+          language === "en"
+            ? "All phases are already in progress or done — nothing to adjust."
+            : "Toutes les phases sont déjà en cours ou terminées — rien à réajuster.",
+      },
       { status: 400 }
     );
   }
 
-  const language = await getLanguage();
   const anthropic = getAnthropicClient();
   let response;
   try {
@@ -97,11 +112,27 @@ export async function POST(request: Request) {
   } catch (err) {
     if (err instanceof Anthropic.APIError) {
       const status = err.status === 401 || err.status === 403 ? 502 : (err.status ?? 502);
-      const detail = `${err.status ?? "réseau"} — ${err.message ?? "erreur inconnue"}`.slice(0, 200);
-      return NextResponse.json({ error: `Le moteur de roadmap n'a pas pu répondre (${detail}). Réessaie.` }, { status });
+      const detail =
+        language === "en"
+          ? `${err.status ?? "network"} — ${err.message ?? "unknown error"}`.slice(0, 200)
+          : `${err.status ?? "réseau"} — ${err.message ?? "erreur inconnue"}`.slice(0, 200);
+      return NextResponse.json(
+        {
+          error:
+            language === "en"
+              ? `The roadmap engine couldn't respond (${detail}). Try again.`
+              : `Le moteur de roadmap n'a pas pu répondre (${detail}). Réessaie.`,
+        },
+        { status }
+      );
     }
     return NextResponse.json(
-      { error: "Le moteur de roadmap a mis trop de temps à répondre. Réessaie." },
+      {
+        error:
+          language === "en"
+            ? "The roadmap engine took too long to respond. Try again."
+            : "Le moteur de roadmap a mis trop de temps à répondre. Réessaie.",
+      },
       { status: 504 }
     );
   }
@@ -149,7 +180,15 @@ export async function POST(request: Request) {
   const { data: inserted, error: insertError } = await supabase.from("roadmap_phases").insert(newPhaseRows).select("*");
 
   if (insertError) {
-    return NextResponse.json({ error: "Impossible d'enregistrer les phases ajustées. Réessaie." }, { status: 500 });
+    return NextResponse.json(
+      {
+        error:
+          language === "en"
+            ? "Couldn't save the adjusted phases. Try again."
+            : "Impossible d'enregistrer les phases ajustées. Réessaie.",
+      },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ phases: [...fixed, ...(inserted ?? newPhaseRows)] });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { getLanguage } from "@/lib/i18n/language";
 
 const joinSchema = z.object({
   name: z.string().trim().min(1, "Le nom est requis."),
@@ -11,6 +12,7 @@ const joinSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const language = await getLanguage();
   const supabase = await createClient();
   const {
     data: { user },
@@ -18,7 +20,7 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json(
-      { error: "Connecte-toi pour rejoindre l'écosystème." },
+      { error: language === "en" ? "Log in to join the ecosystem." : "Connecte-toi pour rejoindre l'écosystème." },
       { status: 401 }
     );
   }
@@ -26,9 +28,8 @@ export async function POST(request: Request) {
   let body;
   try {
     body = joinSchema.parse(await request.json());
-  } catch (err) {
-    const message = err instanceof z.ZodError ? err.issues[0]?.message : "Requête invalide.";
-    return NextResponse.json({ error: message ?? "Requête invalide." }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
 
   // No manual validation step by design — this insert is what feeds the
@@ -49,7 +50,12 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json(
-      { error: "Impossible d'enregistrer ta contribution. Réessaie." },
+      {
+        error:
+          language === "en"
+            ? "Couldn't save your contribution. Try again."
+            : "Impossible d'enregistrer ta contribution. Réessaie.",
+      },
       { status: 500 }
     );
   }

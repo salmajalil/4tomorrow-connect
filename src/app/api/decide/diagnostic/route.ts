@@ -29,32 +29,39 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const language = await getLanguage();
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Connecte-toi pour lancer un diagnostic." }, { status: 401 });
+    return NextResponse.json(
+      { error: language === "en" ? "Log in to launch a diagnostic." : "Connecte-toi pour lancer un diagnostic." },
+      { status: 401 }
+    );
   }
 
   let body: DiagnosticInput;
   try {
     const json = await request.json();
     body = requestSchema.parse(json);
-  } catch (err) {
-    const message = err instanceof z.ZodError ? err.issues[0]?.message : "Requête invalide.";
-    return NextResponse.json({ error: message ?? "Requête invalide." }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
 
   if (!body.challenges && !body.objectives && !body.uploadedDocText) {
     return NextResponse.json(
-      { error: "Décris au moins tes défis ou tes objectifs pour lancer le diagnostic." },
+      {
+        error:
+          language === "en"
+            ? "Describe at least your challenges or objectives to launch the diagnostic."
+            : "Décris au moins tes défis ou tes objectifs pour lancer le diagnostic.",
+      },
       { status: 400 }
     );
   }
 
-  const language = await getLanguage();
   const anthropic = getAnthropicClient();
   let response;
   try {
@@ -71,12 +78,22 @@ export async function POST(request: Request) {
     if (err instanceof Anthropic.APIError) {
       const status = err.status === 401 || err.status === 403 ? 502 : (err.status ?? 502);
       return NextResponse.json(
-        { error: "Le moteur de diagnostic n'a pas pu répondre. Réessaie dans un instant." },
+        {
+          error:
+            language === "en"
+              ? "The diagnostic engine couldn't respond. Try again in a moment."
+              : "Le moteur de diagnostic n'a pas pu répondre. Réessaie dans un instant.",
+        },
         { status }
       );
     }
     return NextResponse.json(
-      { error: "Le moteur de diagnostic a mis trop de temps à répondre. Réessaie." },
+      {
+        error:
+          language === "en"
+            ? "The diagnostic engine took too long to respond. Try again."
+            : "Le moteur de diagnostic a mis trop de temps à répondre. Réessaie.",
+      },
       { status: 504 }
     );
   }
@@ -116,7 +133,10 @@ export async function POST(request: Request) {
       .select("id")
       .single();
     if (orgError) {
-      return NextResponse.json({ error: "Impossible d'enregistrer le diagnostic. Réessaie." }, { status: 500 });
+      return NextResponse.json(
+        { error: language === "en" ? "Couldn't save the diagnostic. Try again." : "Impossible d'enregistrer le diagnostic. Réessaie." },
+        { status: 500 }
+      );
     }
     organizationId = newOrg.id;
   }
@@ -135,7 +155,10 @@ export async function POST(request: Request) {
     .single();
 
   if (transformationError) {
-    return NextResponse.json({ error: "Impossible d'enregistrer le diagnostic. Réessaie." }, { status: 500 });
+    return NextResponse.json(
+      { error: language === "en" ? "Couldn't save the diagnostic. Try again." : "Impossible d'enregistrer le diagnostic. Réessaie." },
+      { status: 500 }
+    );
   }
 
   const transformationId: string = transformation.id;

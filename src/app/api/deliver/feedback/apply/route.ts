@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { getLanguage } from "@/lib/i18n/language";
 import type { RecalibrationSummary, RoadmapPhaseEntry } from "@/types/database";
 
 const requestSchema = z.object({
@@ -14,21 +15,21 @@ const requestSchema = z.object({
 // the caller explicitly opts in, per the brief's "jamais une réécriture
 // automatique silencieuse" rule.
 export async function POST(request: Request) {
+  const language = await getLanguage();
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Connecte-toi." }, { status: 401 });
+    return NextResponse.json({ error: language === "en" ? "Log in." : "Connecte-toi." }, { status: 401 });
   }
 
   let body: z.infer<typeof requestSchema>;
   try {
     body = requestSchema.parse(await request.json());
-  } catch (err) {
-    const message = err instanceof z.ZodError ? err.issues[0]?.message : "Requête invalide.";
-    return NextResponse.json({ error: message ?? "Requête invalide." }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
 
   const { data: feedback, error: feedbackError } = await supabase
@@ -38,10 +39,16 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (feedbackError || !feedback) {
-    return NextResponse.json({ error: "Feedback introuvable." }, { status: 404 });
+    return NextResponse.json(
+      { error: language === "en" ? "Feedback not found." : "Feedback introuvable." },
+      { status: 404 }
+    );
   }
   if (feedback.applied) {
-    return NextResponse.json({ error: "Ce feedback a déjà été appliqué." }, { status: 400 });
+    return NextResponse.json(
+      { error: language === "en" ? "This feedback has already been applied." : "Ce feedback a déjà été appliqué." },
+      { status: 400 }
+    );
   }
 
   const summary = feedback.ai_summary as RecalibrationSummary;

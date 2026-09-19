@@ -25,22 +25,25 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const language = await getLanguage();
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Connecte-toi pour générer des scénarios." }, { status: 401 });
+    return NextResponse.json(
+      { error: language === "en" ? "Log in to generate scenarios." : "Connecte-toi pour générer des scénarios." },
+      { status: 401 }
+    );
   }
 
   let transformationId: string;
   try {
     const json = await request.json();
     ({ transformationId } = requestSchema.parse(json));
-  } catch (err) {
-    const message = err instanceof z.ZodError ? err.issues[0]?.message : "Requête invalide.";
-    return NextResponse.json({ error: message ?? "Requête invalide." }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
 
   // RLS scopes this to the caller's own transformation — a foreign id
@@ -52,7 +55,10 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (txError || !transformation) {
-    return NextResponse.json({ error: "Transformation introuvable." }, { status: 404 });
+    return NextResponse.json(
+      { error: language === "en" ? "Transformation not found." : "Transformation introuvable." },
+      { status: 404 }
+    );
   }
 
   const [{ data: org }, { data: gaps }, { data: priorities }, { data: registry }] = await Promise.all([
@@ -63,7 +69,6 @@ export async function POST(request: Request) {
   ]);
 
   const domains = (transformation.domains as Domain[]) ?? [];
-  const language = await getLanguage();
   const anthropic = getAnthropicClient();
   const userPrompt = buildScenariosUserPrompt({
     domains,
@@ -134,7 +139,12 @@ export async function POST(request: Request) {
     if (firstError instanceof Anthropic.APIError) {
       const status = firstError.status === 401 || firstError.status === 403 ? 502 : (firstError.status ?? 502);
       return NextResponse.json(
-        { error: "Le moteur de scénarios n'a pas pu répondre. Réessaie dans un instant." },
+        {
+          error:
+            language === "en"
+              ? "The scenario engine couldn't respond. Try again in a moment."
+              : "Le moteur de scénarios n'a pas pu répondre. Réessaie dans un instant.",
+        },
         { status }
       );
     }
@@ -142,7 +152,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: firstError.message }, { status: 502 });
     }
     return NextResponse.json(
-      { error: "Le moteur de scénarios a mis trop de temps à répondre. Réessaie." },
+      {
+        error:
+          language === "en"
+            ? "The scenario engine took too long to respond. Try again."
+            : "Le moteur de scénarios a mis trop de temps à répondre. Réessaie.",
+      },
       { status: 504 }
     );
   }
@@ -219,7 +234,12 @@ export async function POST(request: Request) {
   return NextResponse.json({
     scenarios: persistedScenarios.map(({ trajectoryId, scenario }) => ({ trajectoryId, ...scenario })),
     ...(persistedScenarios.length < 3
-      ? { warning: `${persistedScenarios.length} scénario(s) sur 3 généré(s) — les autres ont échoué, tu peux réessayer.` }
+      ? {
+          warning:
+            language === "en"
+              ? `${persistedScenarios.length} of 3 scenario(s) generated — the others failed, you can retry.`
+              : `${persistedScenarios.length} scénario(s) sur 3 généré(s) — les autres ont échoué, tu peux réessayer.`,
+        }
       : {}),
   });
 }

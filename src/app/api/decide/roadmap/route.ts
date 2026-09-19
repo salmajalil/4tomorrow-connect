@@ -41,22 +41,25 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const language = await getLanguage();
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Connecte-toi pour générer une roadmap." }, { status: 401 });
+    return NextResponse.json(
+      { error: language === "en" ? "Log in to generate a roadmap." : "Connecte-toi pour générer une roadmap." },
+      { status: 401 }
+    );
   }
 
   let body: z.infer<typeof requestSchema>;
   try {
     const json = await request.json();
     body = requestSchema.parse(json);
-  } catch (err) {
-    const message = err instanceof z.ZodError ? err.issues[0]?.message : "Requête invalide.";
-    return NextResponse.json({ error: message ?? "Requête invalide." }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
 
   const { data: trajectory, error: trajectoryError } = await supabase
@@ -66,7 +69,10 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (trajectoryError || !trajectory) {
-    return NextResponse.json({ error: "Scénario introuvable." }, { status: 404 });
+    return NextResponse.json(
+      { error: language === "en" ? "Scenario not found." : "Scénario introuvable." },
+      { status: 404 }
+    );
   }
 
   const { data: transformation } = await supabase
@@ -75,7 +81,6 @@ export async function POST(request: Request) {
     .eq("id", trajectory.transformation_id)
     .maybeSingle();
 
-  const language = await getLanguage();
   const anthropic = getAnthropicClient();
   let response;
   try {
@@ -108,12 +113,22 @@ export async function POST(request: Request) {
     if (err instanceof Anthropic.APIError) {
       const status = err.status === 401 || err.status === 403 ? 502 : (err.status ?? 502);
       return NextResponse.json(
-        { error: "Le moteur de roadmap n'a pas pu répondre. Réessaie dans un instant." },
+        {
+          error:
+            language === "en"
+              ? "The roadmap engine couldn't respond. Try again in a moment."
+              : "Le moteur de roadmap n'a pas pu répondre. Réessaie dans un instant.",
+        },
         { status }
       );
     }
     return NextResponse.json(
-      { error: "Le moteur de roadmap a mis trop de temps à répondre. Réessaie." },
+      {
+        error:
+          language === "en"
+            ? "The roadmap engine took too long to respond. Try again."
+            : "Le moteur de roadmap a mis trop de temps à répondre. Réessaie.",
+      },
       { status: 504 }
     );
   }
@@ -163,7 +178,10 @@ export async function POST(request: Request) {
     .select("*");
 
   if (insertError) {
-    return NextResponse.json({ error: "Impossible d'enregistrer la roadmap. Réessaie." }, { status: 500 });
+    return NextResponse.json(
+      { error: language === "en" ? "Couldn't save the roadmap. Try again." : "Impossible d'enregistrer la roadmap. Réessaie." },
+      { status: 500 }
+    );
   }
 
   await supabase

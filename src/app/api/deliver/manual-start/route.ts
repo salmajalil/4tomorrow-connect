@@ -44,31 +44,38 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const language = await getLanguage();
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Connecte-toi pour démarrer un projet." }, { status: 401 });
+    return NextResponse.json(
+      { error: language === "en" ? "Log in to start a project." : "Connecte-toi pour démarrer un projet." },
+      { status: 401 }
+    );
   }
 
   let body: z.infer<typeof requestSchema>;
   try {
     body = requestSchema.parse(await request.json());
-  } catch (err) {
-    const message = err instanceof z.ZodError ? err.issues[0]?.message : "Requête invalide.";
-    return NextResponse.json({ error: message ?? "Requête invalide." }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
 
   if (!body.scope && !body.currentState && !body.targetState && !body.primaryObjective) {
     return NextResponse.json(
-      { error: "Décris au moins le périmètre, l'état actuel ou l'objectif pour démarrer." },
+      {
+        error:
+          language === "en"
+            ? "Describe at least the scope, current state, or objective to get started."
+            : "Décris au moins le périmètre, l'état actuel ou l'objectif pour démarrer.",
+      },
       { status: 400 }
     );
   }
 
-  const language = await getLanguage();
   const w = getDictionary(language).deliver.wizard;
 
   const objectiveLabel: Record<z.infer<typeof objectiveKeySchema>, string> = {
@@ -137,7 +144,10 @@ export async function POST(request: Request) {
       .select("id")
       .single();
     if (orgError || !newOrg) {
-      return NextResponse.json({ error: "Impossible de créer le projet. Réessaie." }, { status: 500 });
+      return NextResponse.json(
+        { error: language === "en" ? "Couldn't create the project. Try again." : "Impossible de créer le projet. Réessaie." },
+        { status: 500 }
+      );
     }
     organizationId = newOrg.id;
   }
@@ -155,7 +165,10 @@ export async function POST(request: Request) {
     .single();
 
   if (transformationError || !transformation) {
-    return NextResponse.json({ error: "Impossible de créer le projet. Réessaie." }, { status: 500 });
+    return NextResponse.json(
+      { error: language === "en" ? "Couldn't create the project. Try again." : "Impossible de créer le projet. Réessaie." },
+      { status: 500 }
+    );
   }
 
   const transformationId: string = transformation.id;
@@ -179,7 +192,10 @@ export async function POST(request: Request) {
     .single();
 
   if (trajectoryError || !trajectory) {
-    return NextResponse.json({ error: "Impossible de créer le projet. Réessaie." }, { status: 500 });
+    return NextResponse.json(
+      { error: language === "en" ? "Couldn't create the project. Try again." : "Impossible de créer le projet. Réessaie." },
+      { status: 500 }
+    );
   }
 
   const { error: linkError } = await supabase
@@ -188,7 +204,10 @@ export async function POST(request: Request) {
     .eq("id", transformationId);
 
   if (linkError) {
-    return NextResponse.json({ error: "Impossible de créer le projet. Réessaie." }, { status: 500 });
+    return NextResponse.json(
+      { error: language === "en" ? "Couldn't create the project. Try again." : "Impossible de créer le projet. Réessaie." },
+      { status: 500 }
+    );
   }
 
   await setModuleStatus(supabase, transformationId, "deliver", "in_progress");

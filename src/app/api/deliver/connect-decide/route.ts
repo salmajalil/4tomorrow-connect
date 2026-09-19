@@ -19,21 +19,24 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const language = await getLanguage();
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Connecte-toi pour connecter un projet." }, { status: 401 });
+    return NextResponse.json(
+      { error: language === "en" ? "Log in to connect a project." : "Connecte-toi pour connecter un projet." },
+      { status: 401 }
+    );
   }
 
   let body: z.infer<typeof requestSchema>;
   try {
     body = requestSchema.parse(await request.json());
-  } catch (err) {
-    const message = err instanceof z.ZodError ? err.issues[0]?.message : "Requête invalide.";
-    return NextResponse.json({ error: message ?? "Requête invalide." }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
 
   // RLS scopes this to the caller's own transformation — a foreign id
@@ -45,7 +48,10 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (txError || !transformation) {
-    return NextResponse.json({ error: "Projet Decide introuvable." }, { status: 404 });
+    return NextResponse.json(
+      { error: language === "en" ? "Decide project not found." : "Projet Decide introuvable." },
+      { status: 404 }
+    );
   }
 
   if (transformation.selected_trajectory_id) {
@@ -62,7 +68,6 @@ export async function POST(request: Request) {
   let trajectoryId = existingTrajectories?.[0]?.id as string | undefined;
 
   if (!trajectoryId) {
-    const language = await getLanguage();
     const trajectoryName =
       (transformation.challenges ?? "").trim().slice(0, 72) ||
       (transformation.objectives ?? "").trim().slice(0, 72) ||
@@ -80,7 +85,10 @@ export async function POST(request: Request) {
       .single();
 
     if (trajectoryError || !newTrajectory) {
-      return NextResponse.json({ error: "Impossible de connecter ce projet. Réessaie." }, { status: 500 });
+      return NextResponse.json(
+        { error: language === "en" ? "Couldn't connect this project. Try again." : "Impossible de connecter ce projet. Réessaie." },
+        { status: 500 }
+      );
     }
     trajectoryId = newTrajectory.id;
   }
@@ -91,7 +99,10 @@ export async function POST(request: Request) {
     .eq("id", transformation.id);
 
   if (linkError) {
-    return NextResponse.json({ error: "Impossible de connecter ce projet. Réessaie." }, { status: 500 });
+    return NextResponse.json(
+      { error: language === "en" ? "Couldn't connect this project. Try again." : "Impossible de connecter ce projet. Réessaie." },
+      { status: 500 }
+    );
   }
 
   await setModuleStatus(supabase, transformation.id, "deliver", "in_progress");

@@ -20,15 +20,14 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const language = await getLanguage();
   let body: z.infer<typeof requestSchema>;
   try {
     body = requestSchema.parse(await request.json());
-  } catch (err) {
-    const message = err instanceof z.ZodError ? err.issues[0]?.message : "Requête invalide.";
-    return NextResponse.json({ error: message ?? "Requête invalide." }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
 
-  const language = await getLanguage();
   const anthropic = getAnthropicClient();
 
   let response;
@@ -42,9 +41,25 @@ export async function POST(request: Request) {
   } catch (err) {
     if (err instanceof Anthropic.APIError) {
       const status = err.status === 401 || err.status === 403 ? 502 : (err.status ?? 502);
-      return NextResponse.json({ error: "Tomorrow n'a pas pu répondre. Réessaie dans un instant." }, { status });
+      return NextResponse.json(
+        {
+          error:
+            language === "en"
+              ? "Tomorrow couldn't reply. Try again in a moment."
+              : "Tomorrow n'a pas pu répondre. Réessaie dans un instant.",
+        },
+        { status }
+      );
     }
-    return NextResponse.json({ error: "Tomorrow a mis trop de temps à répondre. Réessaie." }, { status: 504 });
+    return NextResponse.json(
+      {
+        error:
+          language === "en"
+            ? "Tomorrow took too long to respond. Try again."
+            : "Tomorrow a mis trop de temps à répondre. Réessaie.",
+      },
+      { status: 504 }
+    );
   }
 
   const reply = response.content

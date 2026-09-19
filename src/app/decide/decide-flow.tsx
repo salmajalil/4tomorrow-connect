@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { IntakeForm, type IntakeState } from "@/components/decide/intake-form";
 import { DiagnosticView, type DiagnosticResult } from "@/components/decide/diagnostic-view";
+import { ModuleCrossLinks } from "@/components/decide/module-cross-links";
 import { RadarChart } from "@/components/decide/radar-chart";
 import { ScenarioCard, type ScenarioWithId } from "@/components/decide/scenario-card";
 import { Eyebrow } from "@/components/eyebrow";
@@ -168,6 +169,9 @@ export function DecideFlow() {
   if (phase === "diagnostic" && diagnostic) {
     return (
       <div className="mx-auto w-full max-w-4xl px-4 py-10">
+        <div className="mb-6">
+          <ModuleCrossLinks transformationId={diagnostic.transformationId} />
+        </div>
         <DiagnosticView result={diagnostic} onGenerateScenarios={runScenarios} generating={false} />
       </div>
     );
@@ -194,6 +198,10 @@ export function DecideFlow() {
 
     return (
       <div className="mx-auto w-full max-w-4xl px-4 py-10">
+        <div className="mb-6">
+          <ModuleCrossLinks transformationId={diagnostic.transformationId} />
+        </div>
+
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <Eyebrow>{t.decide.scenarios.eyebrow}</Eyebrow>
@@ -258,6 +266,9 @@ export function DecideFlow() {
 
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-10">
+        <div className="mb-4">
+          <ModuleCrossLinks transformationId={diagnostic.transformationId} />
+        </div>
         <button
           type="button"
           onClick={() => setPhase("scenarios")}

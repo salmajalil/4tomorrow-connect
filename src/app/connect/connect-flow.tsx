@@ -22,17 +22,25 @@ const TOTAL_STEPS = 5;
 
 type Phase = "form" | "loading" | "results" | "error";
 
-export function ConnectFlow() {
+export function ConnectFlow({
+  initialIndustry = "",
+  initialDescription = "",
+  transformationId = null,
+}: {
+  initialIndustry?: string;
+  initialDescription?: string;
+  transformationId?: string | null;
+}) {
   const { t } = useLanguage();
   const [step, setStep] = useState(1);
   const [phase, setPhase] = useState<Phase>("form");
   const [state, setState] = useState<OnboardingState>({
-    industry: "",
+    industry: initialIndustry,
     partnerTypes: [],
     location: "",
     budget: "",
     co2Target: "",
-    description: "",
+    description: initialDescription,
   });
   const [result, setResult] = useState<ModelOutput | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
@@ -50,7 +58,7 @@ export function ConnectFlow() {
       const res = await fetch("/api/match", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(state),
+        body: JSON.stringify({ ...state, transformationId }),
         signal: controller.signal,
       });
       const data = await res.json();

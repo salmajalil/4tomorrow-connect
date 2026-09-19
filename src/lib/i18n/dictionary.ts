@@ -171,6 +171,9 @@ const fr = {
         hideFullDiagnostic: "Masquer le détail",
         fullDiagnosticHint: "Gaps, causes racines, toutes les priorités, tous les risques, critères de décision.",
       },
+      crossLinks: {
+        label: "Continuer avec :",
+      },
       scenarios: {
         eyebrow: "Scénarios stratégiques",
         title: "Trois trajectoires possibles",
@@ -793,6 +796,9 @@ const en: Dictionary = {
         showFullDiagnostic: "See the full diagnostic",
         hideFullDiagnostic: "Hide details",
         fullDiagnosticHint: "Gaps, root causes, all priorities, all risks, decision criteria.",
+      },
+      crossLinks: {
+        label: "Continue with:",
       },
       scenarios: {
         eyebrow: "Strategic scenarios",

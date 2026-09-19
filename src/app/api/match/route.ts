@@ -3,13 +3,7 @@ import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
-import {
-  buildSystemPrompt,
-  buildUserPrompt,
-  parseModelOutput,
-  MatchingParseError,
-  type MatchingInput,
-} from "@/lib/matching";
+import { buildSystemPrompt, buildUserPrompt, parseModelOutput, MatchingParseError } from "@/lib/matching";
 import type { EcosystemMember } from "@/types/database";
 import { setModuleStatus } from "@/lib/module-status";
 import { getLanguage } from "@/lib/i18n/language";
@@ -25,6 +19,10 @@ const requestSchema = z.object({
   budget: z.string().trim().default(""),
   co2Target: z.string().trim().default(""),
   description: z.string().trim().default(""),
+  // Set when the user arrived from another module (e.g. Decide) via
+  // "?transformationId=" — reuse and update that same project instead of
+  // creating a duplicate one, same pattern as Learn's linked projects.
+  transformationId: z.string().uuid().nullable().default(null),
 });
 
 export async function POST(request: Request) {
@@ -41,7 +39,7 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: MatchingInput;
+  let body: z.infer<typeof requestSchema>;
   try {
     const json = await request.json();
     body = requestSchema.parse(json);
@@ -167,23 +165,39 @@ export async function POST(request: Request) {
       body.budget && `Budget : ${body.budget}`,
       body.co2Target && `Objectif CO2 : ${body.co2Target}`,
     ].filter(Boolean);
+    const constraintsText =
+      body.partnerTypes.length > 0 ? `Partenaires recherchés : ${body.partnerTypes.join(", ")}` : null;
+    const objectivesText = objectivesParts.length > 0 ? objectivesParts.join(" · ") : null;
 
-    const { data: transformation, error: transformationError } = await supabase
-      .from("transformations")
-      .insert({
-        organization_id: organizationId,
-        challenges: body.description || null,
-        objectives: objectivesParts.length > 0 ? objectivesParts.join(" · ") : null,
-        constraints:
-          body.partnerTypes.length > 0
-            ? `Partenaires recherchés : ${body.partnerTypes.join(", ")}`
-            : null,
-        status: "active",
-      })
-      .select("id")
-      .single();
-    if (transformationError) throw transformationError;
-    const txId: string = transformation.id;
+    // RLS already scopes this select to the caller's own rows — a foreign
+    // or missing id just returns no row, and we fall through to creating a
+    // fresh transformation below instead of erroring.
+    const { data: linkedTx } = body.transformationId
+      ? await supabase.from("transformations").select("id").eq("id", body.transformationId).maybeSingle()
+      : { data: null };
+
+    let txId: string;
+    if (linkedTx) {
+      txId = linkedTx.id;
+      await supabase
+        .from("transformations")
+        .update({ challenges: body.description || null, objectives: objectivesText, constraints: constraintsText })
+        .eq("id", txId);
+    } else {
+      const { data: transformation, error: transformationError } = await supabase
+        .from("transformations")
+        .insert({
+          organization_id: organizationId,
+          challenges: body.description || null,
+          objectives: objectivesText,
+          constraints: constraintsText,
+          status: "active",
+        })
+        .select("id")
+        .single();
+      if (transformationError) throw transformationError;
+      txId = transformation.id;
+    }
     transformationId = txId;
 
     if (result.gaps.length > 0) {

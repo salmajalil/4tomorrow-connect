@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { usePathname } from "next/navigation";
 import { useLanguage } from "@/components/language-provider";
+import { SearchIcon } from "@/components/icons";
 import type { ChatMessage } from "@/lib/assistant";
 
 // Floating site-wide widget — always mounted (see src/app/layout.tsx), so it
@@ -16,6 +17,7 @@ export function TomorrowChat() {
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [webSearch, setWebSearch] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,7 +41,7 @@ export function TomorrowChat() {
       const res = await fetch("/api/assistant/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: nextMessages, pathname }),
+        body: JSON.stringify({ messages: nextMessages, pathname, webSearchEnabled: webSearch }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t.assistant.errorFallback);
@@ -83,7 +85,23 @@ export function TomorrowChat() {
             {error && <p className="text-xs text-red-400">{error}</p>}
           </div>
 
-          <form onSubmit={sendMessage} className="flex items-center gap-2 border-t border-border bg-surface-2 p-3">
+          <div className="border-t border-border bg-surface-2 px-3 pt-2.5">
+            <button
+              type="button"
+              onClick={() => setWebSearch((v) => !v)}
+              aria-pressed={webSearch}
+              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+                webSearch
+                  ? "border-accent bg-accent/15 text-accent-strong"
+                  : "border-border bg-surface text-muted hover:text-ink"
+              }`}
+            >
+              <SearchIcon aria-hidden className="h-3.5 w-3.5" />
+              {t.assistant.webSearchToggle}
+            </button>
+          </div>
+
+          <form onSubmit={sendMessage} className="flex items-center gap-2 bg-surface-2 p-3 pt-2">
             <input
               type="text"
               value={input}

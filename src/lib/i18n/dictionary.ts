@@ -44,6 +44,7 @@ const fr = {
       send: "Envoyer",
       thinking: "Tomorrow réfléchit...",
       errorFallback: "Tomorrow n'a pas pu répondre. Réessaie dans un instant.",
+      webSearchToggle: "Recherche web",
     },
     home: {
       brandEyebrow: "4 Tomorrow",
@@ -666,6 +667,7 @@ const en: Dictionary = {
       send: "Send",
       thinking: "Tomorrow is thinking...",
       errorFallback: "Tomorrow couldn't reply. Try again in a moment.",
+      webSearchToggle: "Web search",
     },
     home: {
       brandEyebrow: "4 Tomorrow",

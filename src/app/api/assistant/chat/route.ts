@@ -17,6 +17,7 @@ const requestSchema = z.object({
     .min(1)
     .max(20),
   pathname: z.string().trim().default("/"),
+  webSearchEnabled: z.boolean().default(false),
 });
 
 export async function POST(request: Request) {
@@ -35,9 +36,11 @@ export async function POST(request: Request) {
     response = await anthropic.messages.create({
       model: MATCHING_MODEL,
       max_tokens: 800,
-      system: buildAssistantSystemPrompt(language, body.pathname),
+      system: buildAssistantSystemPrompt(language, body.pathname, body.webSearchEnabled),
       messages: body.messages.map((m): ChatMessage => ({ role: m.role, content: m.content })),
-      tools: [{ type: "web_search_20260318", name: "web_search", max_uses: 2 }],
+      ...(body.webSearchEnabled
+        ? { tools: [{ type: "web_search_20260318" as const, name: "web_search" as const, max_uses: 2 }] }
+        : {}),
     });
   } catch (err) {
     if (err instanceof Anthropic.APIError) {

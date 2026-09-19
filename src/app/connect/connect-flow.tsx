@@ -27,14 +27,16 @@ export function ConnectFlow({
   initialIndustry = "",
   initialDescription = "",
   transformationId = null,
+  initialResult = null,
 }: {
   initialIndustry?: string;
   initialDescription?: string;
   transformationId?: string | null;
+  initialResult?: ModelOutput | null;
 }) {
   const { t } = useLanguage();
   const [step, setStep] = useState(1);
-  const [phase, setPhase] = useState<Phase>("form");
+  const [phase, setPhase] = useState<Phase>(initialResult ? "results" : "form");
   const [state, setState] = useState<OnboardingState>({
     industry: initialIndustry,
     partnerTypes: [],
@@ -43,7 +45,7 @@ export function ConnectFlow({
     co2Target: "",
     description: initialDescription,
   });
-  const [result, setResult] = useState<ModelOutput | null>(null);
+  const [result, setResult] = useState<ModelOutput | null>(initialResult);
   const [errorMessage, setErrorMessage] = useState("");
   const [activeTransformationId, setActiveTransformationId] = useState<string | null>(transformationId);
 

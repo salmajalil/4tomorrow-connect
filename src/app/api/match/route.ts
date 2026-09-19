@@ -181,7 +181,13 @@ export async function POST(request: Request) {
       txId = linkedTx.id;
       await supabase
         .from("transformations")
-        .update({ challenges: body.description || null, objectives: objectivesText, constraints: constraintsText })
+        .update({
+          challenges: body.description || null,
+          objectives: objectivesText,
+          constraints: constraintsText,
+          strategic_brief: result.strategicBrief,
+          good_ideas: result.goodIdeas,
+        })
         .eq("id", txId);
     } else {
       const { data: transformation, error: transformationError } = await supabase
@@ -191,6 +197,8 @@ export async function POST(request: Request) {
           challenges: body.description || null,
           objectives: objectivesText,
           constraints: constraintsText,
+          strategic_brief: result.strategicBrief,
+          good_ideas: result.goodIdeas,
           status: "active",
         })
         .select("id")

@@ -38,6 +38,8 @@ export type Transformation = {
   root_causes: { name: string; reason: string }[];
   decision_criteria: string[];
   starting_recommendation: string | null;
+  strategic_brief: string | null;
+  good_ideas: string[];
   created_at: string;
 };
 

@@ -14,7 +14,7 @@ export const DOMAINS = ["manufacturing", "rd", "gtm", "strategy", "digitalizatio
 export type Domain = (typeof DOMAINS)[number];
 
 export const DOMAIN_LABELS: Record<Domain, string> = {
-  manufacturing: "Supply Chain & Manufacturing",
+  manufacturing: "Chaîne d'approvisionnement & Production",
   rd: "R&D",
   gtm: "Commercialisation / Go-to-market",
   strategy: "Stratégie",

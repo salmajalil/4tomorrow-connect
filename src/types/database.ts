@@ -208,7 +208,7 @@ export type Profile = {
   created_at: string;
 };
 
-export type TrainingMode = "rapide" | "document" | "diagnostic";
+export type TrainingMode = "rapide" | "document" | "diagnostic" | "workshop";
 
 export type ExecutiveSummary = {
   addressedChallenge: string;
@@ -234,6 +234,16 @@ export type VideoScene = {
 };
 export type VideoScript = { title: string; scenes: VideoScene[] };
 
+export type WorkshopIntro = { context: string; expectedOutcome: string };
+export type WorkshopSupportSection = { title: string; content: string };
+export type WorkshopStep = {
+  order: number;
+  title: string;
+  durationMinutes: number;
+  description: string;
+  materials: string[];
+};
+
 export type Training = {
   id: string;
   transformation_id: string;
@@ -251,6 +261,9 @@ export type Training = {
   comprehension_check: ComprehensionQuestion[];
   video_script: VideoScript;
   source_doc_name: string | null;
+  workshop_intro: WorkshopIntro | null;
+  workshop_support: WorkshopSupportSection[] | null;
+  workshop_steps: WorkshopStep[] | null;
   created_at: string;
 };
 

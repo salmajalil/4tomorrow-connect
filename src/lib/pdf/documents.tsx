@@ -204,6 +204,61 @@ export function ConnectReportDocument({ result, projectLabel }: { result: ModelO
 // ---------------------------------------------------------------------
 export function LearnReportDocument({ training }: { training: Training }) {
   const domains = domainBadges(training.domains);
+  if (training.mode === "workshop") {
+    return (
+      <ReportShell
+        moduleTag="LEARN · ATELIER"
+        title={training.topic}
+        subtitle={[...domains, training.duration_minutes ? `${training.duration_minutes} min` : null]
+          .filter(Boolean)
+          .join(" · ")}
+      >
+        <SectionTitle>Contexte & résultat attendu</SectionTitle>
+        <Text style={pdfStyles.h3}>Contexte</Text>
+        <Paragraph>{training.workshop_intro?.context ?? ""}</Paragraph>
+        <Text style={pdfStyles.h3}>Résultat attendu</Text>
+        <Paragraph>{training.workshop_intro?.expectedOutcome ?? ""}</Paragraph>
+        <Text style={pdfStyles.h3}>Objectifs</Text>
+        {training.objectives.map((o, i) => (
+          <NumberedItem key={i} index={i}>
+            {o}
+          </NumberedItem>
+        ))}
+
+        <SectionTitle>Support</SectionTitle>
+        {(training.workshop_support ?? []).map((section, i) => (
+          <Card key={i}>
+            <Text style={pdfStyles.h3}>{section.title}</Text>
+            <Paragraph>{section.content}</Paragraph>
+          </Card>
+        ))}
+
+        <View break>
+          <SectionTitle>Déroulé</SectionTitle>
+          {(training.workshop_steps ?? [])
+            .slice()
+            .sort((a, b) => a.order - b.order)
+            .map((step, i) => (
+              <Card key={i}>
+                <Text style={pdfStyles.h3}>
+                  {step.order}. {step.title} ({step.durationMinutes} min)
+                </Text>
+                <Paragraph>{step.description}</Paragraph>
+                {step.materials.length > 0 && (
+                  <Text style={pdfStyles.muted}>Matériel : {step.materials.join(", ")}</Text>
+                )}
+              </Card>
+            ))}
+
+          <SectionTitle>Public & prérequis</SectionTitle>
+          <Text style={pdfStyles.h3}>Participants</Text>
+          <Paragraph>{training.audience || "Non précisé"}</Paragraph>
+          <Text style={pdfStyles.h3}>Prérequis</Text>
+          <Paragraph>{training.prerequisites || "Aucun"}</Paragraph>
+        </View>
+      </ReportShell>
+    );
+  }
   return (
     <ReportShell
       moduleTag="LEARN"

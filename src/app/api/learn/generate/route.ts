@@ -6,15 +6,19 @@ import { getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
 import {
   buildLearnCoreSystemPrompt,
   buildLearnInteractiveSystemPrompt,
+  buildWorkshopSystemPrompt,
   buildLearnUserPrompt,
   parseLearnCoreOutput,
   parseLearnInteractiveOutput,
+  parseWorkshopOutput,
   LearnParseError,
   type TrainingMode,
   type TrainingOutput,
+  type WorkshopOutput,
   type Domain,
 } from "@/lib/learn";
 import { setModuleStatus } from "@/lib/module-status";
+import type { Training } from "@/types/database";
 import { getLanguage } from "@/lib/i18n/language";
 
 // web_search is used in every mode (real examples/insights) — same
@@ -74,7 +78,7 @@ const requestSchema = z.object({
   transformationId: z.string().uuid().nullable().optional(),
   topic: z.string().trim().min(1, "Décris le sujet de la formation."),
   audience: z.string().trim().default(""),
-  mode: z.enum(["rapide", "document", "diagnostic"]),
+  mode: z.enum(["rapide", "document", "diagnostic", "workshop"]),
   sourceDocText: z.string().trim().default(""),
   sourceDocName: z.string().trim().default(""),
   organization: z.string().trim().default(""),
@@ -183,8 +187,6 @@ export async function POST(request: Request) {
   const anthropic = getAnthropicClient();
   const mode: TrainingMode = body.mode;
   const hasLinkedDiagnostic = !!linkedChallenges;
-  const coreSystem = buildLearnCoreSystemPrompt(mode, !!body.sourceDocText, hasLinkedDiagnostic, language);
-  const interactiveSystem = buildLearnInteractiveSystemPrompt(mode, !!body.sourceDocText, hasLinkedDiagnostic, language);
   const userPrompt = buildLearnUserPrompt({
     topic: body.topic,
     organization: organizationName,
@@ -197,45 +199,104 @@ export async function POST(request: Request) {
     linkedDomains: linkedDomains.length > 0 ? (linkedDomains as Domain[]) : undefined,
   });
 
-  let coreRaw: string;
-  let interactiveRaw: string;
-  try {
-    [coreRaw, interactiveRaw] = await Promise.all([
-      runLearnCompletion(anthropic, coreSystem, userPrompt, 6000, 2),
-      runLearnCompletion(anthropic, interactiveSystem, userPrompt, 10000, 1),
-    ]);
-  } catch (err) {
-    if (err instanceof LearnMaxTokensError) {
-      // Distinct from a parse failure — the model was cut off mid-answer.
-      // Surfacing this separately (instead of falling into the generic
-      // LearnParseError message below) makes a real future regression
-      // diagnosable from the error text alone, without a Vercel log dive.
-      return NextResponse.json(
-        {
-          error:
-            language === "en"
-              ? "Generation was interrupted before completion (content too long). Try again, ideally with a more focused topic."
-              : "La génération a été interrompue avant la fin (contenu trop long). Réessaie, idéalement avec un sujet plus ciblé.",
-        },
-        { status: 502 }
-      );
-    }
-    return handleAnthropicError(err, language);
+  function maxTokensResponse() {
+    // Distinct from a parse failure — the model was cut off mid-answer.
+    // Surfacing this separately (instead of falling into the generic
+    // LearnParseError message below) makes a real future regression
+    // diagnosable from the error text alone, without a Vercel log dive.
+    return NextResponse.json(
+      {
+        error:
+          language === "en"
+            ? "Generation was interrupted before completion (content too long). Try again, ideally with a more focused topic."
+            : "La génération a été interrompue avant la fin (contenu trop long). Réessaie, idéalement avec un sujet plus ciblé.",
+      },
+      { status: 502 }
+    );
   }
 
-  let result: TrainingOutput;
-  try {
-    result = { ...parseLearnCoreOutput(coreRaw), ...parseLearnInteractiveOutput(interactiveRaw) };
-  } catch (err) {
-    if (err instanceof LearnParseError) {
-      return NextResponse.json({ error: err.message }, { status: 502 });
-    }
-    throw err;
+  function saveFailedResponse() {
+    return NextResponse.json(
+      {
+        error:
+          language === "en"
+            ? "Couldn't save the generated training. Try again."
+            : "Impossible d'enregistrer la formation générée. Réessaie.",
+      },
+      { status: 500 }
+    );
   }
 
-  const { data: training, error: trainingError } = await supabase
-    .from("trainings")
-    .insert({
+  let trainingRow: Partial<Training> & Pick<Training, "transformation_id" | "topic">;
+
+  if (mode === "workshop") {
+    const workshopSystem = buildWorkshopSystemPrompt(hasLinkedDiagnostic, language);
+
+    let workshopRaw: string;
+    try {
+      workshopRaw = await runLearnCompletion(anthropic, workshopSystem, userPrompt, 8000, 1);
+    } catch (err) {
+      if (err instanceof LearnMaxTokensError) return maxTokensResponse();
+      return handleAnthropicError(err, language);
+    }
+
+    let result: WorkshopOutput;
+    try {
+      result = parseWorkshopOutput(workshopRaw);
+    } catch (err) {
+      if (err instanceof LearnParseError) {
+        return NextResponse.json({ error: err.message }, { status: 502 });
+      }
+      throw err;
+    }
+
+    trainingRow = {
+      transformation_id: transformationId,
+      topic: body.topic,
+      mode,
+      domains: result.domains,
+      audience: body.audience || null,
+      objectives: result.objectives,
+      prerequisites: result.prerequisites,
+      duration_minutes: result.durationMinutes,
+      executive_summary: { addressedChallenge: "", summary: "", actionPlan: [] },
+      key_insights: [],
+      business_implications: [],
+      flashcards: [],
+      comprehension_check: [],
+      video_script: { title: "", scenes: [] },
+      source_doc_name: body.sourceDocName || null,
+      workshop_intro: result.workshopIntro,
+      workshop_support: result.workshopSupport,
+      workshop_steps: result.workshopSteps,
+    };
+  } else {
+    const coreSystem = buildLearnCoreSystemPrompt(mode, !!body.sourceDocText, hasLinkedDiagnostic, language);
+    const interactiveSystem = buildLearnInteractiveSystemPrompt(mode, !!body.sourceDocText, hasLinkedDiagnostic, language);
+
+    let coreRaw: string;
+    let interactiveRaw: string;
+    try {
+      [coreRaw, interactiveRaw] = await Promise.all([
+        runLearnCompletion(anthropic, coreSystem, userPrompt, 6000, 2),
+        runLearnCompletion(anthropic, interactiveSystem, userPrompt, 10000, 1),
+      ]);
+    } catch (err) {
+      if (err instanceof LearnMaxTokensError) return maxTokensResponse();
+      return handleAnthropicError(err, language);
+    }
+
+    let result: TrainingOutput;
+    try {
+      result = { ...parseLearnCoreOutput(coreRaw), ...parseLearnInteractiveOutput(interactiveRaw) };
+    } catch (err) {
+      if (err instanceof LearnParseError) {
+        return NextResponse.json({ error: err.message }, { status: 502 });
+      }
+      throw err;
+    }
+
+    trainingRow = {
       transformation_id: transformationId,
       topic: body.topic,
       mode,
@@ -251,20 +312,20 @@ export async function POST(request: Request) {
       comprehension_check: result.comprehensionCheck,
       video_script: result.videoScript,
       source_doc_name: body.sourceDocName || null,
-    })
+      workshop_intro: null,
+      workshop_support: null,
+      workshop_steps: null,
+    };
+  }
+
+  const { data: training, error: trainingError } = await supabase
+    .from("trainings")
+    .insert(trainingRow)
     .select("*")
     .single();
 
   if (trainingError || !training) {
-    return NextResponse.json(
-      {
-        error:
-          language === "en"
-            ? "Couldn't save the generated training. Try again."
-            : "Impossible d'enregistrer la formation générée. Réessaie.",
-      },
-      { status: 500 }
-    );
+    return saveFailedResponse();
   }
 
   await setModuleStatus(supabase, transformationId, "learn", "done");

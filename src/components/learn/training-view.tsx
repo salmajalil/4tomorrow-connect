@@ -9,9 +9,17 @@ import { useTomorrowController } from "@/components/assistant/tomorrow-context";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Training } from "@/types/database";
 
-type Tab = "apercu" | "points-cles" | "experience" | "video" | "qualiopi";
+type Tab = "apercu" | "points-cles" | "experience" | "video" | "support" | "etapes" | "qualiopi";
 
-function tabs(training: Dictionary["learn"]["training"]): { id: Tab; label: string }[] {
+function tabs(training: Dictionary["learn"]["training"], isWorkshop: boolean): { id: Tab; label: string }[] {
+  if (isWorkshop) {
+    return [
+      { id: "apercu", label: training.tabOverview },
+      { id: "support", label: training.tabSupport },
+      { id: "etapes", label: training.tabSteps },
+      { id: "qualiopi", label: training.tabQualiopi },
+    ];
+  }
   return [
     { id: "apercu", label: training.tabOverview },
     { id: "points-cles", label: training.tabKeyPoints },
@@ -174,7 +182,8 @@ function QuizQuestion({
 export function TrainingView({ training }: { training: Training }) {
   const { t } = useLanguage();
   const tr = t.learn.training;
-  const TABS = tabs(tr);
+  const isWorkshop = training.mode === "workshop";
+  const TABS = tabs(tr, isWorkshop);
   const [tab, setTab] = useState<Tab>("apercu");
   const [quizScore, setQuizScore] = useState(0);
   const [quizAnswered, setQuizAnswered] = useState(0);
@@ -228,7 +237,33 @@ export function TrainingView({ training }: { training: Training }) {
         ))}
       </div>
 
-      {tab === "apercu" && (
+      {tab === "apercu" && isWorkshop && (
+        <div className="flex flex-col gap-4">
+          <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-accent-strong">{tr.workshopContext}</h2>
+            <p className="mt-2 text-sm text-ink">{training.workshop_intro?.context}</p>
+          </div>
+          <div className="rounded-xl border border-border bg-surface p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{tr.workshopExpectedOutcome}</h2>
+            <p className="mt-2 text-sm text-ink">{training.workshop_intro?.expectedOutcome}</p>
+          </div>
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{tr.pedagogicalObjectives}</h2>
+            <ol className="mt-2 flex flex-col gap-2">
+              {training.objectives.map((o, i) => (
+                <li key={i} className="flex gap-3 rounded-lg border border-border bg-surface p-3 text-sm">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-ink">
+                    {i + 1}
+                  </span>
+                  <span className="text-ink">{o}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      )}
+
+      {tab === "apercu" && !isWorkshop && (
         <div className="flex flex-col gap-4">
           <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-accent-strong">{tr.addressedChallenge}</h2>
@@ -251,6 +286,48 @@ export function TrainingView({ training }: { training: Training }) {
               ))}
             </ol>
           </div>
+        </div>
+      )}
+
+      {tab === "support" && (
+        <div className="flex flex-col gap-3">
+          <p className="text-xs text-muted">{tr.workshopSupportSubtitle}</p>
+          {(training.workshop_support ?? []).map((section, i) => (
+            <div key={i} className="rounded-xl border border-border bg-surface p-4">
+              <h2 className="text-sm font-bold text-ink">{section.title}</h2>
+              <p className="mt-2 whitespace-pre-wrap text-sm text-ink">{section.content}</p>
+              <div className="mt-3">
+                <MentoringButton topic={section.title} label={tr.liveMentoring} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === "etapes" && (
+        <div className="flex flex-col gap-3">
+          <p className="text-xs text-muted">{tr.workshopStepsSubtitle}</p>
+          {(training.workshop_steps ?? [])
+            .slice()
+            .sort((a, b) => a.order - b.order)
+            .map((step, i) => (
+              <div key={i} className="rounded-xl border border-border bg-surface p-4">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-accent-strong">
+                    {step.order}. {step.title}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted">
+                    {step.durationMinutes} {tr.workshopStepDuration}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-ink">{step.description}</p>
+                {step.materials.length > 0 && (
+                  <p className="mt-2 text-xs text-muted">
+                    {tr.workshopStepMaterials} {step.materials.join(", ")}
+                  </p>
+                )}
+              </div>
+            ))}
         </div>
       )}
 
@@ -389,8 +466,13 @@ export function TrainingView({ training }: { training: Training }) {
           <div className="rounded-lg border border-border bg-surface-2 p-3 text-xs text-muted">
             {tr.methodUsed}
             {training.source_doc_name ? ` ${tr.fromDocument} ${training.source_doc_name} »` : ""}
-            {training.mode === "diagnostic" ? tr.fromDiagnostic : ""}. {tr.evaluationProof} {totalQuestions}{" "}
-            {totalQuestions > 1 ? `${tr.question}s` : tr.question} {tr.questionsAbove}
+            {training.mode === "diagnostic" ? tr.fromDiagnostic : ""}.
+            {!isWorkshop && (
+              <>
+                {" "}
+                {tr.evaluationProof} {totalQuestions} {totalQuestions > 1 ? `${tr.question}s` : tr.question} {tr.questionsAbove}
+              </>
+            )}
           </div>
         </div>
       )}

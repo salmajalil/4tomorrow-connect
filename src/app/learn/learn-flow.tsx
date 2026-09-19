@@ -122,7 +122,10 @@ export function LearnFlow({
               />
             </div>
           ) : (
-            <LoadingBlock label={t.learn.loading.title} hint={t.learn.loading.hint} />
+            <LoadingBlock
+              label={lastIntake?.mode === "workshop" ? t.learn.loading.titleWorkshop : t.learn.loading.title}
+              hint={lastIntake?.mode === "workshop" ? t.learn.loading.hintWorkshop : t.learn.loading.hint}
+            />
           )}
         </div>
       </LearnThemeWrap>

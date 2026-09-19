@@ -35,7 +35,7 @@ ${RESULT_START}
 ${RESULT_END}
 The block must be the last thing in your response, with valid JSON (no trailing commas, no comments) inside it.`;
 
-export type TrainingMode = "rapide" | "document" | "diagnostic";
+export type TrainingMode = "rapide" | "document" | "diagnostic" | "workshop";
 
 export interface LearnGenerationInput {
   topic: string;
@@ -119,6 +119,36 @@ export type LearnInteractiveOutput = z.infer<typeof interactiveOutputSchema>;
 
 // What the route persists — the two halves merged back together.
 export type TrainingOutput = LearnCoreOutput & LearnInteractiveOutput;
+
+// Workshop prep is a separate deliverable shape, not a training: the input
+// is the workshop's objective, the output is facilitation material (what
+// to present + a timed run-of-show), not flashcards/quiz/video for
+// individual self-study. One call, no interactive half.
+const workshopOutputSchema = z.object({
+  domains: z.array(z.enum(DOMAINS)).min(1),
+  objectives: z.array(z.string().min(1)).min(2).max(4),
+  prerequisites: z.string().min(1),
+  durationMinutes: z.number().min(15).max(480),
+  workshopIntro: z.object({
+    context: z.string().min(1),
+    expectedOutcome: z.string().min(1),
+  }),
+  workshopSupport: z.array(z.object({ title: z.string().min(1), content: z.string().min(1) })).min(2).max(6),
+  workshopSteps: z
+    .array(
+      z.object({
+        order: z.number().min(1),
+        title: z.string().min(1),
+        durationMinutes: z.number().min(1).max(180),
+        description: z.string().min(1),
+        materials: z.array(z.string().min(1)).max(4).default([]),
+      })
+    )
+    .min(3)
+    .max(10),
+});
+
+export type WorkshopOutput = z.infer<typeof workshopOutputSchema>;
 
 function groundingLine(mode: TrainingMode, hasSourceDoc: boolean, hasLinkedDiagnostic: boolean): string {
   return mode === "document" && hasSourceDoc
@@ -209,6 +239,49 @@ Schema:
 }`;
 }
 
+function workshopGroundingLine(hasLinkedDiagnostic: boolean): string {
+  return hasLinkedDiagnostic
+    ? "GROUNDING: this workshop is linked to an already-diagnosed transformation (domains, challenges, objectives given below) — build the workshop directly around that real context, never generic."
+    : "GROUNDING: no linked diagnostic — rely on the workshop objective described below, and use web_search only if one concrete real example would sharpen a support section.";
+}
+
+export function buildWorkshopSystemPrompt(hasLinkedDiagnostic: boolean, language: Language): string {
+  return `You are the workshop-prep engine for "4 Tomorrow / Learn" — this call produces everything a facilitator needs to run a live group workshop: objectives, a short intro (context + expected outcome), support content to present, and a timed step-by-step agenda. This is facilitation material for running a session, not a training package for individual self-study.
+
+${DOMAIN_STEP}
+
+${workshopGroundingLine(hasLinkedDiagnostic)}
+
+You have a web_search tool (max 1 use) — only if one concrete real example would sharpen a support section; don't spend it on exhaustive research. Work under a hard time budget: a complete, on-time answer beats an exhaustive but late one.
+
+PRINCIPE DIRECTEUR — everything adapts to the actual workshop objective, nothing is templated:
+- objectives: measurable objectives for the workshop — what participants can DO or decide by the end, not vague aspirations.
+- prerequisites: state plainly if there truly are none — never invent one to sound thorough.
+- workshopIntro.context: why this workshop matters right now, for this audience.
+- workshopIntro.expectedOutcome: the concrete deliverable or decision the group should have produced by the end (a prioritized list, a shared diagnosis, a draft plan — never "better alignment").
+- workshopSupport: the content a facilitator actually presents or hands out — each section a real talking point, question set, or framework, never a title with nothing under it.
+- workshopSteps: the real run-of-show — each step is something the facilitator DOES (present, brainstorm, vote, debrief), with a realistic duration, ordered from 1, durations summing to roughly durationMinutes; list materials only when genuinely needed (a whiteboard, sticky notes, a printed template).
+
+${NEVER_GENERIC}
+
+HARD ARRAY LIMITS — never exceed these, the response is rejected otherwise: objectives ≤4, workshopSupport ≤6, workshopSteps ≤10, each step's materials ≤4. Pick the most important entries rather than listing everything you can think of.
+
+${languageInstruction(language)}
+
+${RESULT_INSTRUCTION}
+
+Schema:
+{
+  "domains": ["manufacturing" | "rd" | "gtm" | "strategy" | "digitalization", ...],
+  "objectives": [string],
+  "prerequisites": string,
+  "durationMinutes": number,
+  "workshopIntro": { "context": string, "expectedOutcome": string },
+  "workshopSupport": [{ "title": string, "content": string }],
+  "workshopSteps": [{ "order": number, "title": string, "durationMinutes": number, "description": string, "materials": [string] }]
+}`;
+}
+
 export function buildLearnUserPrompt(input: LearnGenerationInput): string {
   return `Sujet de la formation : ${input.topic}
 Organisation : ${input.organization || "(non précisé)"}
@@ -244,6 +317,15 @@ export function parseLearnInteractiveOutput(rawText: string): LearnInteractiveOu
     throw new LearnParseError(
       `Le résultat de la formation ne respecte pas le format attendu : ${parsed.error.message}`
     );
+  }
+  return parsed.data;
+}
+
+export function parseWorkshopOutput(rawText: string): WorkshopOutput {
+  const raw = extractJson(rawText);
+  const parsed = workshopOutputSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new LearnParseError(`Le résultat de l'atelier ne respecte pas le format attendu : ${parsed.error.message}`);
   }
   return parsed.data;
 }

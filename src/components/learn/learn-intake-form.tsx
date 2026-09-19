@@ -28,6 +28,7 @@ function modeOptions(intake: Dictionary["learn"]["intake"]): {
     { id: "rapide", icon: "⚡", label: intake.modeRapide, description: intake.modeRapideDesc },
     { id: "document", icon: "📄", label: intake.modeDocument, description: intake.modeDocumentDesc },
     { id: "diagnostic", icon: "🎯", label: intake.modeDiagnostic, description: intake.modeDiagnosticDesc },
+    { id: "workshop", icon: "🧭", label: intake.modeWorkshop, description: intake.modeWorkshopDesc },
   ];
 }
 
@@ -114,22 +115,22 @@ export function LearnIntakeForm({
       )}
 
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-ink">{intake.topic}</span>
+        <span className="font-medium text-ink">{state.mode === "workshop" ? intake.topicWorkshop : intake.topic}</span>
         <textarea
           value={state.topic}
           onChange={(e) => setState((s) => ({ ...s, topic: e.target.value }))}
-          placeholder={intake.topicPlaceholder}
+          placeholder={state.mode === "workshop" ? intake.topicPlaceholderWorkshop : intake.topicPlaceholder}
           rows={3}
           className="resize-none rounded-xl border border-border bg-surface px-3.5 py-3 text-base leading-relaxed text-ink placeholder:text-muted focus:border-accent focus:outline-none"
         />
       </label>
 
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-ink">{intake.audience}</span>
+        <span className="font-medium text-ink">{state.mode === "workshop" ? intake.audienceWorkshop : intake.audience}</span>
         <input
           value={state.audience}
           onChange={(e) => setState((s) => ({ ...s, audience: e.target.value }))}
-          placeholder={intake.audiencePlaceholder}
+          placeholder={state.mode === "workshop" ? intake.audiencePlaceholderWorkshop : intake.audiencePlaceholder}
           className="rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-ink placeholder:text-muted focus:border-accent focus:outline-none"
         />
       </label>
@@ -229,7 +230,7 @@ export function LearnIntakeForm({
         disabled={!canSubmit}
         className="self-start rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {submitting ? intake.submitting : intake.submit}
+        {submitting ? intake.submitting : state.mode === "workshop" ? intake.submitWorkshop : intake.submit}
       </button>
     </form>
   );

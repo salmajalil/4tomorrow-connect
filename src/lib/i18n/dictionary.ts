@@ -51,7 +51,7 @@ const fr = {
       heroTitlePrefix: "Un seul projet,",
       heroTitleAccent: "quatre leviers connectés.",
       heroDescription:
-        "Fini le jonglage entre outils. 4 Tomorrow connecte diagnostic, partenaires, formation et exécution dans un seul projet piloté par IA — chaque module s'appuie sur le précédent, sans jamais repartir de zéro.",
+        "Connectez Strategy, Tech, partenaires, formation et livraison de vos projets dans un seul écosystème intelligent connecté.",
       launchDiagnostic: "Lancer le diagnostic",
       joinAsPartner: "Ou rejoindre l'écosystème en tant que partenaire",
       platformLabel: "La plateforme",
@@ -670,7 +670,7 @@ const en: Dictionary = {
       heroTitlePrefix: "One project,",
       heroTitleAccent: "four connected levers.",
       heroDescription:
-        "Stop juggling disconnected tools. 4 Tomorrow connects diagnosis, partners, training and execution into one AI-driven project — each module builds on the last, so you never start from scratch.",
+        "Connect Strategy, Tech, partners, training and delivery for your projects into one connected, intelligent ecosystem.",
       launchDiagnostic: "Launch the diagnostic",
       joinAsPartner: "Or join the ecosystem as a partner",
       platformLabel: "The platform",

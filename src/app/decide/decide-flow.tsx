@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { IntakeForm, type IntakeState } from "@/components/decide/intake-form";
 import { DiagnosticView, type DiagnosticResult } from "@/components/decide/diagnostic-view";
-import { ModuleCrossLinks } from "@/components/decide/module-cross-links";
+import { ModuleCrossLinks } from "@/components/module-cross-links";
 import { RadarChart } from "@/components/decide/radar-chart";
 import { ScenarioCard, type ScenarioWithId } from "@/components/decide/scenario-card";
 import { Eyebrow } from "@/components/eyebrow";
@@ -54,22 +54,50 @@ function fifthAxisLabel(domains: Domain[], axisLabels: Dictionary["decide"]["axi
   return axisLabels.co2Fallback;
 }
 
-export function DecideFlow() {
+function initialPhase(hasScenarios: boolean, hasDiagnostic: boolean): Phase {
+  if (hasScenarios) return "scenarios";
+  if (hasDiagnostic) return "diagnostic";
+  return "intake";
+}
+
+export function DecideFlow({
+  initialDiagnostic = null,
+  initialScenarios = null,
+  initialSelectedTrajectoryId = null,
+}: {
+  initialDiagnostic?: DiagnosticResult | null;
+  initialScenarios?: ScenarioWithId[] | null;
+  initialSelectedTrajectoryId?: string | null;
+}) {
   const { t } = useLanguage();
-  const [phase, setPhase] = useState<Phase>("intake");
+  const [phase, setPhase] = useState<Phase>(initialPhase(!!initialScenarios, !!initialDiagnostic));
   const [diagnosticError, setDiagnosticError] = useState("");
   const [scenariosError, setScenariosError] = useState("");
   const [scenariosWarning, setScenariosWarning] = useState("");
   const [lastIntake, setLastIntake] = useState<IntakeState | null>(null);
 
-  const [diagnostic, setDiagnostic] = useState<DiagnosticResult | null>(null);
-  const [scenarios, setScenarios] = useState<ScenarioWithId[] | null>(null);
-  const [selectedTrajectoryId, setSelectedTrajectoryId] = useState<string | null>(null);
+  const [diagnostic, setDiagnostic] = useState<DiagnosticResult | null>(initialDiagnostic);
+  const [scenarios, setScenarios] = useState<ScenarioWithId[] | null>(initialScenarios);
+  const [selectedTrajectoryId, setSelectedTrajectoryId] = useState<string | null>(initialSelectedTrajectoryId);
   const [detailTrajectoryId, setDetailTrajectoryId] = useState<string | null>(null);
 
   // Previously UI-only ("selected" just highlighted a card) — Deliver needs
   // to know which trajectory was actually chosen to know what to execute,
   // so this now persists to transformations.selected_trajectory_id.
+  // Escape hatch: /decide now resumes the user's most recent project by
+  // default (see decide/page.tsx), so this is the only way back to a blank
+  // intake form to start a genuinely different one.
+  function startNewDiagnostic() {
+    setDiagnostic(null);
+    setScenarios(null);
+    setSelectedTrajectoryId(null);
+    setDetailTrajectoryId(null);
+    setDiagnosticError("");
+    setScenariosError("");
+    setScenariosWarning("");
+    setPhase("intake");
+  }
+
   async function selectTrajectory(trajectoryId: string) {
     setSelectedTrajectoryId(trajectoryId);
     if (!diagnostic) return;
@@ -169,8 +197,15 @@ export function DecideFlow() {
   if (phase === "diagnostic" && diagnostic) {
     return (
       <div className="mx-auto w-full max-w-4xl px-4 py-10">
-        <div className="mb-6">
-          <ModuleCrossLinks transformationId={diagnostic.transformationId} />
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <ModuleCrossLinks current="decide" transformationId={diagnostic.transformationId} />
+          <button
+            type="button"
+            onClick={startNewDiagnostic}
+            className="shrink-0 text-sm font-medium text-muted underline underline-offset-2 hover:text-accent"
+          >
+            {t.decide.diagnostic.newDiagnostic}
+          </button>
         </div>
         <DiagnosticView result={diagnostic} onGenerateScenarios={runScenarios} generating={false} />
       </div>
@@ -198,8 +233,15 @@ export function DecideFlow() {
 
     return (
       <div className="mx-auto w-full max-w-4xl px-4 py-10">
-        <div className="mb-6">
-          <ModuleCrossLinks transformationId={diagnostic.transformationId} />
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <ModuleCrossLinks current="decide" transformationId={diagnostic.transformationId} />
+          <button
+            type="button"
+            onClick={startNewDiagnostic}
+            className="shrink-0 text-sm font-medium text-muted underline underline-offset-2 hover:text-accent"
+          >
+            {t.decide.diagnostic.newDiagnostic}
+          </button>
         </div>
 
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -267,7 +309,7 @@ export function DecideFlow() {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-10">
         <div className="mb-4">
-          <ModuleCrossLinks transformationId={diagnostic.transformationId} />
+          <ModuleCrossLinks current="decide" transformationId={diagnostic.transformationId} />
         </div>
         <button
           type="button"

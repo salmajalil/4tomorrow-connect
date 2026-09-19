@@ -153,6 +153,13 @@ export async function POST(request: Request) {
       objectives: body.objectives || null,
       constraints: body.constraints || null,
       domains: result.domains,
+      // Persisted so /decide can rehydrate the full diagnostic later —
+      // these used to only ever live in the API response, lost the moment
+      // the page was left or reloaded.
+      maturity_reading: result.maturityReading,
+      root_causes: result.rootCauses,
+      decision_criteria: result.decisionCriteria,
+      starting_recommendation: result.startingRecommendation,
       status: "active",
     })
     .select("id")
@@ -174,7 +181,12 @@ export async function POST(request: Request) {
   }
   if (result.priorities.length > 0) {
     await supabase.from("priorities").insert(
-      result.priorities.map((p) => ({ transformation_id: transformationId, name: p.name, reason: p.reason }))
+      result.priorities.map((p) => ({
+        transformation_id: transformationId,
+        name: p.name,
+        reason: p.reason,
+        weight: p.weight,
+      }))
     );
   }
   if (result.risks.length > 0) {

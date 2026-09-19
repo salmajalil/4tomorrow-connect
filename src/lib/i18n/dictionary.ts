@@ -31,6 +31,7 @@ const fr = {
       exportFailed: "Export impossible.",
       untitledProject: "Projet sans titre",
       chooseFile: "Choisir un fichier",
+      continueWith: "Continuer avec :",
     },
     assistant: {
       name: "Tomorrow",
@@ -170,9 +171,7 @@ const fr = {
         showFullDiagnostic: "Voir le détail du diagnostic",
         hideFullDiagnostic: "Masquer le détail",
         fullDiagnosticHint: "Gaps, causes racines, toutes les priorités, tous les risques, critères de décision.",
-      },
-      crossLinks: {
-        label: "Continuer avec :",
+        newDiagnostic: "+ Nouveau diagnostic",
       },
       scenarios: {
         eyebrow: "Scénarios stratégiques",
@@ -657,6 +656,7 @@ const en: Dictionary = {
       exportFailed: "Export failed.",
       untitledProject: "Untitled project",
       chooseFile: "Choose a file",
+      continueWith: "Continue with:",
     },
     assistant: {
       name: "Tomorrow",
@@ -796,9 +796,7 @@ const en: Dictionary = {
         showFullDiagnostic: "See the full diagnostic",
         hideFullDiagnostic: "Hide details",
         fullDiagnosticHint: "Gaps, root causes, all priorities, all risks, decision criteria.",
-      },
-      crossLinks: {
-        label: "Continue with:",
+        newDiagnostic: "+ New diagnostic",
       },
       scenarios: {
         eyebrow: "Strategic scenarios",

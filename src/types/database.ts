@@ -34,6 +34,10 @@ export type Transformation = {
   status: string;
   domains: string[];
   selected_trajectory_id: string | null;
+  maturity_reading: string | null;
+  root_causes: { name: string; reason: string }[];
+  decision_criteria: string[];
+  starting_recommendation: string | null;
   created_at: string;
 };
 
@@ -50,6 +54,7 @@ export type Priority = {
   transformation_id: string;
   name: string;
   reason: string | null;
+  weight: number | null;
   created_at: string;
 };
 

@@ -15,6 +15,7 @@ import { MatchingLoadingState, MatchingErrorState } from "@/components/connect/l
 import { MatchResults } from "@/components/connect/match-results";
 import { EcosystemBoosters } from "@/components/connect/ecosystem-boosters";
 import { ExportPdfButton } from "@/components/export-pdf-button";
+import { ModuleCrossLinks } from "@/components/module-cross-links";
 import { useLanguage } from "@/components/language-provider";
 import type { ModelOutput } from "@/lib/matching";
 
@@ -44,6 +45,7 @@ export function ConnectFlow({
   });
   const [result, setResult] = useState<ModelOutput | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [activeTransformationId, setActiveTransformationId] = useState<string | null>(transformationId);
 
   async function launchMatching() {
     setPhase("loading");
@@ -66,6 +68,7 @@ export function ConnectFlow({
         throw new Error(data.error || t.connect.error.unexpectedError);
       }
       setResult(data as ModelOutput);
+      if (data.transformationId) setActiveTransformationId(data.transformationId as string);
       setPhase("results");
     } catch (err) {
       const message =
@@ -100,6 +103,11 @@ export function ConnectFlow({
   if (phase === "results" && result) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-10">
+        {activeTransformationId && (
+          <div className="mb-6">
+            <ModuleCrossLinks current="connect" transformationId={activeTransformationId} />
+          </div>
+        )}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="font-display text-2xl text-ink">{t.connect.results.title}</h1>
           <div className="flex items-center gap-4">

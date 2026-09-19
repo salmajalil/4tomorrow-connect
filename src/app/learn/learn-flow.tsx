@@ -5,6 +5,7 @@ import { LearnIntakeForm, type LearnIntakeState } from "@/components/learn/learn
 import { Eyebrow } from "@/components/eyebrow";
 import { LearnThemeWrap } from "@/components/learn/learn-theme";
 import { TrainingView } from "@/components/learn/training-view";
+import { ModuleCrossLinks } from "@/components/module-cross-links";
 import { parseJsonResponse } from "@/lib/parse-json-response";
 import { useLanguage } from "@/components/language-provider";
 import type { Training } from "@/types/database";
@@ -50,6 +51,7 @@ export function LearnFlow({
   const [error, setError] = useState("");
   const [lastIntake, setLastIntake] = useState<LearnIntakeState | null>(null);
   const [training, setTraining] = useState<Training | null>(null);
+  const [activeTransformationId, setActiveTransformationId] = useState<string | null>(initialTransformationId);
 
   async function runGenerate(intake: LearnIntakeState) {
     setLastIntake(intake);
@@ -70,6 +72,7 @@ export function LearnFlow({
         const { data } = await parseJsonResponse(res);
         if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
         setTraining(data.training as Training);
+        if (data.transformationId) setActiveTransformationId(data.transformationId as string);
         setPhase("result");
         return;
       } catch (err) {
@@ -128,6 +131,11 @@ export function LearnFlow({
     return (
       <LearnThemeWrap>
         <div className="mx-auto w-full max-w-3xl px-4 py-10">
+          {activeTransformationId && (
+            <div className="mb-4">
+              <ModuleCrossLinks current="learn" transformationId={activeTransformationId} />
+            </div>
+          )}
           <button
             type="button"
             onClick={() => setPhase("intake")}

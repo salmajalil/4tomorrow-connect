@@ -5,6 +5,7 @@ import { DeliverHeader, type MissionPhase } from "@/components/deliver/deliver-h
 import { InputsTab } from "@/components/deliver/inputs-tab";
 import { DeliverablesTab } from "@/components/deliver/deliverables-tab";
 import { ControlTowerTab } from "@/components/deliver/control-tower-tab";
+import { ModuleCrossLinks } from "@/components/module-cross-links";
 import { DELIVERABLE_KINDS, type DeliverableKind } from "@/lib/deliver";
 import { useLanguage } from "@/components/language-provider";
 import type { Dictionary } from "@/lib/i18n/dictionary";
@@ -62,6 +63,9 @@ export function DeliverFlow({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-10">
+      <div className="mb-4">
+        <ModuleCrossLinks current="deliver" transformationId={transformationId} />
+      </div>
       <DeliverHeader
         projectTitle={projectTitle}
         organization={organization}

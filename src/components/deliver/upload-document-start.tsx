@@ -90,8 +90,15 @@ export function UploadDocumentStart({ onCancel }: { onCancel: () => void }) {
             const file = e.target.files?.[0];
             if (file) handleFile(file);
           }}
-          className="mt-1 text-sm text-muted file:mr-3 file:rounded-lg file:border file:border-border file:bg-surface-2 file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink"
+          className="hidden"
         />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="mt-1 self-start rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-ink transition hover:border-accent/50"
+        >
+          {t.common.chooseFile}
+        </button>
         {uploading && <span className="text-xs text-muted">{intake.extracting}</span>}
         {uploadError && <span className="text-xs text-danger">{uploadError}</span>}
         {docName && !uploading && (

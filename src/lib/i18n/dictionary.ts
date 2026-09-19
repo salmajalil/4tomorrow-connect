@@ -30,6 +30,7 @@ const fr = {
       exportInProgress: "Export en cours...",
       exportFailed: "Export impossible.",
       untitledProject: "Projet sans titre",
+      chooseFile: "Choisir un fichier",
     },
     assistant: {
       name: "Tomorrow",
@@ -652,6 +653,7 @@ const en: Dictionary = {
       exportInProgress: "Exporting...",
       exportFailed: "Export failed.",
       untitledProject: "Untitled project",
+      chooseFile: "Choose a file",
     },
     assistant: {
       name: "Tomorrow",

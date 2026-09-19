@@ -133,8 +133,15 @@ export function InputsTab({
             const file = e.target.files?.[0];
             if (file) handleFile(file);
           }}
-          className="mt-3 text-xs text-muted file:mr-3 file:rounded-lg file:border file:border-border file:bg-surface-2 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-ink"
+          className="hidden"
         />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="mt-3 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-accent/50"
+        >
+          {t.common.chooseFile}
+        </button>
         {uploading && <p className="mt-1 text-xs text-muted">{inputs.extracting}</p>}
         {uploadError && <p className="mt-1 text-xs text-danger">{uploadError}</p>}
       </div>

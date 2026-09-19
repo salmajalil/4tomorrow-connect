@@ -179,12 +179,7 @@ export default async function Home() {
         {t.home.heroTitlePrefix} <span className="text-accent">{t.home.heroTitleAccent}</span>
       </h1>
       <p className="mt-3 text-sm font-semibold uppercase tracking-[0.14em] text-accent-strong">{t.home.tagline}</p>
-      <p className="mt-4 max-w-xl text-balance text-muted">
-        {t.home.heroIntro} <span className="text-ink">Decide</span> {t.home.heroDecideAction}{" "}
-        <span className="text-ink">Connect</span> {t.home.heroConnectParenthetical}{" "}
-        <span className="text-ink">Learn</span> {t.home.heroLearnParenthetical}{" "}
-        <span className="text-ink">Deliver</span> {t.home.heroDeliverParenthetical} {t.home.heroOutro}
-      </p>
+      <p className="mt-4 max-w-xl text-balance text-muted">{t.home.heroDescription}</p>
 
       <div className="mt-8 flex flex-col items-center gap-3">
         <Link

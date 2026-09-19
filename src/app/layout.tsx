@@ -24,9 +24,9 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "4 Tomorrow — Connect",
+  title: "4 Tomorrow",
   description:
-    "Trouve les partenaires, technologies et experts réels qui adressent les gaps de ta transformation industrielle.",
+    "4 Tomorrow — l'écosystème opérationnel connecté pour la transformation industrielle : diagnostic, partenaires, formation et exécution, un seul projet suivi de bout en bout.",
 };
 
 export const viewport: Viewport = {

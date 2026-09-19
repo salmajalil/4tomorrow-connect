@@ -47,7 +47,7 @@ const fr = {
     },
     home: {
       brandEyebrow: "4 Tomorrow",
-      tagline: "Connected operating ecosystem for industrial transformation.",
+      tagline: "De la stratégie à l'action, pour chaque dirigeant.",
       heroTitlePrefix: "Un seul projet,",
       heroTitleAccent: "quatre leviers connectés.",
       heroDescription:
@@ -666,7 +666,7 @@ const en: Dictionary = {
     },
     home: {
       brandEyebrow: "4 Tomorrow",
-      tagline: "Connected operating ecosystem for industrial transformation.",
+      tagline: "Strategy to action, for every executive.",
       heroTitlePrefix: "One project,",
       heroTitleAccent: "four connected levers.",
       heroDescription:

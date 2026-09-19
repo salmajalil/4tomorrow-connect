@@ -113,6 +113,9 @@ export function DiagnosticView({
 }) {
   const { t } = useLanguage();
   const diagnostic = t.decide.diagnostic;
+  const [showDetails, setShowDetails] = useState(false);
+  const topPriority = [...result.priorities].sort((a, b) => b.weight - a.weight)[0];
+  const topRisk = result.risks[0];
 
   return (
     <div className="flex flex-col gap-8">
@@ -133,79 +136,119 @@ export function DiagnosticView({
 
       <p className="text-base leading-relaxed text-ink">{result.maturityReading}</p>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{diagnostic.gaps}</h2>
-          <ul className="mt-2 flex flex-col gap-2">
-            {result.gaps.map((g, i) => (
-              <li key={i} className="rounded-lg border border-border bg-surface p-3 text-sm">
-                <p className="font-medium text-ink">{g.name}</p>
-                <p className="mt-1 text-muted">{g.reason}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{diagnostic.rootCauses}</h2>
-          <ul className="mt-2 flex flex-col gap-2">
-            {result.rootCauses.map((c, i) => (
-              <li key={i} className="rounded-lg border border-border bg-surface p-3 text-sm">
-                <p className="font-medium text-ink">{c.name}</p>
-                <p className="mt-1 text-muted">{c.reason}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{diagnostic.priorities}</h2>
-          <ul className="mt-2 flex flex-col gap-2">
-            {result.priorities.map((p, i) => (
-              <li key={i} className="rounded-lg border border-border bg-surface p-3 text-sm">
-                <div className="flex items-baseline justify-between gap-2">
-                  <p className="font-medium text-ink">{p.name}</p>
-                  <span className="text-xs font-semibold text-accent">{p.weight}%</span>
-                </div>
-                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
-                  <div className="h-full rounded-full bg-accent" style={{ width: `${p.weight}%` }} />
-                </div>
-                <p className="mt-1.5 text-muted">{p.reason}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{diagnostic.risks}</h2>
-          <ul className="mt-2 flex flex-col gap-2">
-            {result.risks.map((r, i) => (
-              <li key={i} className="rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm">
-                <p className="font-medium text-ink">{r.name}</p>
-                <p className="mt-1 text-muted">{r.reason}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      <div>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{diagnostic.decisionCriteria}</h2>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {result.decisionCriteria.map((c, i) => (
-            <span
-              key={i}
-              className="rounded-full border border-border bg-surface-2 px-3 py-1 text-xs font-medium text-ink"
-            >
-              {c}
-            </span>
-          ))}
-        </div>
-      </div>
-
+      {/* Key messages — always visible. The exhaustive breakdown (all gaps,
+          root causes, priorities, risks, decision criteria) sits behind the
+          "show details" toggle below, so the page opens on what matters
+          instead of a wall of cards. */}
       <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-accent-strong">
           {diagnostic.startingRecommendation}
         </h2>
         <p className="mt-2 text-sm text-ink">{result.startingRecommendation}</p>
       </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {topPriority && (
+          <div className="rounded-lg border border-border bg-surface p-3 text-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">{diagnostic.topPriority}</p>
+            <div className="mt-1.5 flex items-baseline justify-between gap-2">
+              <p className="font-medium text-ink">{topPriority.name}</p>
+              <span className="text-xs font-semibold text-accent">{topPriority.weight}%</span>
+            </div>
+            <p className="mt-1 text-muted">{topPriority.reason}</p>
+          </div>
+        )}
+        {topRisk && (
+          <div className="rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">{diagnostic.topRisk}</p>
+            <p className="mt-1.5 font-medium text-ink">{topRisk.name}</p>
+            <p className="mt-1 text-muted">{topRisk.reason}</p>
+          </div>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowDetails((v) => !v)}
+        className="flex items-center gap-1.5 self-start text-sm font-semibold text-accent hover:text-accent-strong"
+      >
+        <span aria-hidden className={`transition-transform ${showDetails ? "rotate-90" : ""}`}>
+          ›
+        </span>
+        {showDetails ? diagnostic.hideFullDiagnostic : diagnostic.showFullDiagnostic}
+      </button>
+
+      {showDetails && (
+        <div className="flex flex-col gap-8">
+          <p className="-mt-4 text-xs text-muted">{diagnostic.fullDiagnosticHint}</p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{diagnostic.gaps}</h2>
+              <ul className="mt-2 flex flex-col gap-2">
+                {result.gaps.map((g, i) => (
+                  <li key={i} className="rounded-lg border border-border bg-surface p-3 text-sm">
+                    <p className="font-medium text-ink">{g.name}</p>
+                    <p className="mt-1 text-muted">{g.reason}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{diagnostic.rootCauses}</h2>
+              <ul className="mt-2 flex flex-col gap-2">
+                {result.rootCauses.map((c, i) => (
+                  <li key={i} className="rounded-lg border border-border bg-surface p-3 text-sm">
+                    <p className="font-medium text-ink">{c.name}</p>
+                    <p className="mt-1 text-muted">{c.reason}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{diagnostic.priorities}</h2>
+              <ul className="mt-2 flex flex-col gap-2">
+                {result.priorities.map((p, i) => (
+                  <li key={i} className="rounded-lg border border-border bg-surface p-3 text-sm">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="font-medium text-ink">{p.name}</p>
+                      <span className="text-xs font-semibold text-accent">{p.weight}%</span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
+                      <div className="h-full rounded-full bg-accent" style={{ width: `${p.weight}%` }} />
+                    </div>
+                    <p className="mt-1.5 text-muted">{p.reason}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{diagnostic.risks}</h2>
+              <ul className="mt-2 flex flex-col gap-2">
+                {result.risks.map((r, i) => (
+                  <li key={i} className="rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm">
+                    <p className="font-medium text-ink">{r.name}</p>
+                    <p className="mt-1 text-muted">{r.reason}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{diagnostic.decisionCriteria}</h2>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {result.decisionCriteria.map((c, i) => (
+                <span
+                  key={i}
+                  className="rounded-full border border-border bg-surface-2 px-3 py-1 text-xs font-medium text-ink"
+                >
+                  {c}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div>
         <Eyebrow>{diagnostic.recommendedModules}</Eyebrow>

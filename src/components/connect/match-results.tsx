@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { ModelOutput, MatchOutput } from "@/lib/matching";
 import { EcosystemDiagram } from "@/components/connect/ecosystem-diagram";
 import { Eyebrow } from "@/components/eyebrow";
@@ -72,6 +73,7 @@ export function MatchResults({
 }) {
   const { t } = useLanguage();
   const results = t.connect.results;
+  const [showAllMatches, setShowAllMatches] = useState(false);
   const CATEGORY_LABELS: Record<MatchOutput["category"], string> = {
     technology: results.categoryTechnology,
     startup: results.categoryStartup,
@@ -83,6 +85,7 @@ export function MatchResults({
     category,
     matches: result.matches.filter((m) => m.category === category),
   })).filter((group) => group.matches.length > 0);
+  const totalMatches = result.matches.length;
 
   return (
     <div className="flex flex-col gap-8">
@@ -119,18 +122,51 @@ export function MatchResults({
         </div>
       </section>
 
-      <section className="flex flex-col gap-6">
+      <section className="flex flex-col gap-4">
         <Eyebrow>{results.matches}</Eyebrow>
-        {byCategory.map(({ category, matches }) => (
-          <div key={category}>
-            <h3 className="text-base font-semibold text-ink">{CATEGORY_LABELS[category]}</h3>
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {matches.map((match, i) => (
-                <MatchCard key={`${category}-${i}`} match={match} t={t} />
+
+        {!showAllMatches && (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {byCategory.map(({ category, matches }) => (
+                <span
+                  key={category}
+                  className="rounded-full border border-border bg-surface-2 px-3 py-1 text-xs font-medium text-ink"
+                >
+                  {CATEGORY_LABELS[category]} <span className="text-muted">· {matches.length}</span>
+                </span>
               ))}
             </div>
-          </div>
-        ))}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {byCategory.map(({ category, matches }) => (
+                <MatchCard key={category} match={matches[0]} t={t} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {showAllMatches &&
+          byCategory.map(({ category, matches }) => (
+            <div key={category}>
+              <h3 className="text-base font-semibold text-ink">{CATEGORY_LABELS[category]}</h3>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {matches.map((match, i) => (
+                  <MatchCard key={`${category}-${i}`} match={match} t={t} />
+                ))}
+              </div>
+            </div>
+          ))}
+
+        <button
+          type="button"
+          onClick={() => setShowAllMatches((v) => !v)}
+          className="flex items-center gap-1.5 self-start text-sm font-semibold text-accent hover:text-accent-strong"
+        >
+          <span aria-hidden className={`transition-transform ${showAllMatches ? "rotate-90" : ""}`}>
+            ›
+          </span>
+          {showAllMatches ? results.hideAllMatches : `${results.showAllMatches} (${totalMatches})`}
+        </button>
       </section>
     </div>
   );

@@ -8,8 +8,10 @@ import { Eyebrow } from "@/components/eyebrow";
 import { ExportPdfButton } from "@/components/export-pdf-button";
 import { DOMAIN_LABELS, DOMAIN_ICONS, type Domain } from "@/lib/decide";
 import { useLanguage } from "@/components/language-provider";
+import { FlameIcon, TrophyIcon, CalendarIcon, AlertIcon, ArrowRightIcon, SearchIcon } from "@/components/icons";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { ModuleName, ModuleStatusValue } from "@/types/database";
+import type { ComponentType, SVGProps } from "react";
 
 function moduleHref(module: ModuleName, transformationId: string): string | null {
   if (module === "decide") return "/decide";
@@ -108,13 +110,13 @@ function ModuleDots({
 }
 
 function BadgeButton({
-  icon,
+  Icon,
   count,
   active,
   onClick,
   tone,
 }: {
-  icon: string;
+  Icon: ComponentType<SVGProps<SVGSVGElement>>;
   count: number;
   active: boolean;
   onClick: () => void;
@@ -135,7 +137,7 @@ function BadgeButton({
       disabled={count === 0}
       className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold transition disabled:opacity-30 ${toneStyles}`}
     >
-      <span aria-hidden>{icon}</span>
+      <Icon aria-hidden className="h-4 w-4" />
       <span className="tabular-nums">{count}</span>
     </button>
   );
@@ -199,23 +201,24 @@ function ProjectCard({ project, t }: { project: ControlTowerProject; t: Dictiona
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ModuleDots moduleStatus={project.moduleStatus} moduleLabels={MODULE_LABELS} statusLabels={STATUS_LABELS} />
         <span className="flex items-center gap-1.5 text-xs text-muted">
-          <span aria-hidden>📅</span>
+          <CalendarIcon aria-hidden className="h-3.5 w-3.5" />
           {ct.target} {formatTargetDate(project.targetDate, t, language)}
         </span>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <BadgeButton icon="🔥" count={hotCount} active={panel === "hot"} onClick={() => toggle("hot")} tone="hot" />
-        <BadgeButton icon="🏆" count={winCount} active={panel === "win"} onClick={() => toggle("win")} tone="win" />
+        <BadgeButton Icon={FlameIcon} count={hotCount} active={panel === "hot"} onClick={() => toggle("hot")} tone="hot" />
+        <BadgeButton Icon={TrophyIcon} count={winCount} active={panel === "win"} onClick={() => toggle("win")} tone="win" />
         {relevantRecs.length > 0 && (
           <button
             type="button"
             onClick={() => toggle("recs")}
-            className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
               panel === "recs" ? "border-accent bg-accent/15 text-accent-strong" : "border-accent/30 bg-accent/5 text-accent-strong"
             }`}
           >
-            → {relevantRecs.length} {ct.recommendedModules}
+            <ArrowRightIcon aria-hidden className="h-4 w-4" />
+            {relevantRecs.length} {ct.recommendedModules}
           </button>
         )}
       </div>
@@ -223,8 +226,9 @@ function ProjectCard({ project, t }: { project: ControlTowerProject; t: Dictiona
       {panel === "hot" && (
         <div className="flex flex-col gap-2 border-t border-border pt-4">
           {project.pendingValidationCount > 0 && (
-            <p className="rounded-lg border border-danger/30 bg-danger/5 p-2.5 text-xs text-ink">
-              ⚠ {project.pendingValidationCount} {ct.pendingValidation}
+            <p className="flex items-center gap-1.5 rounded-lg border border-danger/30 bg-danger/5 p-2.5 text-xs text-ink">
+              <AlertIcon aria-hidden className="h-3.5 w-3.5 shrink-0" />
+              {project.pendingValidationCount} {ct.pendingValidation}
             </p>
           )}
           {project.risks.map((r) => (
@@ -291,6 +295,8 @@ export function ControlTowerView({
   const ct = t.controlTower;
   const [projects, setProjects] = useState(initialProjects);
   const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "hot" | "done">("all");
 
   const refresh = useCallback(async () => {
     const supabase = createClient();
@@ -325,6 +331,18 @@ export function ControlTowerView({
 
   const totalHot = projects.reduce((n, p) => n + p.risks.length + p.pendingValidationCount, 0);
   const totalWin = projects.reduce((n, p) => n + p.opportunities.length + p.keyMetrics.length, 0);
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredProjects = projects.filter((p) => {
+    const matchesQuery =
+      normalizedQuery === "" ||
+      p.title.toLowerCase().includes(normalizedQuery) ||
+      p.organizationName.toLowerCase().includes(normalizedQuery);
+    if (!matchesQuery) return false;
+    if (statusFilter === "hot") return p.risks.length + p.pendingValidationCount > 0;
+    if (statusFilter === "done") return MODULE_ORDER.every((m) => p.moduleStatus[m] === "done");
+    return true;
+  });
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-10">
@@ -366,11 +384,48 @@ export function ControlTowerView({
           <p className="text-sm text-muted">{ct.emptyMessage}</p>
         </div>
       ) : (
-        <div className="mt-8 flex flex-col gap-4">
-          {projects.map((p) => (
-            <ProjectCard key={p.transformationId} project={p} t={t} />
-          ))}
-        </div>
+        <>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <SearchIcon aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={ct.searchPlaceholder}
+                className="w-full rounded-lg border border-border bg-surface py-2.5 pl-9 pr-3 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+              />
+            </div>
+            <div className="flex shrink-0 gap-2">
+              {(["all", "hot", "done"] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setStatusFilter(f)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                    statusFilter === f
+                      ? "border-accent bg-accent/15 text-accent-strong"
+                      : "border-border bg-surface text-muted hover:text-ink"
+                  }`}
+                >
+                  {f === "all" ? ct.filterAll : f === "hot" ? ct.filterHot : ct.filterDone}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {filteredProjects.length === 0 ? (
+            <div className="mt-6 rounded-xl border border-dashed border-border bg-surface p-8 text-center">
+              <p className="text-sm text-muted">{ct.noResults}</p>
+            </div>
+          ) : (
+            <div className="mt-4 flex flex-col gap-4">
+              {filteredProjects.map((p) => (
+                <ProjectCard key={p.transformationId} project={p} t={t} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

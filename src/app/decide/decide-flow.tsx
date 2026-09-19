@@ -199,13 +199,24 @@ export function DecideFlow({
       <div className="mx-auto w-full max-w-4xl px-4 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <ModuleCrossLinks current="decide" transformationId={diagnostic.transformationId} />
-          <button
-            type="button"
-            onClick={startNewDiagnostic}
-            className="shrink-0 text-sm font-medium text-muted underline underline-offset-2 hover:text-accent"
-          >
-            {t.decide.diagnostic.newDiagnostic}
-          </button>
+          <div className="flex shrink-0 items-center gap-3">
+            {scenarios && (
+              <button
+                type="button"
+                onClick={() => setPhase("scenarios")}
+                className="text-sm font-medium text-muted underline underline-offset-2 hover:text-accent"
+              >
+                {t.decide.diagnostic.viewScenarios}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={startNewDiagnostic}
+              className="text-sm font-medium text-muted underline underline-offset-2 hover:text-accent"
+            >
+              {t.decide.diagnostic.newDiagnostic}
+            </button>
+          </div>
         </div>
         <DiagnosticView result={diagnostic} onGenerateScenarios={runScenarios} generating={false} />
       </div>
@@ -235,13 +246,22 @@ export function DecideFlow({
       <div className="mx-auto w-full max-w-4xl px-4 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <ModuleCrossLinks current="decide" transformationId={diagnostic.transformationId} />
-          <button
-            type="button"
-            onClick={startNewDiagnostic}
-            className="shrink-0 text-sm font-medium text-muted underline underline-offset-2 hover:text-accent"
-          >
-            {t.decide.diagnostic.newDiagnostic}
-          </button>
+          <div className="flex shrink-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setPhase("diagnostic")}
+              className="text-sm font-medium text-muted underline underline-offset-2 hover:text-accent"
+            >
+              {t.decide.scenarios.backToDiagnostic}
+            </button>
+            <button
+              type="button"
+              onClick={startNewDiagnostic}
+              className="text-sm font-medium text-muted underline underline-offset-2 hover:text-accent"
+            >
+              {t.decide.diagnostic.newDiagnostic}
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-start justify-between gap-3">

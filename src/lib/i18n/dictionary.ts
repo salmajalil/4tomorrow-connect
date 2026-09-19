@@ -174,6 +174,7 @@ const fr = {
         hideFullDiagnostic: "Masquer le détail",
         fullDiagnosticHint: "Gaps, causes racines, toutes les priorités, tous les risques, critères de décision.",
         newDiagnostic: "+ Nouveau diagnostic",
+        viewScenarios: "→ Voir les scénarios",
       },
       scenarios: {
         eyebrow: "Scénarios stratégiques",
@@ -183,6 +184,7 @@ const fr = {
         loadingLabel: "Construction des 3 scénarios...",
         loadingHint: "Recherche de fournisseurs et régulations réels — ça peut prendre 1 à 2 minutes.",
         backToScenarios: "← Retour aux scénarios",
+        backToDiagnostic: "← Retour au diagnostic",
         seeFullDetail: "Voir le détail complet →",
         chosen: "Scénario choisi ✓",
         chooseThis: "Choisir ce scénario",
@@ -820,6 +822,7 @@ const en: Dictionary = {
         hideFullDiagnostic: "Hide details",
         fullDiagnosticHint: "Gaps, root causes, all priorities, all risks, decision criteria.",
         newDiagnostic: "+ New diagnostic",
+        viewScenarios: "→ View scenarios",
       },
       scenarios: {
         eyebrow: "Strategic scenarios",
@@ -829,6 +832,7 @@ const en: Dictionary = {
         loadingLabel: "Building the 3 scenarios...",
         loadingHint: "Researching real suppliers and regulations — this can take 1 to 2 minutes.",
         backToScenarios: "← Back to scenarios",
+        backToDiagnostic: "← Back to diagnostic",
         seeFullDetail: "See full detail →",
         chosen: "Scenario chosen ✓",
         chooseThis: "Choose this scenario",

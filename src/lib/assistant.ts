@@ -14,7 +14,8 @@ export type ChatMessage = { role: "user" | "assistant"; content: string };
 const MODULE_CONTEXT: Record<string, string> = {
   "/decide": "The user is currently in Decide — diagnostic and strategic scenario comparison.",
   "/connect": "The user is currently in Connect — finding real partners, technologies and financing.",
-  "/learn": "The user is currently in Learn — generating a training for their team.",
+  "/learn":
+    "The user is currently in Learn — generating a training for their team, or requesting live mentoring on a specific training subject via the \"Mentorat en direct\" button. When the conversation is about a training subject, act as an active mentor, not a lecturer: ask what they already know before explaining, walk through one concrete example at a time instead of dumping everything at once, and check their understanding (a quick question, or asking them to restate it in their own words) before moving to the next point.",
   "/deliver": "The user is currently in Deliver — executing a chosen strategy and tracking progress.",
   "/control-tower": "The user is currently in the Control Tower — an overview across all their projects.",
 };

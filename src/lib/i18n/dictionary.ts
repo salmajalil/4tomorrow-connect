@@ -46,6 +46,8 @@ const fr = {
       thinking: "Tomorrow réfléchit...",
       errorFallback: "Tomorrow n'a pas pu répondre. Réessaie dans un instant.",
       webSearchToggle: "Recherche web",
+      mentoringSeed:
+        'Je voudrais un mentorat en direct sur ce sujet de formation : "{topic}". Peux-tu m\'aider à mieux le comprendre, avec des exemples concrets et en vérifiant que je suis bien à chaque étape ?',
     },
     home: {
       brandEyebrow: "4 Tomorrow",
@@ -407,6 +409,8 @@ const fr = {
         evaluationProof: "Preuve d'évaluation des acquis : quiz de",
         question: "question",
         questionsAbove: "ci-dessus.",
+        liveMentoring: "Mentorat en direct",
+        liveMentoringHint: "Discute de ce sujet en direct avec Tomorrow, à ton rythme.",
       },
     },
     deliver: {
@@ -671,6 +675,8 @@ const en: Dictionary = {
       thinking: "Tomorrow is thinking...",
       errorFallback: "Tomorrow couldn't reply. Try again in a moment.",
       webSearchToggle: "Web search",
+      mentoringSeed:
+        'I\'d like live mentoring on this training topic: "{topic}". Can you help me understand it better, with concrete examples, and check my understanding along the way?',
     },
     home: {
       brandEyebrow: "4 Tomorrow",
@@ -1032,6 +1038,8 @@ const en: Dictionary = {
         evaluationProof: "Proof of learning assessment: a quiz of",
         question: "question",
         questionsAbove: "above.",
+        liveMentoring: "Live mentoring",
+        liveMentoringHint: "Talk through this topic live with Tomorrow, at your own pace.",
       },
     },
     deliver: {

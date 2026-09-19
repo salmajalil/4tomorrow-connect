@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useLanguage } from "@/components/language-provider";
+import { useTomorrowController } from "@/components/assistant/tomorrow-context";
 import { SearchIcon } from "@/components/icons";
 import type { ChatMessage } from "@/lib/assistant";
 
@@ -12,7 +13,7 @@ import type { ChatMessage } from "@/lib/assistant";
 export function TomorrowChat() {
   const { t } = useLanguage();
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const { open, setOpen, pendingTopic, consumePendingTopic } = useTomorrowController();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
@@ -26,9 +27,7 @@ export function TomorrowChat() {
     }
   }, [open, messages, pending]);
 
-  async function sendMessage(e: FormEvent) {
-    e.preventDefault();
-    const text = input.trim();
+  async function sendMessage(text: string) {
     if (!text || pending) return;
 
     const nextMessages: ChatMessage[] = [...messages, { role: "user", content: text }];
@@ -52,6 +51,18 @@ export function TomorrowChat() {
       setPending(false);
     }
   }
+
+  // A "Mentorat en direct" button elsewhere in the app (see Learn's
+  // TrainingView) sets pendingTopic and opens the chat — pick it up here
+  // and kick off the conversation as a real first user message.
+  useEffect(() => {
+    if (!open || !pendingTopic) return;
+    const topic = consumePendingTopic();
+    if (!topic) return;
+    const timer = setTimeout(() => sendMessage(t.assistant.mentoringSeed.replace("{topic}", topic)), 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, pendingTopic]);
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end sm:bottom-6 sm:right-6">
@@ -101,7 +112,13 @@ export function TomorrowChat() {
             </button>
           </div>
 
-          <form onSubmit={sendMessage} className="flex items-center gap-2 bg-surface-2 p-3 pt-2">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              sendMessage(input.trim());
+            }}
+            className="flex items-center gap-2 bg-surface-2 p-3 pt-2"
+          >
             <input
               type="text"
               value={input}
@@ -123,7 +140,7 @@ export function TomorrowChat() {
 
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(!open)}
         aria-label={t.assistant.openLabel}
         className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-ink shadow-[0_0_30px_-6px_var(--accent)] transition hover:bg-accent-strong"
       >

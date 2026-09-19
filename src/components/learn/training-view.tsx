@@ -5,6 +5,7 @@ import { Eyebrow } from "@/components/eyebrow";
 import { ExportPdfButton } from "@/components/export-pdf-button";
 import { DOMAIN_LABELS, DOMAIN_ICONS, type Domain } from "@/lib/learn";
 import { useLanguage } from "@/components/language-provider";
+import { useTomorrowController } from "@/components/assistant/tomorrow-context";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Training } from "@/types/database";
 
@@ -57,6 +58,19 @@ function Flashcard({
           {tapToReveal}
         </span>
       )}
+    </button>
+  );
+}
+
+function MentoringButton({ topic, label }: { topic: string; label: string }) {
+  const { requestMentoring } = useTomorrowController();
+  return (
+    <button
+      type="button"
+      onClick={() => requestMentoring(topic)}
+      className="flex shrink-0 items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent-strong transition hover:bg-accent/20"
+    >
+      💬 {label}
     </button>
   );
 }
@@ -189,12 +203,13 @@ export function TrainingView({ training }: { training: Training }) {
             </span>
           )}
         </div>
-        <div>
+        <div className="flex flex-wrap items-center gap-2">
           <ExportPdfButton
             kind="learn"
             payload={{ training }}
             filename={`4tomorrow-learn-${training.id}.pdf`}
           />
+          <MentoringButton topic={training.topic} label={tr.liveMentoring} />
         </div>
       </div>
 
@@ -249,9 +264,12 @@ export function TrainingView({ training }: { training: Training }) {
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-accent text-xs font-semibold text-accent-strong">
                     {String(i + 1).padStart(2, "0")}
                   </span>
-                  <div>
+                  <div className="flex-1">
                     <p className="text-ink">{insight.text}</p>
                     {insight.source && <p className="mt-1 text-xs text-muted">{tr.source} {insight.source}</p>}
+                    <div className="mt-2">
+                      <MentoringButton topic={insight.text} label={tr.liveMentoring} />
+                    </div>
                   </div>
                 </div>
               ))}

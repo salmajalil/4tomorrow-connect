@@ -4,6 +4,7 @@ import "./globals.css";
 import { Nav } from "@/components/nav";
 import { LanguageProvider } from "@/components/language-provider";
 import { TomorrowChat } from "@/components/assistant/tomorrow-chat";
+import { TomorrowProvider } from "@/components/assistant/tomorrow-context";
 import { getLanguage } from "@/lib/i18n/language";
 
 const geistSans = Geist({
@@ -43,9 +44,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="flex min-h-full flex-col bg-bg text-ink">
         <LanguageProvider initialLanguage={language}>
-          <Nav />
-          <main className="flex flex-1 flex-col">{children}</main>
-          <TomorrowChat />
+          <TomorrowProvider>
+            <Nav />
+            <main className="flex flex-1 flex-col">{children}</main>
+            <TomorrowChat />
+          </TomorrowProvider>
         </LanguageProvider>
       </body>
     </html>

@@ -87,8 +87,10 @@ export function DecideReportDocument({
               <Text style={pdfStyles.h3}>Stack / solutions</Text>
               {s.techStack.map((t, ti) => (
                 <Card key={ti}>
-                  <Text style={pdfStyles.h3}>
-                    {t.name} — {t.maturityScale ?? ""} {t.maturity}
+                  <Text style={pdfStyles.h3}>{t.name}</Text>
+                  <Text style={pdfStyles.muted}>
+                    Maturité : {t.maturity}
+                    {t.maturityScale ? ` (${t.maturityScale})` : ""}
                   </Text>
                   <Paragraph>{t.detail}</Paragraph>
                   <Text style={pdfStyles.muted}>Bénéfice : {t.benefit}</Text>

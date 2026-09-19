@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getLanguage } from "@/lib/i18n/language";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { LearnFlow } from "./learn-flow";
+import type { Training } from "@/types/database";
 
 export default async function LearnPage({
   searchParams,
@@ -49,5 +50,26 @@ export default async function LearnPage({
       ? requestedTransformationId
       : null;
 
-  return <LearnFlow existingProjects={existingProjects} initialTransformationId={initialTransformationId} />;
+  // If this project already has a generated training, show it directly
+  // instead of making the user regenerate it — same "remember input and
+  // output" fix as Decide.
+  let initialTraining: Training | null = null;
+  if (initialTransformationId) {
+    const { data } = await supabase
+      .from("trainings")
+      .select("*")
+      .eq("transformation_id", initialTransformationId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    initialTraining = data ?? null;
+  }
+
+  return (
+    <LearnFlow
+      existingProjects={existingProjects}
+      initialTransformationId={initialTransformationId}
+      initialTraining={initialTraining}
+    />
+  );
 }

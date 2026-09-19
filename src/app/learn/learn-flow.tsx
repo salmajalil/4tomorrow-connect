@@ -42,15 +42,17 @@ function ErrorBlock({ message, onRetry, retryLabel }: { message: string; onRetry
 export function LearnFlow({
   existingProjects,
   initialTransformationId,
+  initialTraining = null,
 }: {
   existingProjects: { id: string; title: string }[];
   initialTransformationId: string | null;
+  initialTraining?: Training | null;
 }) {
   const { t } = useLanguage();
-  const [phase, setPhase] = useState<Phase>("intake");
+  const [phase, setPhase] = useState<Phase>(initialTraining ? "result" : "intake");
   const [error, setError] = useState("");
   const [lastIntake, setLastIntake] = useState<LearnIntakeState | null>(null);
-  const [training, setTraining] = useState<Training | null>(null);
+  const [training, setTraining] = useState<Training | null>(initialTraining);
   const [activeTransformationId, setActiveTransformationId] = useState<string | null>(initialTransformationId);
 
   async function runGenerate(intake: LearnIntakeState) {

@@ -58,8 +58,10 @@ The block must be the last thing in your response, with valid JSON (no trailing 
 
 // ---------------------------------------------------------------------------
 // Stage 1 — Diagnostic: domain detection, maturity, gaps/priorities/risks,
-// and module recommendations. No web_search — pure reasoning over the
-// intake, kept fast and reliable.
+// and module recommendations. web_search is opt-in (see webSearchEnabled
+// below) — off by default to keep the common case fast and reliable, on
+// when the user explicitly asks to enrich the diagnostic with real info
+// about their organization.
 // ---------------------------------------------------------------------------
 
 export interface DiagnosticInput {
@@ -95,10 +97,14 @@ const diagnosticSchema = z.object({
 
 export type DiagnosticOutput = z.infer<typeof diagnosticSchema>;
 
-export function buildDiagnosticSystemPrompt(language: Language): string {
+export function buildDiagnosticSystemPrompt(language: Language, webSearchEnabled: boolean): string {
   return `You are the diagnostic engine for "4 Tomorrow / Decide", a strategic transformation advisory platform used by industrial and business decision-makers.
 
-STEP 0 — DOMAIN DETECTION (internal reasoning, drives everything below, never shown to the user as a menu):
+${
+  webSearchEnabled
+    ? `You have a web_search tool (max 3 uses). Before analyzing, search for the organization named in the intake (combined with its stated industry, if given) to find real, verifiable context — sector, size, recent news, sustainability posture, financial or market signals. Use what you find to sharpen the maturity reading, gaps, and priorities below with specifics the user didn't type themselves. If the organization can't be found, or the name is too generic/ambiguous to search meaningfully, proceed with only what the user provided — never invent facts about a company you couldn't verify. Spend at most one extra search round; don't let this become the bulk of your reasoning time.\n\n`
+    : ""
+}STEP 0 — DOMAIN DETECTION (internal reasoning, drives everything below, never shown to the user as a menu):
 Classify the challenge into one or more of these domains based on signals in the intake:
 - manufacturing: production lines, capacity, yield, plus supply chain end-to-end — sourcing, supplier dependency/concentration, lead times, inventory, logistics/transport, multi-tier traceability
 - rd: innovation, prototypes, research, patents, emerging technology
@@ -111,7 +117,7 @@ CORE RULE — NEVER GENERIC: every sentence you write must contain something tha
 
 Produce:
 1. domains: the detected domain(s) from the list above.
-2. maturityReading: one paragraph reading of the organization's current maturity on this challenge, grounded in what they actually said.
+2. maturityReading: one paragraph reading of the organization's current maturity on this challenge, grounded in what they actually said${webSearchEnabled ? " and in anything verified via web search" : ""}.
 3. gaps: up to 3 concrete gaps (missing capability, resource, or knowledge) — WHAT is missing, each tied to something specific in the intake.
 4. rootCauses: up to 4 root causes — WHY those gaps exist (a structural, organizational, or technical reason behind the symptom), distinct from the gaps themselves. Never restate a gap under a different name — a root cause explains it.
 5. decisionCriteria: 2 to 5 criteria that should drive evaluating the strategic options later (e.g. "temps avant retour sur investissement", "% de réduction CO2", "risque d'arrêt de production pendant le déploiement" for an industrial subject; "taux de dépendance à un fournisseur unique", "délai d'approvisionnement", "visibilité multi-niveaux fournisseurs" for a supply-chain/manufacturing subject; "délai de mise sur le marché", "impact sur la rétention client" for a commercial/digital one) — adapt entirely to the subject, never a fixed list.

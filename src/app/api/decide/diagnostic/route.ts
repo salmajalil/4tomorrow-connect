@@ -8,15 +8,15 @@ import {
   buildDiagnosticUserPrompt,
   parseDiagnosticOutput,
   DecideParseError,
-  type DiagnosticInput,
 } from "@/lib/decide";
 import { setModuleStatus } from "@/lib/module-status";
 import { getLanguage } from "@/lib/i18n/language";
 import type { RecommendableModule } from "@/types/database";
 
-// No web_search in this call — pure reasoning, so a generous ceiling here
-// is just a safety net, not an expected duration.
-export const maxDuration = 60;
+// web_search is opt-in (enrichWithWebSearch) — the ceiling is sized for
+// that path (one search round), even though the default no-search path
+// finishes in a few seconds.
+export const maxDuration = 120;
 
 const requestSchema = z.object({
   organization: z.string().trim().default(""),
@@ -26,6 +26,7 @@ const requestSchema = z.object({
   constraints: z.string().trim().default(""),
   regulations: z.string().trim().default(""),
   uploadedDocText: z.string().trim().default(""),
+  enrichWithWebSearch: z.boolean().default(false),
 });
 
 export async function POST(request: Request) {
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: DiagnosticInput;
+  let body: z.infer<typeof requestSchema>;
   try {
     const json = await request.json();
     body = requestSchema.parse(json);
@@ -71,8 +72,11 @@ export async function POST(request: Request) {
       // priorities just added the same kind of extra JSON content that
       // truncated the scenarios/roadmap responses at their original budgets.
       max_tokens: 4000,
-      system: buildDiagnosticSystemPrompt(language),
+      system: buildDiagnosticSystemPrompt(language, body.enrichWithWebSearch),
       messages: [{ role: "user", content: buildDiagnosticUserPrompt(body) }],
+      ...(body.enrichWithWebSearch
+        ? { tools: [{ type: "web_search_20260318" as const, name: "web_search" as const, max_uses: 3 }] }
+        : {}),
     });
   } catch (err) {
     if (err instanceof Anthropic.APIError) {

@@ -5,11 +5,11 @@ import { getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
 import { buildAssistantSystemPrompt, type ChatMessage } from "@/lib/assistant";
 import { getLanguage } from "@/lib/i18n/language";
 
-// Tomorrow's chat — deliberately cheap and fast: no web_search, modest
-// max_tokens, no database reads. It's a conversational guide, not a
-// generation engine, so it doesn't need the longer budgets the module
-// generation routes use.
-export const maxDuration = 30;
+// Tomorrow's chat — still lightweight (no database reads), but now has
+// web_search for real-world lookups (see buildAssistantSystemPrompt), so
+// the ceiling has to cover an occasional search round, not just a plain
+// completion.
+export const maxDuration = 60;
 
 const requestSchema = z.object({
   messages: z
@@ -34,9 +34,10 @@ export async function POST(request: Request) {
   try {
     response = await anthropic.messages.create({
       model: MATCHING_MODEL,
-      max_tokens: 600,
+      max_tokens: 800,
       system: buildAssistantSystemPrompt(language, body.pathname),
       messages: body.messages.map((m): ChatMessage => ({ role: m.role, content: m.content })),
+      tools: [{ type: "web_search_20260318", name: "web_search", max_uses: 2 }],
     });
   } catch (err) {
     if (err instanceof Anthropic.APIError) {

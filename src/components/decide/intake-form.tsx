@@ -27,6 +27,7 @@ export interface IntakeState {
   urgency: Urgency;
   horizonYears: number;
   organizationSize: OrganizationSize;
+  enrichWithWebSearch: boolean;
 }
 
 // Folded into the free-text "constraints" sent to the diagnostic/scenario
@@ -83,6 +84,7 @@ export function IntakeForm({
     urgency: "planned",
     horizonYears: 3,
     organizationSize: "medium",
+    enrichWithWebSearch: false,
   });
   const [uploadError, setUploadError] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -164,6 +166,19 @@ export function IntakeForm({
           />
         </label>
       </div>
+
+      <label className="flex items-start gap-2.5 rounded-lg border border-border bg-surface p-3 text-sm">
+        <input
+          type="checkbox"
+          checked={state.enrichWithWebSearch}
+          onChange={(e) => setState((s) => ({ ...s, enrichWithWebSearch: e.target.checked }))}
+          className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
+        />
+        <span>
+          <span className="font-medium text-ink">{intake.enrichWebSearch}</span>
+          <span className="block text-xs text-muted">{intake.enrichWebSearchHint}</span>
+        </span>
+      </label>
 
       <label className="flex flex-col gap-1.5 text-sm">
         <span className="font-medium text-ink">{intake.challenges}</span>

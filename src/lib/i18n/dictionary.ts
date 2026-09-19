@@ -99,6 +99,9 @@ const fr = {
         organizationPlaceholder: "Nom de ton organisation",
         industry: "Industrie",
         industryPlaceholder: "Ex : Manufacturing, SaaS, Énergie...",
+        enrichWebSearch: "Enrichir avec une recherche web sur l'organisation",
+        enrichWebSearchHint:
+          "4 Tomorrow cherche des infos réelles et vérifiables sur l'organisation (secteur, taille, actualité) pour affiner le diagnostic. Ajoute quelques secondes au temps de génération.",
         challenges: "Défis",
         challengesPlaceholder:
           "Ex : On veut digitaliser notre suivi de production, aujourd'hui géré sur Excel par 3 personnes à temps plein. Erreurs fréquentes de saisie, pas de visibilité temps réel pour la direction. Contrainte : l'ERP actuel a 12 ans et personne en interne ne sait le modifier.",
@@ -718,6 +721,9 @@ const en: Dictionary = {
         organizationPlaceholder: "Your organization's name",
         industry: "Industry",
         industryPlaceholder: "E.g.: Manufacturing, SaaS, Energy...",
+        enrichWebSearch: "Enrich with a web search on the organization",
+        enrichWebSearchHint:
+          "4 Tomorrow looks up real, verifiable info about the organization (sector, size, recent news) to sharpen the diagnostic. Adds a few seconds to generation time.",
         challenges: "Challenges",
         challengesPlaceholder:
           "E.g.: We want to digitalize our production tracking, currently managed in Excel by 3 full-time people. Frequent data-entry errors, no real-time visibility for management. Constraint: the current ERP is 12 years old and no one internally knows how to modify it.",

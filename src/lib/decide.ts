@@ -14,11 +14,21 @@ export const DOMAINS = ["manufacturing", "rd", "gtm", "strategy", "digitalizatio
 export type Domain = (typeof DOMAINS)[number];
 
 export const DOMAIN_LABELS: Record<Domain, string> = {
-  manufacturing: "Manufacturing / Production",
+  manufacturing: "Supply Chain & Manufacturing",
   rd: "R&D",
   gtm: "Commercialisation / Go-to-market",
   strategy: "Stratégie",
   digitalization: "Digitalisation",
+};
+
+// Small scannability aid shown next to every domain chip across the app
+// (Decide, Learn, Deliver, Control Tower) — purely visual, no copy change.
+export const DOMAIN_ICONS: Record<Domain, string> = {
+  manufacturing: "🚚",
+  rd: "🔬",
+  gtm: "📈",
+  strategy: "🧭",
+  digitalization: "💻",
 };
 
 const RESULT_START = "<RESULT_JSON>";
@@ -90,7 +100,7 @@ export function buildDiagnosticSystemPrompt(language: Language): string {
 
 STEP 0 — DOMAIN DETECTION (internal reasoning, drives everything below, never shown to the user as a menu):
 Classify the challenge into one or more of these domains based on signals in the intake:
-- manufacturing: production lines, capacity, yield, physical supply chain
+- manufacturing: production lines, capacity, yield, plus supply chain end-to-end — sourcing, supplier dependency/concentration, lead times, inventory, logistics/transport, multi-tier traceability
 - rd: innovation, prototypes, research, patents, emerging technology
 - gtm: launch, market, customers, distribution, sales
 - strategy: positioning, trade-offs, resource allocation, executive committee decisions
@@ -104,7 +114,7 @@ Produce:
 2. maturityReading: one paragraph reading of the organization's current maturity on this challenge, grounded in what they actually said.
 3. gaps: up to 3 concrete gaps (missing capability, resource, or knowledge) — WHAT is missing, each tied to something specific in the intake.
 4. rootCauses: up to 4 root causes — WHY those gaps exist (a structural, organizational, or technical reason behind the symptom), distinct from the gaps themselves. Never restate a gap under a different name — a root cause explains it.
-5. decisionCriteria: 2 to 5 criteria that should drive evaluating the strategic options later (e.g. "temps avant retour sur investissement", "% de réduction CO2", "risque d'arrêt de production pendant le déploiement" for an industrial subject; "délai de mise sur le marché", "impact sur la rétention client" for a commercial/digital one) — adapt entirely to the subject, never a fixed list.
+5. decisionCriteria: 2 to 5 criteria that should drive evaluating the strategic options later (e.g. "temps avant retour sur investissement", "% de réduction CO2", "risque d'arrêt de production pendant le déploiement" for an industrial subject; "taux de dépendance à un fournisseur unique", "délai d'approvisionnement", "visibilité multi-niveaux fournisseurs" for a supply-chain/manufacturing subject; "délai de mise sur le marché", "impact sur la rétention client" for a commercial/digital one) — adapt entirely to the subject, never a fixed list.
 6. priorities: up to 4 priorities — what matters most to address first, and why, specific to this challenge. Each carries a "weight" (0-100) reflecting its relative importance; weights across all returned priorities must sum to 100.
 7. risks: up to 3 cross-cutting risks (not yet tied to any specific strategic option).
 8. startingRecommendation: one paragraph — where to start, concretely.
@@ -281,8 +291,8 @@ ${registryBlock}
 You have a web_search tool (max 2 uses). Use it efficiently — batch what you need, then finalize. You are working under a hard time budget; a complete, on-time answer beats an exhaustive but late one.
 
 PRINCIPE DIRECTEUR — everything adapts to the actual subject, nothing is templated:
-- Choose scenario postures that fit the detected domain(s) — e.g. for digitalization: deployment speed vs integration depth vs legacy resilience; for go-to-market: fast penetration vs brand-building vs distribution partnerships; for product development: build vs partner vs acquire; for technical modernization: full replacement vs progressive migration vs hybrid; for heavy industrial transformation: operational efficiency vs technology balance vs environmental leadership. Pick whichever framing actually fits this challenge — never force a "cost vs CO2 vs physical tech" frame on a non-industrial subject.
-- indicators: choose the KPIs that make sense for this type of challenge (e.g. cost delta, CO2 reduction, ROI in years for an industrial/physical transformation; cost delta, time-to-market, ROI in months, acquisition/retention impact for a digital, product, or commercial one). Never force the same three metrics onto every subject. Every indicator needs an honest "confidence": "verified" ONLY if you found this specific number via web search with a source; "estimate" if it's your best professional reasoning from the intake with no source (this is the common case — say so, don't dress it up as fact); "unknown" — with value set to null, never a plausible-looking number — when you genuinely cannot ground even a rough estimate. A wall of confident-looking numbers with no basis is a credibility risk for whoever acts on this; an honest "estimate" or "unknown" is not a weaker answer.
+- Choose scenario postures that fit the detected domain(s) — e.g. for digitalization: deployment speed vs integration depth vs legacy resilience; for go-to-market: fast penetration vs brand-building vs distribution partnerships; for product development: build vs partner vs acquire; for technical modernization: full replacement vs progressive migration vs hybrid; for heavy industrial transformation: operational efficiency vs technology balance vs environmental leadership; for supply chain & manufacturing: single-sourcing vs dual/multi-sourcing vs vertical integration, or nearshoring vs offshoring resilience trade-offs. Pick whichever framing actually fits this challenge — never force a "cost vs CO2 vs physical tech" frame on a non-industrial subject.
+- indicators: choose the KPIs that make sense for this type of challenge (e.g. cost delta, CO2 reduction, ROI in years for an industrial/physical transformation; lead time reduction, supplier dependency ratio, inventory turnover for a supply-chain/manufacturing one; cost delta, time-to-market, ROI in months, acquisition/retention impact for a digital, product, or commercial one). Never force the same three metrics onto every subject. Every indicator needs an honest "confidence": "verified" ONLY if you found this specific number via web search with a source; "estimate" if it's your best professional reasoning from the intake with no source (this is the common case — say so, don't dress it up as fact); "unknown" — with value set to null, never a plausible-looking number — when you genuinely cannot ground even a rough estimate. A wall of confident-looking numbers with no basis is a credibility risk for whoever acts on this; an honest "estimate" or "unknown" is not a weaker answer.
 - techStack: up to 4 elements — physical technologies, software components, distribution channels, or skills to acquire, whichever fits the scenario. maturityScale must itself be adapted: "TRL 1-9" only for a physical or mature technology; "validated / pilot / hypothesis" for a commercial or organizational approach; another scale if that fits better. Always state in "detail" whether the maturity level comes from a verified source or is an estimate — never imply a false precision.
 - suppliers: the type of actor searched for (technical supplier, distributor, marketing partner, integrator, investor...) must be determined by the nature of THIS scenario, not fixed in advance. Every supplier must be a real, specific, verifiable organization or named person — NEVER something generic. Only include website/contactEmail when reasonably confident it is real; omit rather than invent.
 - regulations: search for and list only regulations/certifications/standards actually relevant to this specific subject and found with a source — industrial/safety standards for a physical subject, sectoral regulation (GDPR, financial compliance, etc.) for a digital or product subject, market standards for a commercialization subject. Never invent a reference; if none found, return an empty array.

@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { DOMAINS, DOMAIN_LABELS, type Domain } from "@/lib/decide";
+import { DOMAINS, DOMAIN_LABELS, DOMAIN_ICONS, type Domain } from "@/lib/decide";
 import type { Language } from "@/types/database";
 
-export { DOMAINS, DOMAIN_LABELS };
+export { DOMAINS, DOMAIN_LABELS, DOMAIN_ICONS };
 export type { Domain };
 
 function languageInstruction(language: Language): string {

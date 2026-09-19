@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Eyebrow } from "@/components/eyebrow";
 import { createClient } from "@/lib/supabase/client";
-import { DOMAIN_LABELS, type Domain } from "@/lib/decide";
+import { DOMAIN_LABELS, DOMAIN_ICONS, type Domain } from "@/lib/decide";
 import { useLanguage } from "@/components/language-provider";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { ModuleRelevance, RecommendableModule } from "@/types/database";
@@ -125,7 +125,7 @@ export function DiagnosticView({
               key={d}
               className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent-strong"
             >
-              {DOMAIN_LABELS[d]}
+              <span aria-hidden>{DOMAIN_ICONS[d]}</span> {DOMAIN_LABELS[d]}
             </span>
           ))}
         </div>

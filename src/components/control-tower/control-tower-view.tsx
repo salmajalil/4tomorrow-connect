@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { fetchControlTowerProjects, MODULE_ORDER, type ControlTowerProject } from "@/lib/control-tower";
 import { Eyebrow } from "@/components/eyebrow";
 import { ExportPdfButton } from "@/components/export-pdf-button";
-import { DOMAIN_LABELS, type Domain } from "@/lib/decide";
+import { DOMAIN_LABELS, DOMAIN_ICONS, type Domain } from "@/lib/decide";
 import { useLanguage } from "@/components/language-provider";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { ModuleName, ModuleStatusValue } from "@/types/database";
@@ -187,7 +187,7 @@ function ProjectCard({ project, t }: { project: ControlTowerProject; t: Dictiona
             <div className="mt-2 flex flex-wrap gap-1.5">
               {domains.map((d) => (
                 <span key={d} className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[10px] text-muted">
-                  {DOMAIN_LABELS[d] ?? d}
+                  <span aria-hidden>{DOMAIN_ICONS[d]}</span> {DOMAIN_LABELS[d] ?? d}
                 </span>
               ))}
             </div>

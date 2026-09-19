@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Eyebrow } from "@/components/eyebrow";
 import { ExportPdfButton } from "@/components/export-pdf-button";
-import { DOMAIN_LABELS, type Domain } from "@/lib/learn";
+import { DOMAIN_LABELS, DOMAIN_ICONS, type Domain } from "@/lib/learn";
 import { useLanguage } from "@/components/language-provider";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Training } from "@/types/database";
@@ -175,7 +175,7 @@ export function TrainingView({ training }: { training: Training }) {
         <div className="flex flex-wrap items-center gap-2">
           {domains.map((d) => (
             <span key={d} className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent-strong">
-              {DOMAIN_LABELS[d] ?? d}
+              <span aria-hidden>{DOMAIN_ICONS[d]}</span> {DOMAIN_LABELS[d] ?? d}
             </span>
           ))}
           {training.duration_minutes && (

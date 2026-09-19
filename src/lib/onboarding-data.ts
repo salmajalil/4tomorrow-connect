@@ -24,6 +24,7 @@ export const INDUSTRIES: IndustryOption[] = [
 // on the step extends this list per-session.
 export const PARTNER_TYPES: string[] = [
   "Suppliers",
+  "Logistics Providers",
   "Experts",
   "Investors",
   "Distributors",

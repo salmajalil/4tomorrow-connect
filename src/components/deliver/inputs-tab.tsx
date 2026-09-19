@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { extractFileText } from "@/lib/extract-file-text";
-import { DOMAIN_LABELS, type Domain } from "@/lib/decide";
+import { DOMAIN_LABELS, DOMAIN_ICONS, type Domain } from "@/lib/decide";
 import { useLanguage } from "@/components/language-provider";
 
 function StatusBadge({ done, doneLabel, todoLabel }: { done: boolean; doneLabel: string; todoLabel: string }) {
@@ -151,7 +151,7 @@ export function InputsTab({
                 key={d}
                 className="rounded-full border border-accent/40 bg-accent/10 px-2.5 py-0.5 text-xs font-semibold text-accent-strong"
               >
-                {DOMAIN_LABELS[d]}
+                <span aria-hidden>{DOMAIN_ICONS[d]}</span> {DOMAIN_LABELS[d]}
               </span>
             ))}
           </div>

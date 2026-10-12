@@ -65,7 +65,7 @@ export function TomorrowChat() {
   }, [open, pendingTopic]);
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end sm:bottom-6 sm:right-6">
+    <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 z-50 flex flex-col items-end md:bottom-6 md:right-6">
       {open && (
         <div className="mb-3 flex h-[28rem] w-[calc(100vw-2rem)] max-w-sm flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl">
           <div className="flex items-center justify-between border-b border-border bg-surface-2 px-4 py-3">
@@ -93,7 +93,7 @@ export function TomorrowChat() {
             {pending && (
               <p className="text-xs italic text-muted">{t.assistant.thinking}</p>
             )}
-            {error && <p className="text-xs text-red-400">{error}</p>}
+            {error && <p className="text-xs text-danger">{error}</p>}
           </div>
 
           <div className="border-t border-border bg-surface-2 px-3 pt-2.5">
@@ -142,7 +142,7 @@ export function TomorrowChat() {
         type="button"
         onClick={() => setOpen(!open)}
         aria-label={t.assistant.openLabel}
-        className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-ink shadow-[0_0_30px_-6px_var(--accent)] transition hover:bg-accent-strong"
+        className="flex h-12 w-12 items-center justify-center rounded-full border border-accent/60 bg-surface-2 text-accent-strong shadow-[0_8px_24px_-8px_rgba(0,0,0,0.8)] transition hover:bg-accent hover:text-accent-ink md:h-14 md:w-14"
       >
         {open ? (
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-6 w-6">

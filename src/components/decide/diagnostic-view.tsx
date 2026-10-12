@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@/components/icons";
 import { useState } from "react";
 import Link from "next/link";
 import { Eyebrow } from "@/components/eyebrow";
@@ -128,7 +129,7 @@ export function DiagnosticView({
               key={d}
               className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent-strong"
             >
-              <span aria-hidden>{DOMAIN_ICONS[d]}</span> {DOMAIN_LABELS[d]}
+              <Icon name={DOMAIN_ICONS[d]} className="inline h-3.5 w-3.5 align-[-2px]" /> {DOMAIN_LABELS[d]}
             </span>
           ))}
         </div>

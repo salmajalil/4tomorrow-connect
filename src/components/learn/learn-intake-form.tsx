@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon, type IconName } from "@/components/icons";
 import { useRef, useState } from "react";
 import { Eyebrow } from "@/components/eyebrow";
 import { extractFileText } from "@/lib/extract-file-text";
@@ -20,15 +21,15 @@ export interface LearnIntakeState {
 
 function modeOptions(intake: Dictionary["learn"]["intake"]): {
   id: TrainingMode;
-  icon: string;
+  icon: IconName;
   label: string;
   description: string;
 }[] {
   return [
-    { id: "rapide", icon: "⚡", label: intake.modeRapide, description: intake.modeRapideDesc },
-    { id: "document", icon: "📄", label: intake.modeDocument, description: intake.modeDocumentDesc },
-    { id: "diagnostic", icon: "🎯", label: intake.modeDiagnostic, description: intake.modeDiagnosticDesc },
-    { id: "workshop", icon: "🧭", label: intake.modeWorkshop, description: intake.modeWorkshopDesc },
+    { id: "rapide", icon: "bolt", label: intake.modeRapide, description: intake.modeRapideDesc },
+    { id: "document", icon: "document", label: intake.modeDocument, description: intake.modeDocumentDesc },
+    { id: "diagnostic", icon: "target", label: intake.modeDiagnostic, description: intake.modeDiagnosticDesc },
+    { id: "workshop", icon: "route", label: intake.modeWorkshop, description: intake.modeWorkshopDesc },
   ];
 }
 
@@ -151,8 +152,8 @@ export function LearnIntakeForm({
                   selected ? "border-accent bg-accent/10" : "border-border bg-surface hover:border-accent/40"
                 }`}
               >
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-2 text-xl">
-                  {opt.icon}
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-2 text-accent">
+                  <Icon name={opt.icon} className="h-5 w-5" />
                 </span>
                 <span className="flex flex-col gap-0.5">
                   <span className="text-sm font-semibold text-ink">{opt.label}</span>

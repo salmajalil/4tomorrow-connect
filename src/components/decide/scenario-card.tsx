@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import type { ScenarioOutput } from "@/lib/decide";
-import type { IndicatorEntry, IndicatorFeedback, TrajectoryIndicators } from "@/types/database";
+import type { IndicatorFeedback, TrajectoryIndicators } from "@/types/database";
+import { ValidationQueue } from "@/components/decide/validation-queue";
 import { RoadmapView } from "@/components/decide/roadmap-view";
 import { useLanguage } from "@/components/language-provider";
 import type { Dictionary } from "@/lib/i18n/dictionary";
-import type { Language } from "@/types/database";
 
 export type ScenarioWithId = ScenarioOutput & { trajectoryId: string };
 
@@ -16,6 +15,9 @@ const SLOT_LABELS = ["A", "B", "C"];
 type DetailTab = "brief" | "techno" | "roadmap" | "suppliers";
 
 function SourceBadge({ source, t }: { source: "registry" | "web_search"; t: Dictionary }) {
+  // Only partners from the 4 Tomorrow network get a badge: it is a mark of
+  // trust. Market research results need no label.
+  if (source !== "registry") return null;
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
@@ -24,145 +26,6 @@ function SourceBadge({ source, t }: { source: "registry" | "web_search"; t: Dict
     >
       {source === "registry" ? t.decide.scenarios.registrySource : t.decide.scenarios.webSource}
     </span>
-  );
-}
-
-// A validated indicator (confidence "verified") displays as a plain fact.
-function ValidatedIndicatorChip({
-  indicatorKey,
-  entry,
-  t,
-}: {
-  indicatorKey: string;
-  entry: IndicatorEntry;
-  t: Dictionary;
-}) {
-  return (
-    <div className="flex min-w-[7rem] flex-col items-center gap-0.5 rounded-lg border border-border bg-surface-2 px-3 py-2 text-center">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{indicatorKey}</p>
-      <p className="mt-0.5 text-sm font-semibold text-ink">{String(entry.value)}</p>
-      <span className="text-[10px] text-success">{t.decide.scenarios.validated}</span>
-    </div>
-  );
-}
-
-// Everything that ISN'T "verified" (estimate or unknown) never shows a raw
-// number by default — an AI guess presented next to a hard fact reads as a
-// hard fact. Instead: the number stays masked behind an explicit "afficher"
-// toggle, and a small note thread is the only way to move it to "verified".
-// Sending a note is both the record of who said what and, at the same time,
-// how the value gets entered/confirmed — there's no separate "edit" step,
-// since it's the same person (the transformation owner) doing both.
-function IndicatorReview({
-  trajectoryId,
-  indicatorKey,
-  entry,
-  notes,
-  indicatorsSnapshot,
-  feedbackSnapshot,
-  onIndicatorsChange,
-  onFeedbackChange,
-  t,
-  language,
-}: {
-  trajectoryId: string;
-  indicatorKey: string;
-  entry: IndicatorEntry;
-  notes: { note: string; at: string }[];
-  indicatorsSnapshot: TrajectoryIndicators;
-  feedbackSnapshot: IndicatorFeedback;
-  onIndicatorsChange: (next: TrajectoryIndicators) => void;
-  onFeedbackChange: (next: IndicatorFeedback) => void;
-  t: Dictionary;
-  language: Language;
-}) {
-  const [revealed, setRevealed] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [sending, setSending] = useState(false);
-  const scenarios = t.decide.scenarios;
-
-  async function send() {
-    const trimmed = draft.trim();
-    if (!trimmed) return;
-    setSending(true);
-    const updatedIndicators: TrajectoryIndicators = {
-      ...indicatorsSnapshot,
-      [indicatorKey]: { value: trimmed, confidence: "verified" },
-    };
-    const updatedFeedback: IndicatorFeedback = {
-      ...feedbackSnapshot,
-      [indicatorKey]: [...(feedbackSnapshot[indicatorKey] ?? []), { note: trimmed, at: new Date().toISOString() }],
-    };
-    await createClient()
-      .from("trajectories")
-      .update({ indicators: updatedIndicators, indicators_feedback: updatedFeedback })
-      .eq("id", trajectoryId);
-    onIndicatorsChange(updatedIndicators);
-    onFeedbackChange(updatedFeedback);
-    setDraft("");
-    setSending(false);
-  }
-
-  return (
-    <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border bg-surface-2/50 p-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted">{indicatorKey}</p>
-        <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent-strong">
-          {t.common.unvalidated}
-        </span>
-      </div>
-
-      {entry.confidence === "estimate" ? (
-        revealed ? (
-          <p className="text-sm text-muted">
-            {scenarios.aiEstimateNoSource} <span className="font-medium text-ink">{String(entry.value)}</span>{" "}
-            <button type="button" onClick={() => setRevealed(false)} className="text-xs text-accent underline underline-offset-2">
-              {scenarios.hide}
-            </button>
-          </p>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setRevealed(true)}
-            className="self-start text-xs font-medium text-accent underline underline-offset-2"
-          >
-            {scenarios.showAiEstimate}
-          </button>
-        )
-      ) : (
-        <p className="text-sm text-muted">{scenarios.notEstimable}</p>
-      )}
-
-      {notes.length > 0 && (
-        <ul className="flex flex-col gap-1 border-t border-border pt-2 text-xs text-muted">
-          {notes.map((n, i) => (
-            <li key={i}>
-              <span className="font-medium text-ink">{n.note}</span>{" "}
-              <span className="text-[10px]">
-                — {new Date(n.at).toLocaleDateString(language === "fr" ? "fr-FR" : "en-US")}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div className="flex gap-2">
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={scenarios.confirmOrCorrect}
-          className="min-w-0 flex-1 rounded border border-border bg-surface px-2 py-1.5 text-xs text-ink focus:border-accent focus:outline-none"
-        />
-        <button
-          type="button"
-          onClick={send}
-          disabled={sending || !draft.trim()}
-          className="shrink-0 rounded bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {scenarios.send}
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -201,6 +64,8 @@ export function ScenarioCard({
   onSelect,
   detail = false,
   onOpenDetail,
+  recommended = false,
+  compact = false,
 }: {
   scenario: ScenarioWithId;
   index: number;
@@ -213,12 +78,17 @@ export function ScenarioCard({
   // page): tabs always shown, no toggle needed.
   detail?: boolean;
   onOpenDetail?: () => void;
+  // The scenario 4 Tomorrow recommends gets the full card; the two
+  // alternatives are shown compact, one click away from comparison.
+  recommended?: boolean;
+  compact?: boolean;
 }) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const scenarios = t.decide.scenarios;
   const [activeTab, setActiveTab] = useState<DetailTab>("brief");
   const [indicators, setIndicators] = useState<TrajectoryIndicators>(scenario.indicators);
   const [feedback, setFeedback] = useState<IndicatorFeedback>({});
+  const [expanded, setExpanded] = useState(false);
 
   const CATEGORY_LABELS: Record<string, string> = {
     technology: t.connect.results.categoryTechnology,
@@ -226,6 +96,8 @@ export function ScenarioCard({
     expert: t.connect.results.categoryExpert,
     partner: t.connect.results.categoryPartner,
     funding: t.connect.results.categoryFunding,
+    supplier: t.connect.results.categorySupplier,
+    support: t.connect.results.categorySupport,
   };
 
   const TABS: { id: DetailTab; label: string }[] = [
@@ -235,77 +107,119 @@ export function ScenarioCard({
     { id: "suppliers", label: scenarios.tabSuppliers },
   ];
 
-  const indicatorEntries = Object.entries(indicators);
-  const validatedEntries = indicatorEntries.filter(([, entry]) => entry.confidence === "verified");
-  const unvalidatedEntries = indicatorEntries.filter(([, entry]) => entry.confidence !== "verified");
+  const rank: Record<string, number> = { verified: 0, estimate: 1, unknown: 2 };
+  const keyFigures = Object.entries(indicators)
+    .filter(([, e]) => e.value !== null && e.value !== "")
+    .sort((x, y) => rank[x[1].confidence] - rank[y[1].confidence])
+    .slice(0, compact ? 1 : 3);
+  const stanceShort = scenarios.stanceShort[index] ?? scenario.stance;
 
   return (
     <div
-      className={`flex flex-col gap-4 rounded-xl border p-5 transition ${
-        selected ? "border-accent bg-accent/5 shadow-[0_0_0_1px_var(--accent)]" : "border-border bg-surface"
-      }`}
+      className={`flex flex-col gap-5 border p-5 transition sm:p-6 ${
+        selected || recommended ? "border-accent bg-surface" : "border-border bg-surface"
+      } ${recommended && !compact ? "shadow-[0_0_0_1px_var(--accent)]" : ""}`}
     >
-      <div className="flex items-start gap-3">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-accent/40 bg-accent/10 text-sm font-semibold text-accent-strong">
-          {SLOT_LABELS[index] ?? index + 1}
+      <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em]">
+        <span className="text-muted">
+          {SLOT_LABELS[index] ?? index + 1} · {stanceShort}
         </span>
-        <div className="min-w-0">
-          <span className="text-xs font-semibold uppercase tracking-wide text-accent">{scenario.stance}</span>
-          <h3 className="mt-0.5 font-display text-xl text-ink">{scenario.name}</h3>
-        </div>
+        {recommended && <span className="bg-accent px-2 py-0.5 text-accent-ink">{scenarios.recommended}</span>}
+        {selected && !recommended && <span className="border border-accent px-2 py-0.5 text-accent-strong">{scenarios.chosen}</span>}
       </div>
 
-      <p className="text-sm text-muted">{scenario.description}</p>
+      <div>
+        <h3 className={`text-balance font-display leading-tight text-ink ${compact ? "text-2xl" : "text-3xl sm:text-4xl"}`}>
+          {scenario.name}
+        </h3>
+        {keyFigures[0] && (
+          <p className="mt-2 text-base text-body">
+            {keyFigures[0][0]} : <span className="font-medium text-accent-strong">{String(keyFigures[0][1].value)}</span>
+          </p>
+        )}
+      </div>
 
-      {validatedEntries.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {validatedEntries.map(([key, entry]) => (
-            <ValidatedIndicatorChip key={key} indicatorKey={key} entry={entry} t={t} />
-          ))}
+      <div>
+        <p className={`text-sm leading-relaxed text-muted ${expanded ? "" : compact ? "line-clamp-2" : "line-clamp-3"}`}>
+          {scenario.description}
+        </p>
+        {!compact && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="mt-1 text-xs font-medium text-accent-strong underline-offset-4 hover:underline"
+          >
+            {expanded ? scenarios.readLess : scenarios.readMore}
+          </button>
+        )}
+      </div>
+
+      {!compact && keyFigures.length > 0 && (
+        <div>
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">{scenarios.keyFigures}</p>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {keyFigures.map(([key, entry]) => (
+              <div key={key} className="flex min-w-0 flex-col gap-2 border border-border bg-surface-2 p-3">
+                <span className="text-xs leading-snug text-muted">{key}</span>
+                <span className="font-display text-2xl leading-none text-ink">{String(entry.value)}</span>
+                <span
+                  className={`self-start px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.12em] ${
+                    entry.confidence === "verified"
+                      ? "bg-success text-bg"
+                      : entry.confidence === "estimate"
+                        ? "border border-accent/70 text-accent-strong"
+                        : "border border-dashed border-muted text-muted"
+                  }`}
+                >
+                  {entry.confidence === "verified"
+                    ? scenarios.verifiedBadge
+                    : entry.confidence === "estimate"
+                      ? scenarios.estimateBadge
+                      : scenarios.unknownBadge}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {unvalidatedEntries.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">{scenarios.unvalidatedTitle}</p>
-          {unvalidatedEntries.map(([key, entry]) => (
-            <IndicatorReview
-              key={key}
-              trajectoryId={scenario.trajectoryId}
-              indicatorKey={key}
-              entry={entry}
-              notes={feedback[key] ?? []}
-              indicatorsSnapshot={indicators}
-              feedbackSnapshot={feedback}
-              onIndicatorsChange={setIndicators}
-              onFeedbackChange={setFeedback}
-              t={t}
-              language={language}
-            />
-          ))}
-        </div>
+      {!compact && (
+        <ValidationQueue
+          trajectoryId={scenario.trajectoryId}
+          indicators={indicators}
+          feedback={feedback}
+          onChange={({ indicators: i, feedback: f }) => {
+            setIndicators(i);
+            setFeedback(f);
+          }}
+          t={t}
+        />
       )}
 
-      {(scenario.risksSpecific.length > 0 || scenario.opportunitiesSpecific.length > 0) && (
-        <div className="flex flex-wrap gap-1.5">
-          {scenario.opportunitiesSpecific.map((o, i) => (
-            <span
-              key={`opp-${i}`}
-              title={o.reason}
-              className="rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success"
-            >
-              ↗ {o.name}
-            </span>
-          ))}
-          {scenario.risksSpecific.map((r, i) => (
-            <span
-              key={`risk-${i}`}
-              title={r.reason}
-              className="rounded-full bg-danger/10 px-2.5 py-1 text-xs font-medium text-danger"
-            >
-              ⚠ {r.name}
-            </span>
-          ))}
+      {!compact && (scenario.risksSpecific.length > 0 || scenario.opportunitiesSpecific.length > 0) && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-success">{scenarios.gains}</p>
+            <ul className="mt-2 flex flex-col gap-2">
+              {scenario.opportunitiesSpecific.map((o, i) => (
+                <li key={`opp-${i}`} title={o.reason} className="flex gap-2 text-sm text-body">
+                  <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
+                  {o.name}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-danger">{scenarios.watch}</p>
+            <ul className="mt-2 flex flex-col gap-2">
+              {scenario.risksSpecific.map((r, i) => (
+                <li key={`risk-${i}`} title={r.reason} className="flex gap-2 text-sm text-body">
+                  <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-danger" />
+                  {r.name}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
 
@@ -313,9 +227,9 @@ export function ScenarioCard({
         <button
           type="button"
           onClick={onOpenDetail}
-          className="self-start text-xs font-semibold text-accent underline underline-offset-2"
+          className="self-start text-sm font-medium text-accent-strong underline-offset-4 hover:underline"
         >
-          {scenarios.seeFullDetail}
+          {compact ? scenarios.seeDetail : scenarios.seeFullDetail}
         </button>
       )}
 
@@ -340,7 +254,11 @@ export function ScenarioCard({
 
           {activeTab === "brief" && (
             <div className="flex flex-col gap-4">
-              <div className="rounded-lg border border-border bg-surface-2 p-3">
+              <div className="border border-border bg-surface-2 p-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">{scenarios.positioning}</h4>
+                <p className="mt-1 text-sm text-body">{scenario.stance}</p>
+              </div>
+              <div className="border border-border bg-surface-2 p-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">{scenarios.executiveBriefing}</h4>
                 <p className="mt-1 text-sm text-ink">{scenario.executiveBriefing}</p>
               </div>

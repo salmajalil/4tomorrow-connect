@@ -149,8 +149,10 @@ const CATEGORY_LABELS: Record<MatchOutput["category"], string> = {
   expert: "Experts & consultants",
   partner: "Partenaires",
   funding: "Financement & subventions",
+  supplier: "Fournisseurs",
+  support: "Accompagnement",
 };
-const CATEGORY_ORDER: MatchOutput["category"][] = ["technology", "startup", "expert", "partner", "funding"];
+const CATEGORY_ORDER: MatchOutput["category"][] = ["partner", "technology", "startup", "supplier", "funding", "support", "expert"];
 
 export function ConnectReportDocument({ result, projectLabel }: { result: ModelOutput; projectLabel: string }) {
   const byCategory = CATEGORY_ORDER.map((category) => ({

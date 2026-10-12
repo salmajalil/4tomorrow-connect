@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@/components/icons";
 import { useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { extractFileText } from "@/lib/extract-file-text";
@@ -158,7 +159,7 @@ export function InputsTab({
                 key={d}
                 className="rounded-full border border-accent/40 bg-accent/10 px-2.5 py-0.5 text-xs font-semibold text-accent-strong"
               >
-                <span aria-hidden>{DOMAIN_ICONS[d]}</span> {DOMAIN_LABELS[d]}
+                <Icon name={DOMAIN_ICONS[d]} className="inline h-3.5 w-3.5 align-[-2px]" /> {DOMAIN_LABELS[d]}
               </span>
             ))}
           </div>

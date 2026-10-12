@@ -76,6 +76,28 @@ export default function LoginPage() {
     }
   }
 
+  async function handleForgotPassword() {
+    setError(null);
+    setMessage(null);
+    if (!email) {
+      setError(t.login.forgotPasswordNeedsEmail);
+      return;
+    }
+    setLoading(true);
+    const supabase = createClient();
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/auth/reset-password")}`,
+      });
+      if (resetError) throw resetError;
+      setMessage(t.login.resetPasswordSent);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.login.genericError);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="mx-auto flex min-h-[calc(100vh-64px)] w-full max-w-sm flex-col justify-center px-4 py-12">
       <h1 className="font-display text-3xl text-ink">
@@ -133,6 +155,17 @@ export default function LoginPage() {
               placeholder="••••••••"
             />
           </label>
+        )}
+
+        {mode === "password" && !isSignUp && (
+          <button
+            type="button"
+            onClick={handleForgotPassword}
+            disabled={loading}
+            className="self-start text-xs text-muted underline underline-offset-2 hover:text-accent disabled:opacity-50"
+          >
+            {t.login.forgotPassword}
+          </button>
         )}
 
         {error && (

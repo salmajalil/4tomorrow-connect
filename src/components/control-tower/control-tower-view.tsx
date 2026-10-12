@@ -221,6 +221,13 @@ function ProjectCard({ project, t }: { project: ControlTowerProject; t: Dictiona
             {relevantRecs.length} {ct.recommendedModules}
           </button>
         )}
+        <Link
+          href={`/impact?transformationId=${project.transformationId}`}
+          className="ml-auto inline-flex items-center gap-1.5 text-sm font-semibold text-accent underline-offset-4 hover:underline"
+        >
+          {t.impact.openImpact}
+          <ArrowRightIcon aria-hidden className="h-4 w-4" />
+        </Link>
       </div>
 
       {panel === "hot" && (

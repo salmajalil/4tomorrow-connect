@@ -10,13 +10,15 @@ import {
   LearnReportDocument,
   ControlTowerReportDocument,
 } from "@/lib/pdf/documents";
+import { CeoReportDocument, DetailedReportDocument } from "@/lib/pdf/project-reports";
+import { fetchProjectImpact } from "@/lib/project-impact";
 
 // Formats data the client already legitimately fetched and is displaying
 // (its own diagnostic/scenarios, matching results, training, or control
 // tower projects) into a downloadable PDF — no new Supabase reads here, so
 // the only access check that matters is "is this a signed-in user at all".
 const requestSchema = z.object({
-  kind: z.enum(["decide", "connect", "learn", "control-tower"]),
+  kind: z.enum(["decide", "connect", "learn", "control-tower", "project-ceo", "project-detailed"]),
   payload: z.record(z.string(), z.unknown()),
 });
 
@@ -26,8 +28,10 @@ type Kind = z.infer<typeof requestSchema>["kind"];
 // at the call site below via this one cast — the client only ever sends
 // back an object it already received from one of our own API routes, so
 // this is a formatting boundary, not a security one.
+type PayloadKind = Exclude<Kind, "project-ceo" | "project-detailed">;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const BUILDERS: Record<Kind, (payload: any) => ReactElement<DocumentProps>> = {
+const BUILDERS: Record<PayloadKind, (payload: any) => ReactElement<DocumentProps>> = {
   decide: (p) => DecideReportDocument(p),
   connect: (p) => ConnectReportDocument(p),
   learn: (p) => LearnReportDocument(p),
@@ -39,7 +43,14 @@ const FILENAMES: Record<Kind, string> = {
   connect: "4tomorrow-connect.pdf",
   learn: "4tomorrow-learn.pdf",
   "control-tower": "4tomorrow-tour-de-controle.pdf",
+  "project-ceo": "4tomorrow-synthese-ceo.pdf",
+  "project-detailed": "4tomorrow-rapport-detaille.pdf",
 };
+
+// The two project reports are built server-side from the project id: the
+// data is re-read through the signed-in user's own Supabase client, so RLS
+// guarantees nobody can render someone else's project.
+const projectPayloadSchema = z.object({ transformationId: z.string().uuid() });
 
 export async function POST(request: Request) {
   const language = await getLanguage();
@@ -65,7 +76,23 @@ export async function POST(request: Request) {
 
   let buffer: Buffer;
   try {
-    const document = BUILDERS[body.kind](body.payload);
+    let document: ReactElement<DocumentProps>;
+    if (body.kind === "project-ceo" || body.kind === "project-detailed") {
+      const { transformationId } = projectPayloadSchema.parse(body.payload);
+      const project = await fetchProjectImpact(supabase, transformationId);
+      if (!project) {
+        return NextResponse.json(
+          { error: language === "en" ? "Project not found." : "Projet introuvable." },
+          { status: 404 }
+        );
+      }
+      document =
+        body.kind === "project-ceo"
+          ? CeoReportDocument({ project, language })
+          : DetailedReportDocument({ project, language });
+    } else {
+      document = BUILDERS[body.kind](body.payload);
+    }
     buffer = await renderToBuffer(document);
   } catch {
     return NextResponse.json(

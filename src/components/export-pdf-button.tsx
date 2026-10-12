@@ -4,7 +4,7 @@ import { useState } from "react";
 import { parseJsonResponse } from "@/lib/parse-json-response";
 import { useLanguage } from "@/components/language-provider";
 
-type ExportKind = "decide" | "connect" | "learn" | "control-tower";
+type ExportKind = "decide" | "connect" | "learn" | "control-tower" | "project-ceo" | "project-detailed";
 
 export function ExportPdfButton({
   kind,

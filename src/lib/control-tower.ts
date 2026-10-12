@@ -12,6 +12,10 @@ export const MODULE_ORDER: ModuleName[] = ["decide", "connect", "learn", "delive
 export type ControlTowerProject = {
   transformationId: string;
   title: string;
+  // Full challenge statement, kept for the card subtitle; the title itself
+  // is now the short "organisation · domain" form.
+  summary: string;
+  archived: boolean;
   organizationName: string;
   domains: string[];
   createdAt: string;
@@ -43,7 +47,7 @@ export async function fetchControlTowerProjects(
 
   const { data: transformations } = await supabase
     .from("transformations")
-    .select("id, organization_id, challenges, objectives, domains, created_at")
+    .select("id, organization_id, challenges, objectives, domains, status, created_at")
     .in("organization_id", orgIds)
     .order("created_at", { ascending: false });
 
@@ -115,6 +119,8 @@ export async function fetchControlTowerProjects(
     return {
       transformationId: t.id,
       title,
+      summary: (t.challenges?.trim() || t.objectives?.trim() || "").slice(0, 160),
+      archived: t.status === "archived",
       organizationName: orgNameById.get(t.organization_id) ?? "",
       domains: (t.domains as string[]) ?? [],
       createdAt: t.created_at,

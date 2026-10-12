@@ -1,7 +1,7 @@
 const SIZE = 340;
 const CENTER = SIZE / 2;
 const MAX_RADIUS = 120;
-const SCENARIO_COLORS = ["#c9a256", "#7c93ad", "#c9713f"];
+const SCENARIO_COLORS = ["#c8955a", "#7fb8c4", "#d48a6a"];
 
 function axisPoint(index: number, total: number, radius: number) {
   const angle = -90 + (360 / total) * index;

@@ -16,6 +16,9 @@ const SLOT_LABELS = ["A", "B", "C"];
 type DetailTab = "brief" | "techno" | "roadmap" | "suppliers";
 
 function SourceBadge({ source, t }: { source: "registry" | "web_search"; t: Dictionary }) {
+  // Only partners from the 4 Tomorrow network get a badge: it is a mark of
+  // trust. Market research results need no label.
+  if (source !== "registry") return null;
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
@@ -303,7 +306,7 @@ export function ScenarioCard({
               title={r.reason}
               className="rounded-full bg-danger/10 px-2.5 py-1 text-xs font-medium text-danger"
             >
-              ⚠ {r.name}
+              {r.name}
             </span>
           ))}
         </div>

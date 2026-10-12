@@ -1,9 +1,10 @@
 import { z } from "zod";
 import type { EcosystemMember, Language } from "@/types/database";
+import type { IconName } from "@/components/icons";
 
 function languageInstruction(language: Language): string {
   const languageName = language === "en" ? "English" : "French";
-  return `Respond in ${languageName}, except JSON keys which stay in English exactly as specified.`;
+  return `Respond in ${languageName}, except JSON keys which stay in English exactly as specified. Write every human-readable value in ${languageName} even when the user's own input, documents or sources are written in another language; keep proper nouns (company, product, place names) as they are.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -23,12 +24,12 @@ export const DOMAIN_LABELS: Record<Domain, string> = {
 
 // Small scannability aid shown next to every domain chip across the app
 // (Decide, Learn, Deliver, Control Tower) — purely visual, no copy change.
-export const DOMAIN_ICONS: Record<Domain, string> = {
-  manufacturing: "🚚",
-  rd: "🔬",
-  gtm: "📈",
-  strategy: "🧭",
-  digitalization: "💻",
+export const DOMAIN_ICONS: Record<Domain, IconName> = {
+  manufacturing: "factory",
+  rd: "flask",
+  gtm: "trend",
+  strategy: "route",
+  digitalization: "chip",
 };
 
 const RESULT_START = "<RESULT_JSON>";

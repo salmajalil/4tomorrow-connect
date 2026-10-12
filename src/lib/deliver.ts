@@ -10,7 +10,7 @@ import {
 
 function languageInstruction(language: Language): string {
   const languageName = language === "en" ? "English" : "French";
-  return `Respond in ${languageName}, except JSON keys which stay in English exactly as specified.`;
+  return `Respond in ${languageName}, except JSON keys which stay in English exactly as specified. Write every human-readable value in ${languageName} even when the user's own input, documents or sources are written in another language; keep proper nouns (company, product, place names) as they are.`;
 }
 
 export { DOMAINS, DOMAIN_LABELS, DELIVERABLE_KINDS };

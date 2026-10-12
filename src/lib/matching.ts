@@ -3,7 +3,7 @@ import type { EcosystemMember, Language } from "@/types/database";
 
 function languageInstruction(language: Language): string {
   const languageName = language === "en" ? "English" : "French";
-  return `Respond in ${languageName}, EXCEPT for the JSON keys themselves which must stay in English exactly as specified below.`;
+  return `Respond in ${languageName}, EXCEPT for the JSON keys themselves which must stay in English exactly as specified below. Write every human-readable value (names of categories, reasons, briefs, gaps) in ${languageName} even when the user's input or your web sources are in another language; keep proper nouns as they are.`;
 }
 
 export interface MatchingInput {

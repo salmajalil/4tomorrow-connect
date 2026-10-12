@@ -1,28 +1,33 @@
 @import "tailwindcss";
 
 /*
- * "Industrial luxury / futuristic" theme: dark ground, warm brass accent.
- * Single fixed theme (not following OS light/dark) — a deliberate brand
- * choice for this product, not an oversight.
+ * 4 Tomorrow brand system — the same ink, gold and cream as the printed
+ * catalogue and use-case booklets, so the platform and the sales material
+ * read as one product. Single fixed dark theme: a deliberate brand choice.
+ *
+ * Module accents (Decide gold, Connect steel, Learn sage, Deliver sand) are
+ * applied by each module's ThemeWrap, which overrides only the --accent
+ * family; ground, surfaces, borders and text stay identical everywhere.
  */
 :root {
-  --bg: #0b0d10;
-  --surface: #14171b;
-  --surface-2: #1b1f24;
-  --border: #262b31;
-  --ink: #eef1f4;
-  --muted: #8b929c;
-  --accent: #c9a256;
-  --accent-strong: #e0bd6e;
-  --accent-ink: #14171b;
-  --success: #4fae7a;
-  --danger: #d9695a;
-  /* Cool signal color reserved for live/real-time indicators (Control
-     Tower pulse dots, "mis à jour à l'instant" badges) — kept distinct
-     from the warm brass --accent so a live update never reads as a
-     regular interactive/brand element. */
-  --live: #5fc7d6;
-  --live-ink: #0b0d10;
+  --bg: #0b0a08;
+  --surface: #16130f;
+  --surface-2: #1d1914;
+  --border: #2a251f;
+  --border-strong: #3a342c;
+  --ink: #f3eee7;
+  --body: #d8d1c6;
+  --muted: #a9a297;
+  --accent: #c8955a;
+  --accent-strong: #e0b57f;
+  --accent-ink: #0b0a08;
+  /* Semantic colours, deliberately soft: sage for gains, terracotta for
+     attention. Never used as large flat fills — dots, rules and outlines. */
+  --success: #9cc08a;
+  --danger: #d48a6a;
+  /* Cool signal colour reserved for live/real-time indicators. */
+  --live: #7fb8c4;
+  --live-ink: #0b0a08;
 }
 
 @theme inline {
@@ -30,7 +35,9 @@
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-ink: var(--ink);
+  --color-body: var(--body);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
@@ -39,13 +46,28 @@
   --color-danger: var(--danger);
   --color-live: var(--live);
   --color-live-ink: var(--live-ink);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-display: var(--font-playfair);
+  --font-sans: var(--font-instrument-sans);
+  --font-mono: var(--font-dm-mono);
+  --font-display: var(--font-instrument-serif);
 }
 
 body {
   background: var(--bg);
   color: var(--ink);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Display headings in the catalogue serif read best slightly tighter. */
+.font-display {
+  letter-spacing: -0.01em;
+  font-weight: 400;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

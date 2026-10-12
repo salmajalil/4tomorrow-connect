@@ -169,7 +169,7 @@ export default async function Home() {
             href="/control-tower"
             className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-accent hover:text-ink"
           >
-            <span aria-hidden>📡</span>
+            
             {t.nav.controlTower}
           </Link>
         )}

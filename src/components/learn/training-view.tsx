@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon, type IconName } from "@/components/icons";
 import { useState } from "react";
 import { Eyebrow } from "@/components/eyebrow";
 import { ExportPdfButton } from "@/components/export-pdf-button";
@@ -78,16 +79,17 @@ function MentoringButton({ topic, label }: { topic: string; label: string }) {
       onClick={() => requestMentoring(topic)}
       className="flex shrink-0 items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent-strong transition hover:bg-accent/20"
     >
-      💬 {label}
+      <Icon name="chat" className="h-3.5 w-3.5" />
+      {label}
     </button>
   );
 }
 
-function FormatTile({ icon, title, subtitle }: { icon: string; title: string; subtitle: string }) {
+function FormatTile({ icon, title, subtitle }: { icon: IconName; title: string; subtitle: string }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-2 text-xl">
-        {icon}
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-2 text-accent">
+        <Icon name={icon} className="h-5 w-5" />
       </span>
       <div>
         <h2 className="text-sm font-bold text-ink">{title}</h2>
@@ -198,17 +200,17 @@ export function TrainingView({ training }: { training: Training }) {
         <div className="flex flex-wrap items-center gap-2">
           {domains.map((d) => (
             <span key={d} className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent-strong">
-              <span aria-hidden>{DOMAIN_ICONS[d]}</span> {DOMAIN_LABELS[d] ?? d}
+              <Icon name={DOMAIN_ICONS[d]} className="inline h-3.5 w-3.5 align-[-2px]" /> {DOMAIN_LABELS[d] ?? d}
             </span>
           ))}
           {training.duration_minutes && (
             <span className="rounded-full border border-border bg-surface-2 px-3 py-1 text-xs text-muted">
-              ⏱ {training.duration_minutes} min
+              <Icon name="clock" className="inline h-3.5 w-3.5 align-[-2px]" /> {training.duration_minutes} min
             </span>
           )}
           {quizAnswered > 0 && (
             <span className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent-strong">
-              ⚡ {quizScore * 10} XP
+              <Icon name="spark" className="inline h-3.5 w-3.5 align-[-2px]" /> {quizScore * 10} XP
             </span>
           )}
         </div>
@@ -368,7 +370,7 @@ export function TrainingView({ training }: { training: Training }) {
       {tab === "experience" && (
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-3">
-            <FormatTile icon="🃏" title={tr.interactiveCards} subtitle={tr.interactiveCardsSubtitle} />
+            <FormatTile icon="learn" title={tr.interactiveCards} subtitle={tr.interactiveCardsSubtitle} />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {training.flashcards.map((f, i) => (
                 <Flashcard
@@ -415,7 +417,7 @@ export function TrainingView({ training }: { training: Training }) {
 
       {tab === "video" && (
         <div className="flex flex-col gap-4">
-          <FormatTile icon="🎬" title={tr.videoScript} subtitle={tr.videoScriptSubtitle} />
+          <FormatTile icon="film" title={tr.videoScript} subtitle={tr.videoScriptSubtitle} />
           <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
             <h2 className="font-display text-lg text-ink">{training.video_script.title}</h2>
           </div>
@@ -429,7 +431,7 @@ export function TrainingView({ training }: { training: Training }) {
                   <span className="text-xs text-muted">{scene.durationSeconds}s</span>
                 </div>
                 <p className="mt-2 text-sm text-ink">{scene.narration}</p>
-                <p className="mt-2 text-xs text-muted">🎬 {scene.visualSuggestion}</p>
+                <p className="mt-2 flex gap-1.5 text-xs text-muted"><Icon name="film" className="mt-0.5 h-3.5 w-3.5 shrink-0" />{scene.visualSuggestion}</p>
               </div>
             ))}
           </div>

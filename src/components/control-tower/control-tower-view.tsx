@@ -8,7 +8,7 @@ import { Eyebrow } from "@/components/eyebrow";
 import { ExportPdfButton } from "@/components/export-pdf-button";
 import { DOMAIN_LABELS, DOMAIN_ICONS, type Domain } from "@/lib/decide";
 import { useLanguage } from "@/components/language-provider";
-import { FlameIcon, TrophyIcon, CalendarIcon, AlertIcon, ArrowRightIcon, SearchIcon } from "@/components/icons";
+import { FlameIcon, TrophyIcon, CalendarIcon, AlertIcon, ArrowRightIcon, SearchIcon, Icon } from "@/components/icons";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { ModuleName, ModuleStatusValue } from "@/types/database";
 import type { ComponentType, SVGProps } from "react";
@@ -189,7 +189,7 @@ function ProjectCard({ project, t }: { project: ControlTowerProject; t: Dictiona
             <div className="mt-2 flex flex-wrap gap-1.5">
               {domains.map((d) => (
                 <span key={d} className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[10px] text-muted">
-                  <span aria-hidden>{DOMAIN_ICONS[d]}</span> {DOMAIN_LABELS[d] ?? d}
+                  <Icon name={DOMAIN_ICONS[d]} className="inline h-3.5 w-3.5 align-[-2px]" /> {DOMAIN_LABELS[d] ?? d}
                 </span>
               ))}
             </div>

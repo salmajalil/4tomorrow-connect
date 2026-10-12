@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon, type IconName } from "@/components/icons";
 import { useState } from "react";
 import { DELIVERABLE_KINDS, DELIVERABLE_LABELS, type DeliverableKind } from "@/lib/deliver";
 import { ExecutionGantt } from "@/components/deliver/execution-gantt";
@@ -16,13 +17,13 @@ import type {
   RoadmapPhaseEntry,
 } from "@/types/database";
 
-const KIND_ICONS: Record<DeliverableKind, string> = {
-  roadmap: "🗺️",
-  action_plan: "✅",
-  kpi_dashboard: "📊",
-  risk_map: "⚠️",
-  executive_report: "📄",
-  toolkit: "🧰",
+const KIND_ICONS: Record<DeliverableKind, IconName> = {
+  roadmap: "map",
+  action_plan: "checklist",
+  kpi_dashboard: "chart",
+  risk_map: "alert",
+  executive_report: "document",
+  toolkit: "toolbox",
 };
 
 // The "Transformation Roadmap" deliverable's detail view IS the co-
@@ -239,7 +240,7 @@ export function DeliverablesTab({
             <div key={kind} className="rounded-xl border border-border bg-surface p-4">
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-lg">
-                  {KIND_ICONS[kind]}
+                  <Icon name={KIND_ICONS[kind]} className="h-5 w-5 text-accent" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-ink">{DELIVERABLE_LABELS[kind]}</p>

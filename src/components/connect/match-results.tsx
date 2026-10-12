@@ -16,6 +16,9 @@ const CATEGORY_ORDER: MatchOutput["category"][] = [
 ];
 
 function SourceBadge({ source, t }: { source: MatchOutput["source"]; t: Dictionary }) {
+  // Only partners from the 4 Tomorrow network get a badge: it is a mark of
+  // trust. Market research results need no label.
+  if (source !== "registry") return null;
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${

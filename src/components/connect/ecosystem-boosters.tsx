@@ -1,3 +1,4 @@
+import { Icon, type IconName } from "@/components/icons";
 import { useLanguage } from "@/components/language-provider";
 
 // Weekly ecosystem leaderboard — example data by design (see product
@@ -8,11 +9,11 @@ import { useLanguage } from "@/components/language-provider";
 type BoosterEntry = { org: string; score: number; deltaPct: number };
 type BoosterKey = "tech" | "ai" | "esg" | "strategy";
 
-const BOOSTER_ICONS: Record<BoosterKey, string> = {
-  tech: "⚡",
-  ai: "🤖",
-  esg: "🌱",
-  strategy: "🎯",
+const BOOSTER_ICONS: Record<BoosterKey, IconName> = {
+  tech: "bolt",
+  ai: "chip",
+  esg: "leaf",
+  strategy: "target",
 };
 
 const BOOSTER_DATA: Record<BoosterKey, BoosterEntry[]> = {
@@ -39,7 +40,6 @@ const BOOSTER_DATA: Record<BoosterKey, BoosterEntry[]> = {
 };
 
 const BOOSTER_ORDER: BoosterKey[] = ["tech", "ai", "esg", "strategy"];
-const RANK_MEDALS = ["🥇", "🥈", "🥉"];
 
 export function EcosystemBoosters() {
   const { t } = useLanguage();
@@ -62,7 +62,7 @@ export function EcosystemBoosters() {
         {BOOSTER_ORDER.map((key) => (
           <div key={key} className="rounded-lg border border-border bg-surface-2 p-4">
             <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-              <span aria-hidden>{BOOSTER_ICONS[key]}</span>
+              <Icon name={BOOSTER_ICONS[key]} className="h-4 w-4 text-accent" />
               {b.categories[key]}
             </p>
             <p className="mt-0.5 text-[11px] text-muted">{b.categoryHints[key]}</p>
@@ -71,12 +71,12 @@ export function EcosystemBoosters() {
                 <li key={entry.org} className={i > 0 ? "border-t border-border/60 pt-2" : undefined}>
                   <div className="flex items-center justify-between gap-2 text-xs">
                     <span className="flex items-center gap-1.5 truncate text-muted">
-                      <span aria-hidden>{RANK_MEDALS[i]}</span>
+                      <span aria-hidden className="w-4 shrink-0 text-center font-mono text-[10px] text-accent">{i + 1}</span>
                       <span className="truncate text-ink">{entry.org}</span>
                     </span>
                     <span className="flex shrink-0 items-center gap-1 font-semibold text-accent-strong">
                       {entry.score}
-                      <span className="text-[10px] font-medium text-emerald-400">+{entry.deltaPct}%</span>
+                      <span className="text-[10px] font-medium text-success">+{entry.deltaPct}%</span>
                     </span>
                   </div>
                   {i === 0 && (

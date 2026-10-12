@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MATCH_CATEGORIES } from "@/lib/ecosystem-bricks";
 import type { EcosystemMember, Language } from "@/types/database";
 import type { IconName } from "@/components/icons";
 
@@ -208,7 +209,7 @@ const techStackItemSchema = z.object({
 });
 
 const scenarioSupplierSchema = z.object({
-  category: z.enum(["technology", "startup", "expert", "partner", "funding"]),
+  category: z.enum(MATCH_CATEGORIES),
   name: z.string().min(1),
   reason: z.string().min(1),
   website: z.string().nullable().optional(),
@@ -322,7 +323,7 @@ Schema (a single scenario object, not an array):
   "indicators": { [key: string]: { "value": string | number | null, "confidence": "verified" | "estimate" | "unknown" } },
   "radarScores": { "cost": number, "risk": number, "roi": number, "feasibility": number, [fifthAxis: string]: number },
   "techStack": [{ "name": string, "maturity": string, "maturityScale": string, "detail": string, "benefit": string }],
-  "suppliers": [{ "category": "technology"|"startup"|"expert"|"partner"|"funding", "name": string, "reason": string, "website": string|null, "contactEmail": string|null, "source": "registry"|"web_search", "ecosystemMemberId": string|null }],
+  "suppliers": [{ "category": "partner"|"technology"|"startup"|"supplier"|"funding"|"support"|"expert", "name": string, "reason": string, "website": string|null, "contactEmail": string|null, "source": "registry"|"web_search", "ecosystemMemberId": string|null }],
   "regulations": [{ "name": string, "description": string, "sourceUrl": string|null }],
   "executiveBriefing": string,
   "risksSpecific": [{ "name": string, "reason": string }],

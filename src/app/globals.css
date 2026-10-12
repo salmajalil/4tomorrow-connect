@@ -63,6 +63,36 @@ body {
   font-weight: 400;
 }
 
+/* Connect: a slow pulse running along each link of the ecosystem map. */
+.eco-flow {
+  stroke-dasharray: 2 6;
+  animation: eco-flow 2.4s linear infinite;
+}
+@keyframes eco-flow {
+  to {
+    stroke-dashoffset: -32;
+  }
+}
+
+/* Learn: 3D flip for flashcards. */
+.flip-scene {
+  perspective: 1200px;
+}
+.flip-card {
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.flip-card[data-flipped="true"] {
+  transform: rotateY(180deg);
+}
+.flip-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flip-back {
+  transform: rotateY(180deg);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

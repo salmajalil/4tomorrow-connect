@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { EcosystemMember, Language } from "@/types/database";
+import { MATCH_CATEGORIES } from "@/lib/ecosystem-bricks";
 
 function languageInstruction(language: Language): string {
   const languageName = language === "en" ? "English" : "French";
@@ -16,7 +17,7 @@ export interface MatchingInput {
 }
 
 const matchSchema = z.object({
-  category: z.enum(["technology", "startup", "expert", "partner", "funding"]),
+  category: z.enum(MATCH_CATEGORIES),
   name: z.string().min(1),
   reason: z.string().min(1),
   gapAddressed: z.string().min(1),
@@ -24,6 +25,9 @@ const matchSchema = z.object({
   contactEmail: z.string().nullable().optional(),
   source: z.enum(["registry", "web_search"]),
   ecosystemMemberId: z.string().nullable().optional(),
+  // How well this match fits the project, 1-10. Optional: older stored
+  // results don't have it and simply render without the gauge.
+  fit: z.coerce.number().nullable().optional().catch(null),
 });
 
 const modelOutputSchema = z.object({
@@ -101,7 +105,8 @@ STRICT RULES:
 1. Every recommendation MUST explicitly name the gap it addresses (gapAddressed must match one of the "gaps" you output, by its "name").
 2. NEVER recommend something generic ("an AI platform", "a consulting firm"). Every match MUST be a real, specific, verifiable organization or named person.
 3. Only include a website or contactEmail when you are reasonably confident it is real (found via web_search or present in the directory above). If you cannot verify one, omit the field entirely — never invent a plausible-looking email or URL.
-4. category must be one of: "technology", "startup", "expert", "partner", "funding". Use "funding" for real, named grant programs, subsidy schemes, or investors — never a vague "funding is available" statement without naming the specific program or organization.
+4. category must be one of: "partner" (technical / integration partner), "technology" (technology provider), "startup", "supplier" (equipment, material or component supplier), "funding" (real, named grant program, subsidy scheme or investor — never a vague "funding is available"), "support" (support organisation: competitiveness cluster, regional agency, CCI, technical centre, accelerator, public support program), "expert" (named expert or specialised consultancy). Aim to cover the five ecosystem bricks — technical partners, suppliers, funding, support organisations, experts — whenever the project genuinely needs them.
+4b. fit is an integer from 1 to 10: how directly this match closes its gap for THIS project (10 = obvious first call).
 5. source must be "registry" only when the match came from the KNOWN ECOSYSTEM DIRECTORY above (include its id as ecosystemMemberId); otherwise "web_search".
 6. strategicBrief is ONE synthesis paragraph (not a list) naming the specific opportunity and the recommended strategic angle for this exact project.
 7. goodIdeas is exactly 3 numbered, actionable, project-specific recommendations — never generic advice.
@@ -119,10 +124,11 @@ ${RESULT_START}
   "goodIdeas": [string, string, string],
   "matches": [
     {
-      "category": "technology" | "startup" | "expert" | "partner" | "funding",
+      "category": "partner" | "technology" | "startup" | "supplier" | "funding" | "support" | "expert",
       "name": string,
       "reason": string,
       "gapAddressed": string,
+      "fit": number,
       "website": string | null,
       "contactEmail": string | null,
       "source": "registry" | "web_search",
@@ -132,7 +138,7 @@ ${RESULT_START}
 }
 ${RESULT_END}
 
-Produce at least 4 matches across at least 2 different categories when possible. The ${RESULT_START}...${RESULT_END} block must be the last thing in your response, with valid JSON (no trailing commas, no comments) inside it.`;
+Produce at least 6 matches across at least 3 different categories when possible, and keep each "reason" to one or two short sentences. The ${RESULT_START}...${RESULT_END} block must be the last thing in your response, with valid JSON (no trailing commas, no comments) inside it.`;
 }
 
 export function buildUserPrompt(input: MatchingInput): string {

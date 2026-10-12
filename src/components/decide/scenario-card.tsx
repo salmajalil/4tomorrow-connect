@@ -96,6 +96,8 @@ export function ScenarioCard({
     expert: t.connect.results.categoryExpert,
     partner: t.connect.results.categoryPartner,
     funding: t.connect.results.categoryFunding,
+    supplier: t.connect.results.categorySupplier,
+    support: t.connect.results.categorySupport,
   };
 
   const TABS: { id: DetailTab; label: string }[] = [

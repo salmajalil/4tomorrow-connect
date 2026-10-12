@@ -5,7 +5,7 @@ import Link from "next/link";
 import { IntakeForm, type IntakeState } from "@/components/decide/intake-form";
 import { DiagnosticView, type DiagnosticResult } from "@/components/decide/diagnostic-view";
 import { ModuleCrossLinks } from "@/components/module-cross-links";
-import { RadarChart } from "@/components/decide/radar-chart";
+import { ScenarioComparator } from "@/components/decide/scenario-comparator";
 import { ScenarioCard, type ScenarioWithId } from "@/components/decide/scenario-card";
 import { Eyebrow } from "@/components/eyebrow";
 import { ExportPdfButton } from "@/components/export-pdf-button";
@@ -237,10 +237,27 @@ export function DecideFlow({
 
   if (phase === "scenarios" && scenarios && diagnostic) {
     const axes = Array.from(new Set(scenarios.flatMap((s) => Object.keys(s.radarScores))));
-    const radarSeries = scenarios.map((s) => ({
-      label: s.name,
-      values: axes.map((a) => s.radarScores[a] ?? 0),
-    }));
+    // One recommendation up front: the client's chosen trajectory if there is
+    // one, otherwise the balanced middle scenario. The two others stay one
+    // click away, compact, below the side-by-side comparison.
+    const selectedIndex = scenarios.findIndex((s) => s.trajectoryId === selectedTrajectoryId);
+    const recommendedIndex = selectedIndex >= 0 ? selectedIndex : Math.min(1, scenarios.length - 1);
+    const recommendedScenario = scenarios[recommendedIndex];
+    const labels = t.decide.axisLabels as Record<string, string>;
+    const axisLabel = (axis: string) => {
+      if (axis === "co2") return fifthAxisLabel(diagnostic.domains, t.decide.axisLabels);
+      if (labels[axis]) return labels[axis];
+      const plain = axis.replace(/[_-]+/g, " ").trim();
+      return plain.charAt(0).toUpperCase() + plain.slice(1);
+    };
+    const openDetail = (trajectoryId: string) => {
+      setDetailTrajectoryId(trajectoryId);
+      setPhase("scenario-detail");
+    };
+    const chooseAndOpen = async (trajectoryId: string) => {
+      openDetail(trajectoryId);
+      await selectTrajectory(trajectoryId);
+    };
 
     return (
       <div className="mx-auto w-full max-w-4xl px-4 py-10">
@@ -294,26 +311,61 @@ export function DecideFlow({
           </div>
         )}
 
-        <div className="mt-6">
-          <RadarChart axes={axes} series={radarSeries} />
-        </div>
+        <section className="mt-8">
+          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.18em] text-accent-strong">
+            {t.decide.scenarios.recommendedTitle}
+          </p>
+          <ScenarioCard
+            key={recommendedScenario.trajectoryId}
+            scenario={recommendedScenario}
+            index={recommendedIndex}
+            co2SliderLabel={fifthAxisLabel(diagnostic.domains, t.decide.axisLabels)}
+            selected={selectedTrajectoryId === recommendedScenario.trajectoryId}
+            onSelect={() => chooseAndOpen(recommendedScenario.trajectoryId)}
+            onOpenDetail={() => openDetail(recommendedScenario.trajectoryId)}
+            recommended
+          />
+        </section>
 
-        <div className="mt-6 flex flex-col gap-6">
-          {scenarios.map((s, i) => (
-            <ScenarioCard
-              key={s.trajectoryId}
-              scenario={s}
-              index={i}
-              co2SliderLabel={fifthAxisLabel(diagnostic.domains, t.decide.axisLabels)}
-              selected={selectedTrajectoryId === s.trajectoryId}
-              onSelect={() => selectTrajectory(s.trajectoryId)}
-              onOpenDetail={() => {
-                setDetailTrajectoryId(s.trajectoryId);
-                setPhase("scenario-detail");
-              }}
+        {axes.length > 0 && scenarios.length > 1 && (
+          <div className="mt-8">
+            <ScenarioComparator
+              axes={axes}
+              axisLabel={axisLabel}
+              scenarios={scenarios.map((s, i) => ({
+                label: `${t.decide.scenarios.stanceShort[i] ?? ""} · ${s.name}`,
+                scores: s.radarScores,
+              }))}
+              recommendedIndex={recommendedIndex}
+              title={t.decide.scenarios.compareTitle}
+              hint={t.decide.scenarios.compareHint}
             />
-          ))}
-        </div>
+          </div>
+        )}
+
+        {scenarios.length > 1 && (
+          <section className="mt-8">
+            <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.18em] text-muted">
+              {t.decide.scenarios.alternativesTitle}
+            </p>
+            <div className="grid gap-4 md:grid-cols-2">
+              {scenarios.map((s, i) =>
+                i === recommendedIndex ? null : (
+                  <ScenarioCard
+                    key={s.trajectoryId}
+                    scenario={s}
+                    index={i}
+                    co2SliderLabel={fifthAxisLabel(diagnostic.domains, t.decide.axisLabels)}
+                    selected={selectedTrajectoryId === s.trajectoryId}
+                    onSelect={() => chooseAndOpen(s.trajectoryId)}
+                    onOpenDetail={() => openDetail(s.trajectoryId)}
+                    compact
+                  />
+                )
+              )}
+            </div>
+          </section>
+        )}
       </div>
     );
   }

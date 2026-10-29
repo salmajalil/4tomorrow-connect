@@ -6,6 +6,7 @@ import type {
   RecommendableModule,
   ModuleRelevance,
 } from "@/types/database";
+import { projectTitle } from "@/lib/text";
 
 export const MODULE_ORDER: ModuleName[] = ["decide", "connect", "learn", "deliver"];
 
@@ -111,15 +112,15 @@ export async function fetchControlTowerProjects(
       .reduce<string | null>((max, r) => (!max || r.end_date > max ? r.end_date : max), null);
 
     const title = t.challenges?.trim()
-      ? t.challenges.trim().slice(0, 72) + (t.challenges.trim().length > 72 ? "…" : "")
+      ? projectTitle(t.challenges)
       : t.objectives?.trim()
-        ? t.objectives.trim().slice(0, 72)
+        ? projectTitle(t.objectives)
         : orgNameById.get(t.organization_id) || untitledProjectLabel;
 
     return {
       transformationId: t.id,
       title,
-      summary: (t.challenges?.trim() || t.objectives?.trim() || "").slice(0, 160),
+      summary: projectTitle(t.challenges?.trim() || t.objectives?.trim() || "", 160),
       archived: t.status === "archived",
       organizationName: orgNameById.get(t.organization_id) ?? "",
       domains: (t.domains as string[]) ?? [],

@@ -31,9 +31,8 @@ export async function POST(request: Request) {
 
   const anthropic = getAnthropicClient();
 
-  let response;
-  try {
-    response = await anthropic.messages.create({
+  const createCall = () =>
+    anthropic.messages.create({
       model: MATCHING_MODEL,
       max_tokens: 800,
       system: buildAssistantSystemPrompt(language, body.pathname, body.webSearchEnabled),
@@ -42,6 +41,23 @@ export async function POST(request: Request) {
         ? { tools: [{ type: "web_search_20260318" as const, name: "web_search" as const, max_uses: 2 }] }
         : {}),
     });
+
+  let response;
+  try {
+    try {
+      response = await createCall();
+    } catch (err) {
+      // Same transient-overload retry as every other Anthropic call in the
+      // app (see learn.ts) — Tomorrow is the most visible, most-used
+      // surface, so a single 429/529 blip showing as a dead chat bubble is
+      // the worst possible place to skip this.
+      if (err instanceof Anthropic.APIError && (err.status === 429 || err.status === 529)) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        response = await createCall();
+      } else {
+        throw err;
+      }
+    }
   } catch (err) {
     if (err instanceof Anthropic.APIError) {
       const status = err.status === 401 || err.status === 403 ? 502 : (err.status ?? 502);

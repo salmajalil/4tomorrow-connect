@@ -37,11 +37,24 @@ export function TomorrowChat() {
     setError("");
 
     try {
-      const res = await fetch("/api/assistant/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: nextMessages, pathname, webSearchEnabled: webSearch }),
-      });
+      let res: Response;
+      try {
+        res = await fetch("/api/assistant/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: nextMessages, pathname, webSearchEnabled: webSearch }),
+        });
+      } catch (err) {
+        // One retry on a dropped connection (TypeError) — same mobile-network
+        // reality every other long-running call in the app already accounts
+        // for; Tomorrow is short enough that this alone usually recovers it.
+        if (!(err instanceof TypeError)) throw err;
+        res = await fetch("/api/assistant/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: nextMessages, pathname, webSearchEnabled: webSearch }),
+        });
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t.assistant.errorFallback);
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);

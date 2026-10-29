@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { setModuleStatus } from "@/lib/module-status";
 import { getLanguage } from "@/lib/i18n/language";
+import { projectTitle } from "@/lib/text";
 
 // "Connect to Decide" — the user already started a diagnostic in Decide
 // (a transformation exists) but never picked a trajectory there. Rather
@@ -69,9 +70,7 @@ export async function POST(request: Request) {
 
   if (!trajectoryId) {
     const trajectoryName =
-      (transformation.challenges ?? "").trim().slice(0, 72) ||
-      (transformation.objectives ?? "").trim().slice(0, 72) ||
-      "Projet";
+      projectTitle(transformation.challenges ?? "") || projectTitle(transformation.objectives ?? "") || "Projet";
 
     const { data: newTrajectory, error: trajectoryError } = await supabase
       .from("trajectories")

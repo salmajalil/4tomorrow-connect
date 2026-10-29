@@ -4,6 +4,7 @@ import { getLanguage } from "@/lib/i18n/language";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { LearnFlow } from "./learn-flow";
 import type { Training } from "@/types/database";
+import { projectTitle } from "@/lib/text";
 
 export default async function LearnPage({
   searchParams,
@@ -37,7 +38,7 @@ export default async function LearnPage({
     existingProjects = (transformations ?? []).map((tr) => ({
       id: tr.id,
       title:
-        (tr.challenges?.trim() ? tr.challenges.trim().slice(0, 60) : tr.objectives?.trim()?.slice(0, 60)) ||
+        (tr.challenges?.trim() ? projectTitle(tr.challenges, 60) : tr.objectives?.trim() ? projectTitle(tr.objectives, 60) : "") ||
         t.common.untitledProject,
     }));
   }

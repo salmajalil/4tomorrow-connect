@@ -8,6 +8,7 @@ import { DeliverThemeWrap } from "@/components/deliver/deliver-theme";
 import { DeliverFlow } from "./deliver-flow";
 import type { DeliverableKind, Deliverable } from "@/types/database";
 import type { Domain } from "@/lib/decide";
+import { projectTitle as toProjectTitle } from "@/lib/text";
 
 function EmptyState({
   title,
@@ -71,8 +72,7 @@ export default async function DeliverPage({
     .filter((tr) => !tr.selected_trajectory_id)
     .map((tr) => ({
       id: tr.id,
-      title:
-        tr.challenges?.trim()?.slice(0, 60) || tr.objectives?.trim()?.slice(0, 60) || t.common.untitledProject,
+      title: tr.challenges?.trim() ? toProjectTitle(tr.challenges, 60) : tr.objectives?.trim() ? toProjectTitle(tr.objectives, 60) : t.common.untitledProject,
     }));
 
   if (candidates.length === 0) {
@@ -107,8 +107,10 @@ export default async function DeliverPage({
   }
 
   const projectTitle = transformation.challenges?.trim()
-    ? transformation.challenges.trim().slice(0, 72)
-    : transformation.objectives?.trim()?.slice(0, 72) || org?.name || t.common.untitledProject;
+    ? toProjectTitle(transformation.challenges)
+    : transformation.objectives?.trim()
+      ? toProjectTitle(transformation.objectives)
+      : org?.name || t.common.untitledProject;
 
   return (
     <DeliverThemeWrap>

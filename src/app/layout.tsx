@@ -5,7 +5,9 @@ import { Nav } from "@/components/nav";
 import { LanguageProvider } from "@/components/language-provider";
 import { TomorrowChat } from "@/components/assistant/tomorrow-chat";
 import { TomorrowProvider } from "@/components/assistant/tomorrow-context";
+import { BrandThemeProvider } from "@/components/brand-theme-context";
 import { getLanguage } from "@/lib/i18n/language";
+import { createClient } from "@/lib/supabase/server";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,6 +39,22 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const language = await getLanguage();
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  let initialBrandTheme = null;
+  if (user) {
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("brand_theme")
+      .eq("owner_id", user.id)
+      .limit(1)
+      .maybeSingle();
+    initialBrandTheme = org?.brand_theme ?? null;
+  }
+
   return (
     <html
       lang={language}
@@ -44,11 +62,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="flex min-h-full flex-col bg-bg text-ink">
         <LanguageProvider initialLanguage={language}>
-          <TomorrowProvider>
-            <Nav />
-            <main className="flex flex-1 flex-col">{children}</main>
-            <TomorrowChat />
-          </TomorrowProvider>
+          <BrandThemeProvider initialTheme={initialBrandTheme}>
+            <TomorrowProvider>
+              <Nav />
+              <main className="flex flex-1 flex-col">{children}</main>
+              <TomorrowChat />
+            </TomorrowProvider>
+          </BrandThemeProvider>
         </LanguageProvider>
       </body>
     </html>

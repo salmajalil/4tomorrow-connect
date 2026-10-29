@@ -17,11 +17,26 @@ export type ModuleRelevance = "relevant" | "possible" | "not_relevant";
 export type ModuleStatusValue = "not_started" | "in_progress" | "done";
 export type Language = "fr" | "en";
 
+export type BrandTheme = {
+  bg: string;
+  surface: string;
+  surfaceAlt: string;
+  border: string;
+  ink: string;
+  muted: string;
+  accent: string;
+  accentStrong: string;
+  accentInk: string;
+  sourceLabel: string;
+  generatedAt: string;
+};
+
 export type Organization = {
   id: string;
   owner_id: string;
   name: string;
   industry: string | null;
+  brand_theme: BrandTheme | null;
   created_at: string;
 };
 

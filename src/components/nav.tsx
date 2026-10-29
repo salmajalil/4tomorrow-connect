@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/sign-out-button";
 import { LanguageToggle } from "@/components/language-toggle";
+import { BrandThemeControl } from "@/components/brand-theme-control";
 import { getLanguage } from "@/lib/i18n/language";
 import { getDictionary } from "@/lib/i18n/dictionary";
 
@@ -40,6 +41,7 @@ export async function Nav() {
               <Link href="/deliver" className="font-medium text-ink hover:text-accent">
                 {t.nav.deliver}
               </Link>
+              <BrandThemeControl />
               <SignOutButton label={t.nav.signOut} />
             </>
           ) : (

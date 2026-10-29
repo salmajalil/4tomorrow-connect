@@ -125,8 +125,12 @@ function ModuleNetwork({ t }: { t: Dictionary }) {
             <Link
               key={mod.key}
               href={mod.href}
-              style={{ borderTopColor: MODULE_COLORS[mod.key].accent, borderTopWidth: 3 }}
-              className="rounded-lg border border-border bg-surface-2 px-2.5 py-2 text-center text-xs text-muted transition hover:text-ink"
+              style={{
+                borderTopColor: MODULE_COLORS[mod.key].accent,
+                borderTopWidth: 3,
+                background: `linear-gradient(180deg, color-mix(in srgb, ${MODULE_COLORS[mod.key].accent} 10%, var(--surface-2)), var(--surface-2))`,
+              }}
+              className="rounded-lg border border-border px-2.5 py-2 text-center text-xs text-muted transition hover:-translate-y-0.5 hover:text-ink"
             >
               <span className="block font-semibold text-ink">{mod.label}</span>
               {mod.blurb}
@@ -143,6 +147,59 @@ function ModuleNetwork({ t }: { t: Dictionary }) {
   );
 }
 
+const STEP_ICONS = [
+  <path key="compass" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm3.5 6.5-2 5.5-5.5 2 2-5.5 5.5-2Z" />,
+  <path key="network" d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM2 20c0-3 3-5 6-5s6 2 6 5M14 15c3 0 6 2 6 5" />,
+  <path key="bolt" d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />,
+];
+const STEP_COLORS = [MODULE_COLORS.decide, MODULE_COLORS.connect, MODULE_COLORS.deliver];
+
+function StepFlow({ t }: { t: Dictionary }) {
+  const steps = [
+    { title: t.home.step1Title, body: t.home.step1Body },
+    { title: t.home.step2Title, body: t.home.step2Body },
+    { title: t.home.step3Title, body: t.home.step3Body },
+  ];
+  return (
+    <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-3">
+      {steps.map((step, i) => (
+        <div key={i} className="relative">
+          {i < steps.length - 1 && (
+            <div
+              aria-hidden
+              className="absolute -right-2.5 top-7 hidden h-px w-5 sm:block"
+              style={{ background: `linear-gradient(90deg, ${STEP_COLORS[i].accent}, ${STEP_COLORS[i + 1].accent})` }}
+            />
+          )}
+          <div
+            className="h-full rounded-xl border p-4"
+            style={{
+              borderColor: "var(--border)",
+              background: `radial-gradient(ellipse 140% 100% at 0% 0%, color-mix(in srgb, ${STEP_COLORS[i].accent} 14%, var(--surface)), var(--surface))`,
+            }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={STEP_COLORS[i].accent}
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-7 w-7"
+            >
+              {STEP_ICONS[i]}
+            </svg>
+            <p className="mt-3 text-sm font-semibold" style={{ color: STEP_COLORS[i].strong }}>
+              {step.title}
+            </p>
+            <p className="mt-1 text-sm text-muted">{step.body}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default async function Home() {
   const supabase = await createClient();
   const {
@@ -155,10 +212,13 @@ export default async function Home() {
     <div className="relative mx-auto flex w-full max-w-4xl flex-1 flex-col items-center px-4 py-16 text-center">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-80 opacity-40"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[32rem] opacity-70"
         style={{
-          background:
-            "radial-gradient(ellipse 60% 100% at 50% 0%, color-mix(in srgb, var(--accent) 35%, transparent), transparent)",
+          background: [
+            `radial-gradient(ellipse 55% 60% at 18% 0%, color-mix(in srgb, ${MODULE_COLORS.decide.accent} 20%, transparent), transparent 70%)`,
+            `radial-gradient(ellipse 55% 60% at 82% 10%, color-mix(in srgb, ${MODULE_COLORS.connect.accent} 16%, transparent), transparent 70%)`,
+            `radial-gradient(ellipse 70% 70% at 50% 0%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%)`,
+          ].join(", "),
         }}
       />
 
@@ -200,19 +260,8 @@ export default async function Home() {
         </div>
       </div>
 
-      <div className="mt-12 grid w-full grid-cols-1 gap-4 text-left sm:grid-cols-3">
-        <div className="rounded-xl border border-border bg-surface p-4">
-          <p className="text-sm font-semibold text-accent">{t.home.step1Title}</p>
-          <p className="mt-1 text-sm text-muted">{t.home.step1Body}</p>
-        </div>
-        <div className="rounded-xl border border-border bg-surface p-4">
-          <p className="text-sm font-semibold text-accent">{t.home.step2Title}</p>
-          <p className="mt-1 text-sm text-muted">{t.home.step2Body}</p>
-        </div>
-        <div className="rounded-xl border border-border bg-surface p-4">
-          <p className="text-sm font-semibold text-accent">{t.home.step3Title}</p>
-          <p className="mt-1 text-sm text-muted">{t.home.step3Body}</p>
-        </div>
+      <div className="mt-12 w-full text-left">
+        <StepFlow t={t} />
       </div>
     </div>
   );

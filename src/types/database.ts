@@ -50,9 +50,11 @@ export type Transformation = {
   domains: string[];
   selected_trajectory_id: string | null;
   maturity_reading: string | null;
+  maturity_highlights: string[] | null;
   root_causes: { name: string; reason: string }[];
   decision_criteria: string[];
   starting_recommendation: string | null;
+  starting_actions: string[] | null;
   strategic_brief: string | null;
   good_ideas: string[];
   created_at: string;
@@ -152,6 +154,7 @@ export type Trajectory = {
   indicators_feedback: IndicatorFeedback;
   regulations: RegulationEntry[];
   executive_briefing: string | null;
+  briefing_highlights: string[] | null;
   roadmap_start_date: string | null;
   priority_cost: number | null;
   priority_co2: number | null;
@@ -228,6 +231,7 @@ export type TrainingMode = "rapide" | "document" | "diagnostic" | "workshop";
 export type ExecutiveSummary = {
   addressedChallenge: string;
   summary: string;
+  summaryHighlights: string[];
   actionPlan: string[];
 };
 

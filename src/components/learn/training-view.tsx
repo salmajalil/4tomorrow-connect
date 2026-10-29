@@ -69,6 +69,7 @@ export function TrainingView({ training }: { training: Training }) {
   const [quizScore, setQuizScore] = useState(0);
   const [quizAnswered, setQuizAnswered] = useState(0);
   const [mastered, setMastered] = useState(0);
+  const [showSummaryFull, setShowSummaryFull] = useState(false);
   const domains = training.domains as Domain[];
   const totalQuestions = training.comprehension_check.length;
 
@@ -171,7 +172,28 @@ export function TrainingView({ training }: { training: Training }) {
           </div>
           <div className="rounded-xl border border-border bg-surface p-4">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{tr.summary}</h2>
-            <p className="mt-2 text-sm text-ink">{training.executive_summary.summary}</p>
+            {(training.executive_summary.summaryHighlights ?? []).length > 0 ? (
+              <>
+                <ul className="mt-2 flex flex-col gap-1.5">
+                  {training.executive_summary.summaryHighlights.map((h, i) => (
+                    <li key={i} className="flex items-baseline gap-2 text-sm text-ink">
+                      <span aria-hidden className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                      {h}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => setShowSummaryFull((v) => !v)}
+                  className="mt-2 text-xs font-medium text-muted underline underline-offset-2 hover:text-accent"
+                >
+                  {showSummaryFull ? tr.hideFullText : tr.readFullText}
+                </button>
+                {showSummaryFull && <p className="mt-2 text-sm text-ink">{training.executive_summary.summary}</p>}
+              </>
+            ) : (
+              <p className="mt-2 text-sm text-ink">{training.executive_summary.summary}</p>
+            )}
           </div>
           <div>
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{tr.actionPlan}</h2>

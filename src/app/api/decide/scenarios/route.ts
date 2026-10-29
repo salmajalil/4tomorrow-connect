@@ -178,6 +178,7 @@ export async function POST(request: Request) {
         indicators: scenario.indicators,
         regulations: scenario.regulations,
         executive_briefing: scenario.executiveBriefing,
+        briefing_highlights: scenario.briefingHighlights,
       })
       .select("id")
       .single();

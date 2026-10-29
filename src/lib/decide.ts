@@ -81,6 +81,7 @@ const relevanceEnum = z.enum(["relevant", "possible", "not_relevant"]);
 const diagnosticSchema = z.object({
   domains: z.array(z.enum(DOMAINS)).min(1),
   maturityReading: z.string().min(1),
+  maturityHighlights: z.array(z.string().min(1)).min(2).max(4),
   gaps: z.array(z.object({ name: z.string().min(1), reason: z.string().min(1) })).min(1).max(3),
   rootCauses: z.array(z.object({ name: z.string().min(1), reason: z.string().min(1) })).min(1).max(4),
   decisionCriteria: z.array(z.string().min(1)).min(2).max(5),
@@ -90,6 +91,7 @@ const diagnosticSchema = z.object({
     .max(4),
   risks: z.array(z.object({ name: z.string().min(1), reason: z.string().min(1) })).min(1).max(3),
   startingRecommendation: z.string().min(1),
+  startingActions: z.array(z.string().min(1)).min(2).max(4),
   moduleRecommendations: z.object({
     connect: z.object({ relevance: relevanceEnum, reason: z.string().min(1) }),
     learn: z.object({ relevance: relevanceEnum, reason: z.string().min(1) }),
@@ -120,12 +122,14 @@ CORE RULE — NEVER GENERIC: every sentence you write must contain something tha
 Produce:
 1. domains: the detected domain(s) from the list above.
 2. maturityReading: one paragraph reading of the organization's current maturity on this challenge, grounded in what they actually said${webSearchEnabled ? " and in anything verified via web search" : ""}. Be direct, not diplomatic: explicitly position them against what leading competitors or best-in-class players in their sector are already doing (from general sector knowledge if web search is off, or verified specifics if it's on), and clearly name what is wrong or lagging in their overall strategy — never soften a real gap into vague corporate language.
+2b. maturityHighlights: 2 to 4 short bullet versions of maturityReading's most important points (≤15 words each, no trailing period) — someone reading only these must get the real substance without opening the full paragraph. Each one stands alone (no "also," "and," continuing a previous bullet).
 3. gaps: up to 3 concrete gaps (missing capability, resource, or knowledge) — WHAT is missing, each tied to something specific in the intake.
 4. rootCauses: up to 4 root causes — WHY those gaps exist (a structural, organizational, or technical reason behind the symptom), distinct from the gaps themselves. Never restate a gap under a different name — a root cause explains it.
 5. decisionCriteria: 2 to 5 criteria that should drive evaluating the strategic options later (e.g. "temps avant retour sur investissement", "% de réduction CO2", "risque d'arrêt de production pendant le déploiement" for an industrial subject; "taux de dépendance à un fournisseur unique", "délai d'approvisionnement", "visibilité multi-niveaux fournisseurs" for a supply-chain/manufacturing subject; "délai de mise sur le marché", "impact sur la rétention client" for a commercial/digital one) — adapt entirely to the subject, never a fixed list.
 6. priorities: up to 4 priorities — what matters most to address first, and why, specific to this challenge. Each carries a "weight" (0-100) reflecting its relative importance; weights across all returned priorities must sum to 100.
 7. risks: up to 3 cross-cutting risks (not yet tied to any specific strategic option).
 8. startingRecommendation: one paragraph — where to start, concretely.
+8b. startingActions: 2 to 4 short, concrete, imperative first actions derived from startingRecommendation (≤12 words each, start with a verb, no trailing period) — a checklist someone could act on today.
 9. moduleRecommendations: for each of "connect", "learn", "deliver", a relevance ("relevant" | "possible" | "not_relevant") and a one-sentence reason grounded in the actual gaps found:
    - connect is "relevant" when a gap implies needing something external (a technology, partner, supplier, or skill not held internally).
    - learn is "relevant" when a gap is capability/human in nature (missing internal skills, a team that needs training) rather than purely technical or external.
@@ -139,12 +143,14 @@ Schema:
 {
   "domains": ["manufacturing" | "rd" | "gtm" | "strategy" | "digitalization", ...],
   "maturityReading": string,
+  "maturityHighlights": [string, ...],
   "gaps": [{ "name": string, "reason": string }],
   "rootCauses": [{ "name": string, "reason": string }],
   "decisionCriteria": [string, ...],
   "priorities": [{ "name": string, "reason": string, "weight": number }],
   "risks": [{ "name": string, "reason": string }],
   "startingRecommendation": string,
+  "startingActions": [string, ...],
   "moduleRecommendations": {
     "connect": { "relevance": "relevant"|"possible"|"not_relevant", "reason": string },
     "learn": { "relevance": "relevant"|"possible"|"not_relevant", "reason": string },
@@ -250,6 +256,7 @@ const scenarioSchema = z.object({
   suppliers: z.array(scenarioSupplierSchema).min(0).max(6),
   regulations: z.array(regulationSchema).min(0).max(6),
   executiveBriefing: z.string().min(1),
+  briefingHighlights: z.array(z.string().min(1)).min(2).max(4),
   risksSpecific: z.array(z.object({ name: z.string().min(1), reason: z.string().min(1) })).min(1).max(5),
   opportunitiesSpecific: z
     .array(z.object({ name: z.string().min(1), reason: z.string().min(1) }))
@@ -306,6 +313,7 @@ PRINCIPE DIRECTEUR — everything adapts to the actual subject, nothing is templ
 - regulations: search for and list only regulations/certifications/standards actually relevant to this specific subject and found with a source — industrial/safety standards for a physical subject, sectoral regulation (GDPR, financial compliance, etc.) for a digital or product subject, market standards for a commercialization subject. Never invent a reference; if none found, return an empty array.
 - radarScores: 0-10 per axis, in coherence with the indicators you just stated (never a score disconnected from the displayed numbers). Always include "cost", "risk", "roi", "feasibility" as axes, plus ONE more axis you choose to fit the subject (e.g. "co2" for an industrial/environmental subject, "speed" or "scalability" for a digital/commercial one).
 - risksSpecific / opportunitiesSpecific: distinct from the transverse risks already identified in the diagnostic — specific to what makes THIS scenario's approach risky or promising.
+- briefingHighlights: 2 to 4 short bullet versions of executiveBriefing's most important points (≤15 words each, no trailing period) — a reader scanning only these must get the real substance.
 
 HARD ARRAY LIMITS — never exceed these, the response is rejected otherwise: techStack ≤4 items, suppliers ≤4 items, regulations ≤4 items, risksSpecific ≤3 items, opportunitiesSpecific ≤3 items. Pick the most important entries rather than listing everything you found.
 
@@ -326,6 +334,7 @@ Schema (a single scenario object, not an array):
   "suppliers": [{ "category": "partner"|"technology"|"startup"|"supplier"|"funding"|"support"|"expert", "name": string, "reason": string, "website": string|null, "contactEmail": string|null, "source": "registry"|"web_search", "ecosystemMemberId": string|null }],
   "regulations": [{ "name": string, "description": string, "sourceUrl": string|null }],
   "executiveBriefing": string,
+  "briefingHighlights": [string, ...],
   "risksSpecific": [{ "name": string, "reason": string }],
   "opportunitiesSpecific": [{ "name": string, "reason": string }]
 }`;

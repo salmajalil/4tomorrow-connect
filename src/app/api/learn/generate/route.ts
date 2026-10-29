@@ -259,7 +259,7 @@ export async function POST(request: Request) {
       objectives: result.objectives,
       prerequisites: result.prerequisites,
       duration_minutes: result.durationMinutes,
-      executive_summary: { addressedChallenge: "", summary: "", actionPlan: [] },
+      executive_summary: { addressedChallenge: "", summary: "", summaryHighlights: [], actionPlan: [] },
       key_insights: [],
       business_implications: [],
       flashcards: [],

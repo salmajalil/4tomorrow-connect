@@ -157,9 +157,11 @@ export async function POST(request: Request) {
       // these used to only ever live in the API response, lost the moment
       // the page was left or reloaded.
       maturity_reading: result.maturityReading,
+      maturity_highlights: result.maturityHighlights,
       root_causes: result.rootCauses,
       decision_criteria: result.decisionCriteria,
       starting_recommendation: result.startingRecommendation,
+      starting_actions: result.startingActions,
       status: "active",
     })
     .select("id")

@@ -14,12 +14,14 @@ export interface DiagnosticResult {
   transformationId: string;
   domains: Domain[];
   maturityReading: string;
+  maturityHighlights: string[];
   gaps: { name: string; reason: string }[];
   rootCauses: { name: string; reason: string }[];
   decisionCriteria: string[];
   priorities: { name: string; reason: string; weight: number }[];
   risks: { name: string; reason: string }[];
   startingRecommendation: string;
+  startingActions: string[];
   moduleRecommendations: Record<RecommendableModule, { relevance: ModuleRelevance; reason: string }>;
 }
 
@@ -115,6 +117,8 @@ export function DiagnosticView({
   const { t } = useLanguage();
   const diagnostic = t.decide.diagnostic;
   const [showDetails, setShowDetails] = useState(false);
+  const [showMaturityFull, setShowMaturityFull] = useState(false);
+  const [showRecommendationFull, setShowRecommendationFull] = useState(false);
   const topPriority = [...result.priorities].sort((a, b) => b.weight - a.weight)[0];
   const topRisk = result.risks[0];
 
@@ -135,7 +139,28 @@ export function DiagnosticView({
         </div>
       </div>
 
-      <p className="text-base leading-relaxed text-ink">{result.maturityReading}</p>
+      {result.maturityHighlights.length > 0 ? (
+        <div className="flex flex-col gap-3">
+          <ul className="flex flex-col gap-2">
+            {result.maturityHighlights.map((h, i) => (
+              <li key={i} className="flex items-baseline gap-2.5 text-base text-ink">
+                <span aria-hidden className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                {h}
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={() => setShowMaturityFull((v) => !v)}
+            className="self-start text-xs font-medium text-muted underline underline-offset-2 hover:text-accent"
+          >
+            {showMaturityFull ? diagnostic.hideFullText : diagnostic.readFullText}
+          </button>
+          {showMaturityFull && <p className="text-sm leading-relaxed text-muted">{result.maturityReading}</p>}
+        </div>
+      ) : (
+        <p className="text-base leading-relaxed text-ink">{result.maturityReading}</p>
+      )}
 
       {/* Key messages — always visible. The exhaustive breakdown (all gaps,
           root causes, priorities, risks, decision criteria) sits behind the
@@ -145,7 +170,30 @@ export function DiagnosticView({
         <h2 className="text-sm font-semibold uppercase tracking-wide text-accent-strong">
           {diagnostic.startingRecommendation}
         </h2>
-        <p className="mt-2 text-sm text-ink">{result.startingRecommendation}</p>
+        {result.startingActions.length > 0 ? (
+          <>
+            <ul className="mt-2.5 flex flex-col gap-1.5">
+              {result.startingActions.map((a, i) => (
+                <li key={i} className="flex items-baseline gap-2 text-sm text-ink">
+                  <span className="font-mono text-xs text-accent-strong">{String(i + 1).padStart(2, "0")}</span>
+                  {a}
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={() => setShowRecommendationFull((v) => !v)}
+              className="mt-2.5 text-xs font-medium text-accent-strong underline underline-offset-2 hover:text-accent"
+            >
+              {showRecommendationFull ? diagnostic.hideFullText : diagnostic.readFullText}
+            </button>
+            {showRecommendationFull && (
+              <p className="mt-2 text-sm text-ink/90">{result.startingRecommendation}</p>
+            )}
+          </>
+        ) : (
+          <p className="mt-2 text-sm text-ink">{result.startingRecommendation}</p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

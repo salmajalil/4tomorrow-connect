@@ -72,6 +72,7 @@ const coreOutputSchema = z.object({
   executiveSummary: z.object({
     addressedChallenge: z.string().min(1),
     summary: z.string().min(1),
+    summaryHighlights: z.array(z.string().min(1)).min(2).max(4),
     actionPlan: z.array(z.string().min(1)).min(2).max(6),
   }),
   keyInsights: z
@@ -181,6 +182,7 @@ PRINCIPE DIRECTEUR — everything adapts to the actual topic and domain, nothing
 - objectives: measurable pedagogical objectives (Qualiopi requires these to be explicit, not vague aspirations like "comprendre les enjeux").
 - prerequisites: state plainly if there truly are none — never invent a prerequisite to sound thorough.
 - executiveSummary.summary: be direct, not diplomatic — explicitly position where the organization/sector stands relative to leading competitors or best-in-class players on this topic, and name plainly what's being done wrong or left behind by staying at the status quo.
+- executiveSummary.summaryHighlights: 2 to 4 short bullet versions of summary's most important points (≤15 words each, no trailing period) — someone scanning only these gets the real substance without reading the paragraph.
 - keyInsights: facts specific to THIS topic, each with a real source when found via web_search (a real organization, publication, or figure — never invented). This is what makes the training feel alive rather than generic — treat it as the most important field.
 - businessImplications: concrete consequences for an organization acting on this topic — costs, risks, opportunities, never platitudes. Include the cost of inaction (what falling behind competitors on this actually costs) when it's a genuine implication.
 
@@ -198,7 +200,7 @@ Schema:
   "objectives": [string],
   "prerequisites": string,
   "durationMinutes": number,
-  "executiveSummary": { "addressedChallenge": string, "summary": string, "actionPlan": [string] },
+  "executiveSummary": { "addressedChallenge": string, "summary": string, "summaryHighlights": [string, ...], "actionPlan": [string] },
   "keyInsights": [{ "text": string, "source": string|null }],
   "businessImplications": [{ "text": string }]
 }`;

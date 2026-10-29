@@ -58,7 +58,7 @@ export default async function DecidePage({
     const { data: transformation } = await supabase
       .from("transformations")
       .select(
-        "id, domains, maturity_reading, root_causes, decision_criteria, starting_recommendation, selected_trajectory_id"
+        "id, domains, maturity_reading, maturity_highlights, root_causes, decision_criteria, starting_recommendation, starting_actions, selected_trajectory_id"
       )
       .eq("id", transformationId)
       .maybeSingle();
@@ -94,12 +94,14 @@ export default async function DecidePage({
         transformationId: transformation.id,
         domains: (transformation.domains as Domain[]) ?? [],
         maturityReading: transformation.maturity_reading,
+        maturityHighlights: (transformation.maturity_highlights as string[]) ?? [],
         gaps: (gaps ?? []).map((g) => ({ name: g.name, reason: g.reason ?? "" })),
         rootCauses: (transformation.root_causes as { name: string; reason: string }[]) ?? [],
         decisionCriteria: (transformation.decision_criteria as string[]) ?? [],
         priorities: (priorities ?? []).map((p) => ({ name: p.name, reason: p.reason ?? "", weight: p.weight ?? 0 })),
         risks: (risks ?? []).map((r) => ({ name: r.name, reason: r.reason ?? "" })),
         startingRecommendation: transformation.starting_recommendation ?? "",
+        startingActions: (transformation.starting_actions as string[]) ?? [],
         moduleRecommendations,
       };
       initialSelectedTrajectoryId = transformation.selected_trajectory_id ?? null;
@@ -111,7 +113,7 @@ export default async function DecidePage({
       // pile up older runs and overload the comparison.
       const { data: latestTrajectories } = await supabase
         .from("trajectories")
-        .select("id, name, stance, description, tech_stack, scores, indicators, regulations, executive_briefing")
+        .select("id, name, stance, description, tech_stack, scores, indicators, regulations, executive_briefing, briefing_highlights")
         .eq("transformation_id", transformationId)
         .order("created_at", { ascending: false })
         .limit(3);
@@ -155,6 +157,7 @@ export default async function DecidePage({
               })),
             regulations: traj.regulations ?? [],
             executiveBriefing: traj.executive_briefing ?? "",
+            briefingHighlights: (traj.briefing_highlights as string[]) ?? [],
             risksSpecific: (scenarioRisks ?? [])
               .filter((r) => r.trajectory_id === traj.id)
               .map((r) => ({ name: r.name, reason: r.reason ?? "" })),

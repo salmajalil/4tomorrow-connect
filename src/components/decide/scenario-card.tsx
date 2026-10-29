@@ -89,6 +89,7 @@ export function ScenarioCard({
   const [indicators, setIndicators] = useState<TrajectoryIndicators>(scenario.indicators);
   const [feedback, setFeedback] = useState<IndicatorFeedback>({});
   const [expanded, setExpanded] = useState(false);
+  const [showBriefingFull, setShowBriefingFull] = useState(false);
 
   const CATEGORY_LABELS: Record<string, string> = {
     technology: t.connect.results.categoryTechnology,
@@ -260,7 +261,28 @@ export function ScenarioCard({
               </div>
               <div className="border border-border bg-surface-2 p-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">{scenarios.executiveBriefing}</h4>
-                <p className="mt-1 text-sm text-ink">{scenario.executiveBriefing}</p>
+                {scenario.briefingHighlights.length > 0 ? (
+                  <>
+                    <ul className="mt-2 flex flex-col gap-1.5">
+                      {scenario.briefingHighlights.map((h, i) => (
+                        <li key={i} className="flex items-baseline gap-2 text-sm text-ink">
+                          <span aria-hidden className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                          {h}
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      type="button"
+                      onClick={() => setShowBriefingFull((v) => !v)}
+                      className="mt-2 text-xs font-medium text-muted underline underline-offset-2 hover:text-accent"
+                    >
+                      {showBriefingFull ? t.decide.diagnostic.hideFullText : t.decide.diagnostic.readFullText}
+                    </button>
+                    {showBriefingFull && <p className="mt-2 text-sm text-ink">{scenario.executiveBriefing}</p>}
+                  </>
+                ) : (
+                  <p className="mt-1 text-sm text-ink">{scenario.executiveBriefing}</p>
+                )}
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>

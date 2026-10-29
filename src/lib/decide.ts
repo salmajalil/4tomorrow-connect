@@ -1,9 +1,11 @@
 import { z } from "zod";
+import { MATCH_CATEGORIES } from "@/lib/ecosystem-bricks";
 import type { EcosystemMember, Language } from "@/types/database";
+import type { IconName } from "@/components/icons";
 
 function languageInstruction(language: Language): string {
   const languageName = language === "en" ? "English" : "French";
-  return `Respond in ${languageName}, except JSON keys which stay in English exactly as specified.`;
+  return `Respond in ${languageName}, except JSON keys which stay in English exactly as specified. Write every human-readable value in ${languageName} even when the user's own input, documents or sources are written in another language; keep proper nouns (company, product, place names) as they are.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -23,12 +25,12 @@ export const DOMAIN_LABELS: Record<Domain, string> = {
 
 // Small scannability aid shown next to every domain chip across the app
 // (Decide, Learn, Deliver, Control Tower) — purely visual, no copy change.
-export const DOMAIN_ICONS: Record<Domain, string> = {
-  manufacturing: "🚚",
-  rd: "🔬",
-  gtm: "📈",
-  strategy: "🧭",
-  digitalization: "💻",
+export const DOMAIN_ICONS: Record<Domain, IconName> = {
+  manufacturing: "factory",
+  rd: "flask",
+  gtm: "trend",
+  strategy: "route",
+  digitalization: "chip",
 };
 
 const RESULT_START = "<RESULT_JSON>";
@@ -207,7 +209,7 @@ const techStackItemSchema = z.object({
 });
 
 const scenarioSupplierSchema = z.object({
-  category: z.enum(["technology", "startup", "expert", "partner", "funding"]),
+  category: z.enum(MATCH_CATEGORIES),
   name: z.string().min(1),
   reason: z.string().min(1),
   website: z.string().nullable().optional(),
@@ -321,7 +323,7 @@ Schema (a single scenario object, not an array):
   "indicators": { [key: string]: { "value": string | number | null, "confidence": "verified" | "estimate" | "unknown" } },
   "radarScores": { "cost": number, "risk": number, "roi": number, "feasibility": number, [fifthAxis: string]: number },
   "techStack": [{ "name": string, "maturity": string, "maturityScale": string, "detail": string, "benefit": string }],
-  "suppliers": [{ "category": "technology"|"startup"|"expert"|"partner"|"funding", "name": string, "reason": string, "website": string|null, "contactEmail": string|null, "source": "registry"|"web_search", "ecosystemMemberId": string|null }],
+  "suppliers": [{ "category": "partner"|"technology"|"startup"|"supplier"|"funding"|"support"|"expert", "name": string, "reason": string, "website": string|null, "contactEmail": string|null, "source": "registry"|"web_search", "ecosystemMemberId": string|null }],
   "regulations": [{ "name": string, "description": string, "sourceUrl": string|null }],
   "executiveBriefing": string,
   "risksSpecific": [{ "name": string, "reason": string }],

@@ -107,11 +107,15 @@ export default async function DecidePage({
       // If scenarios were already generated for this project, rehydrate them
       // too, so returning here shows the full comparison, not just the
       // diagnostic.
-      const { data: trajectories } = await supabase
+      // Only the latest generation (three scenarios): regenerating used to
+      // pile up older runs and overload the comparison.
+      const { data: latestTrajectories } = await supabase
         .from("trajectories")
         .select("id, name, stance, description, tech_stack, scores, indicators, regulations, executive_briefing")
         .eq("transformation_id", transformationId)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false })
+        .limit(3);
+      const trajectories = latestTrajectories ? [...latestTrajectories].reverse() : null;
 
       if (trajectories && trajectories.length > 0) {
         const trajectoryIds = trajectories.map((t) => t.id);

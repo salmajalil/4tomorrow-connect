@@ -15,7 +15,7 @@ export interface RoadmapPhase {
   order_index: number;
 }
 
-const GANTT_COLORS = ["#c9a256", "#7c93ad", "#c9713f", "#7ea88a", "#b98a9a"];
+const GANTT_COLORS = ["#c8955a", "#7fb8c4", "#d48a6a", "#9cc08a", "#d9c3a5"];
 
 function daysBetween(a: string, b: string) {
   return (new Date(b).getTime() - new Date(a).getTime()) / 86_400_000;

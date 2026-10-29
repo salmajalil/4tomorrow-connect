@@ -13,7 +13,6 @@ import {
 } from "@/components/connect/onboarding-steps";
 import { MatchingLoadingState, MatchingErrorState } from "@/components/connect/loading-error";
 import { MatchResults } from "@/components/connect/match-results";
-import { EcosystemBoosters } from "@/components/connect/ecosystem-boosters";
 import { ExportPdfButton } from "@/components/export-pdf-button";
 import { ModuleCrossLinks } from "@/components/module-cross-links";
 import { useLanguage } from "@/components/language-provider";
@@ -130,7 +129,11 @@ export function ConnectFlow({
             </button>
           </div>
         </div>
-        <MatchResults result={result} projectLabel={state.industry || t.connect.results.yourProject} />
+        <MatchResults
+          result={result}
+          projectLabel={state.industry || t.connect.results.yourProject}
+          storageKey={`connect-shortlist-${activeTransformationId ?? "draft"}`}
+        />
         <div className="mt-10 rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted">
           {t.connect.results.missingPartner}{" "}
           <Link href="/ecosystem/join" className="font-medium text-accent underline underline-offset-2">
@@ -209,12 +212,6 @@ export function ConnectFlow({
           </button>
         )}
       </div>
-
-      {step === 1 && (
-        <div className="mt-12">
-          <EcosystemBoosters />
-        </div>
-      )}
     </div>
   );
 }

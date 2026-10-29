@@ -1,10 +1,11 @@
 "use client";
 
+import { Icon } from "@/components/icons";
 import { useState } from "react";
 import { parseJsonResponse } from "@/lib/parse-json-response";
 import { useLanguage } from "@/components/language-provider";
 
-type ExportKind = "decide" | "connect" | "learn" | "control-tower";
+type ExportKind = "decide" | "connect" | "learn" | "control-tower" | "project-ceo" | "project-detailed";
 
 export function ExportPdfButton({
   kind,
@@ -58,7 +59,14 @@ export function ExportPdfButton({
         disabled={loading}
         className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-ink transition hover:border-accent/50 hover:text-accent-strong disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {loading ? t.common.exportInProgress : `⬇ ${label ?? t.common.exportPdf}`}
+        {loading ? (
+          t.common.exportInProgress
+        ) : (
+          <>
+            <Icon name="download" className="h-3.5 w-3.5" />
+            {label ?? t.common.exportPdf}
+          </>
+        )}
       </button>
       {error && <span className="text-xs text-danger">{error}</span>}
     </div>

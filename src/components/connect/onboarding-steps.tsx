@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@/components/icons";
 import { useState } from "react";
 import { INDUSTRIES, PARTNER_TYPES } from "@/lib/onboarding-data";
 import { useLanguage } from "@/components/language-provider";
@@ -49,7 +50,7 @@ export function IndustryStep({
                   : "border-border bg-surface text-ink hover:border-accent/60"
               }`}
             >
-              <span className="text-2xl">{industry.icon}</span>
+              <Icon name={industry.icon} className="h-7 w-7" />
               <span className="text-sm font-medium">{industry.label}</span>
             </button>
           );

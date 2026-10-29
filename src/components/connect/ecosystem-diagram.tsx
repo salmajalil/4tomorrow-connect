@@ -1,99 +1,127 @@
-import type { MatchOutput } from "@/lib/matching";
+"use client";
 
-const SIZE = 360;
+import { BRICKS, type BrickKey } from "@/lib/ecosystem-bricks";
+
+const SIZE = 380;
 const CENTER = SIZE / 2;
-const NODE_RADIUS_FROM_CENTER = 128;
-const CENTER_NODE_R = 46;
+const ORBIT = 132;
+const CENTER_R = 50;
 
+// The project at the centre, the five ecosystem bricks around it. Every
+// brick is a button: tapping one filters the players below, and the link
+// lights up — the ecosystem reads as connected, not as a list. Bricks with
+// nobody in them stay drawn (dashed) so the client sees what is missing.
 export function EcosystemDiagram({
   projectLabel,
-  groups,
+  centerLabel,
+  counts,
+  labels,
+  active,
+  onSelect,
 }: {
   projectLabel: string;
-  groups: { category: MatchOutput["category"]; label: string; count: number }[];
+  centerLabel: string;
+  counts: Record<BrickKey, number>;
+  labels: Record<BrickKey, string>;
+  active: BrickKey | null;
+  onSelect: (key: BrickKey | null) => void;
 }) {
-  if (groups.length === 0) return null;
-
-  const nodes = groups.map((group, i) => {
-    // Start at the top (-90deg) and go clockwise, evenly spaced.
-    const angle = -90 + (360 / groups.length) * i;
+  const nodes = BRICKS.map((b, i) => {
+    const angle = -90 + (360 / BRICKS.length) * i;
     const rad = (angle * Math.PI) / 180;
-    const x = CENTER + NODE_RADIUS_FROM_CENTER * Math.cos(rad);
-    const y = CENTER + NODE_RADIUS_FROM_CENTER * Math.sin(rad);
-    const r = Math.min(30, 16 + group.count * 3.5);
-    // Label anchors flip side depending on which half of the circle it's on,
-    // so text never runs off the viewBox or overlaps the node.
-    const textAnchor: "start" | "end" | "middle" =
-      Math.cos(rad) > 0.2 ? "start" : Math.cos(rad) < -0.2 ? "end" : "middle";
-    const labelX = x + (textAnchor === "start" ? r + 8 : textAnchor === "end" ? -(r + 8) : 0);
-    const labelY = y + (Math.sin(rad) > 0.5 ? r + 16 : Math.sin(rad) < -0.5 ? -(r + 10) : 4);
-
-    return { ...group, x, y, r, textAnchor, labelX, labelY };
+    const x = CENTER + ORBIT * Math.cos(rad);
+    const y = CENTER + ORBIT * Math.sin(rad);
+    const count = counts[b.key];
+    const r = count === 0 ? 20 : Math.min(32, 22 + count * 2.5);
+    const below = Math.sin(rad) > 0.3;
+    return { ...b, x, y, r, count, labelY: below ? y + r + 16 : y - r - 9 };
   });
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
-      <svg
-        viewBox={`0 0 ${SIZE} ${SIZE}`}
-        role="img"
-        aria-label={`Écosystème connecté à ${projectLabel} : ${groups
-          .map((g) => `${g.label} (${g.count})`)
-          .join(", ")}`}
-        className="mx-auto block w-full max-w-sm"
-      >
-        {nodes.map((node) => (
+    <svg
+      viewBox={`0 0 ${SIZE} ${SIZE}`}
+      role="group"
+      aria-label={`${projectLabel} : ${nodes.map((n) => `${labels[n.key]} (${n.count})`).join(", ")}`}
+      className="mx-auto block w-full max-w-md select-none"
+    >
+      {nodes.map((n) => {
+        const lit = active === n.key;
+        return (
           <line
-            key={`line-${node.category}`}
+            key={`l-${n.key}`}
             x1={CENTER}
             y1={CENTER}
-            x2={node.x}
-            y2={node.y}
-            stroke="var(--border)"
-            strokeWidth={1.5}
+            x2={n.x}
+            y2={n.y}
+            stroke={lit ? "var(--accent)" : "var(--border-strong)"}
+            strokeWidth={lit ? 2 : 1}
+            strokeDasharray={n.count === 0 ? "3 4" : undefined}
+            className={n.count > 0 && !lit ? "eco-flow" : undefined}
           />
-        ))}
+        );
+      })}
 
-        <circle cx={CENTER} cy={CENTER} r={CENTER_NODE_R} fill="var(--surface-2)" stroke="var(--accent)" strokeWidth={2} />
-        <text
-          x={CENTER}
-          y={CENTER - 4}
-          textAnchor="middle"
-          fill="var(--muted)"
-          fontSize={10}
-          letterSpacing="0.08em"
-        >
-          TON PROJET
+      <g onClick={() => onSelect(null)} className="cursor-pointer">
+        <circle cx={CENTER} cy={CENTER} r={CENTER_R} fill="var(--surface-2)" stroke="var(--accent)" strokeWidth={1.5} />
+        <text x={CENTER} y={CENTER - 6} textAnchor="middle" fill="var(--muted)" fontSize={9} letterSpacing="0.14em">
+          {centerLabel.toUpperCase()}
         </text>
-        <text
-          x={CENTER}
-          y={CENTER + 14}
-          textAnchor="middle"
-          fill="var(--ink)"
-          fontSize={13}
-          fontWeight={600}
-        >
-          {projectLabel.length > 16 ? `${projectLabel.slice(0, 15)}…` : projectLabel}
+        <text x={CENTER} y={CENTER + 12} textAnchor="middle" fill="var(--ink)" fontSize={13} fontWeight={600}>
+          {projectLabel.length > 15 ? `${projectLabel.slice(0, 14)}…` : projectLabel}
         </text>
+      </g>
 
-        {nodes.map((node) => (
-          <g key={node.category}>
-            <circle cx={node.x} cy={node.y} r={node.r} fill="var(--surface-2)" stroke="var(--accent)" strokeWidth={1.5} />
-            <text x={node.x} y={node.y + 4} textAnchor="middle" fill="var(--accent-strong)" fontSize={13} fontWeight={700}>
-              {node.count}
-            </text>
+      {nodes.map((n) => {
+        const lit = active === n.key;
+        const dim = n.count === 0;
+        return (
+          <g
+            key={n.key}
+            role="button"
+            tabIndex={0}
+            aria-pressed={lit}
+            aria-label={`${labels[n.key]} : ${n.count}`}
+            onClick={() => onSelect(lit ? null : n.key)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect(lit ? null : n.key);
+              }
+            }}
+            className="cursor-pointer outline-none"
+          >
+            <circle
+              cx={n.x}
+              cy={n.y}
+              r={n.r}
+              fill={lit ? "var(--accent)" : "var(--surface)"}
+              stroke={dim ? "var(--border-strong)" : "var(--accent)"}
+              strokeWidth={1.5}
+              strokeDasharray={dim ? "3 3" : undefined}
+            />
             <text
-              x={node.labelX}
-              y={node.labelY}
-              textAnchor={node.textAnchor}
-              fill="var(--ink)"
-              fontSize={11}
+              x={n.x}
+              y={n.y + 5}
+              textAnchor="middle"
+              fill={lit ? "var(--accent-ink)" : dim ? "var(--muted)" : "var(--accent-strong)"}
+              fontSize={16}
               fontWeight={600}
             >
-              {node.label}
+              {n.count}
+            </text>
+            <text
+              x={n.x}
+              y={n.labelY}
+              textAnchor="middle"
+              fill={lit ? "var(--accent-strong)" : dim ? "var(--muted)" : "var(--ink)"}
+              fontSize={11}
+              fontWeight={500}
+            >
+              {labels[n.key]}
             </text>
           </g>
-        ))}
-      </svg>
-    </div>
+        );
+      })}
+    </svg>
   );
 }

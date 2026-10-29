@@ -1,17 +1,35 @@
-// Per-module accent palette — Decide (blue) and Connect (green) get a
-// signature color; Learn gets its own bright golden-yellow (brighter than
-// the sitewide default brass); Deliver stays on the plain sitewide default
-// (near-black + brass gold, see :root in globals.css) since it has no
-// ThemeWrap override of its own. Shared between each module's ThemeWrap
-// (CSS custom-property overrides, see decide-theme.tsx for the pattern)
-// and the homepage's module-network diagram, which paints each node in its
-// own module's color to make the "connected but distinct" ecosystem
-// visible even when every module isn't open at once.
+import type { CSSProperties } from "react";
+
+// Per-module accent palette, tuned to the printed catalogue: every module
+// keeps the same ink ground, surfaces and text, and only its accent changes
+// — Decide gold, Connect steel blue, Learn sage, Deliver sand. Same chroma
+// and lightness family, so the four read as one product, not four apps.
+// Shared between each module's ThemeWrap and every diagram that paints a
+// module in its own colour (home network, impact journey, PDF reports).
 export type ModuleKey = "decide" | "connect" | "learn" | "deliver";
 
 export const MODULE_COLORS: Record<ModuleKey, { accent: string; strong: string }> = {
-  decide: { accent: "#4a90e2", strong: "#7ab3f0" },
-  connect: { accent: "#3fd67a", strong: "#7bf1a8" },
-  learn: { accent: "#f0b93c", strong: "#f7d06a" },
-  deliver: { accent: "#c9a256", strong: "#e0bd6e" },
+  decide: { accent: "#c8955a", strong: "#e0b57f" },
+  connect: { accent: "#7fb8c4", strong: "#a8d3dc" },
+  learn: { accent: "#9cc08a", strong: "#bfd8b1" },
+  deliver: { accent: "#d9c3a5", strong: "#ecdcc4" },
 };
+
+// CSS custom-property overrides for a module's ThemeWrap: only the accent
+// family changes; components keep reading --accent / --accent-strong, so a
+// whole module re-themes without touching any component.
+export function moduleThemeVars(key: ModuleKey): CSSProperties {
+  const c = MODULE_COLORS[key];
+  return {
+    "--accent": c.accent,
+    "--accent-strong": c.strong,
+    "--accent-ink": "#0b0a08",
+  } as CSSProperties;
+}
+
+// A faint glow of the module colour at the top of the page — enough to
+// tell where you are, never enough to change the brand ground.
+export function moduleBackground(key: ModuleKey): string {
+  const hex = MODULE_COLORS[key].accent;
+  return `radial-gradient(ellipse 70% 40% at 50% -5%, ${hex}1f 0%, transparent 70%), var(--bg)`;
+}

@@ -1,15 +1,17 @@
 "use client";
 
+import { Icon, type IconName } from "@/components/icons";
 import { useState } from "react";
 import { Eyebrow } from "@/components/eyebrow";
 import { ExportPdfButton } from "@/components/export-pdf-button";
 import { DOMAIN_LABELS, DOMAIN_ICONS, type Domain } from "@/lib/learn";
+import { FlashcardDeck, QuizRunner } from "@/components/learn/interactive";
 import { useLanguage } from "@/components/language-provider";
 import { useTomorrowController } from "@/components/assistant/tomorrow-context";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Training } from "@/types/database";
 
-type Tab = "apercu" | "points-cles" | "experience" | "video" | "support" | "etapes" | "qualiopi";
+type Tab = "apercu" | "points-cles" | "cartes" | "quiz" | "video" | "support" | "etapes" | "qualiopi";
 
 function tabs(training: Dictionary["learn"]["training"], isWorkshop: boolean): { id: Tab; label: string }[] {
   if (isWorkshop) {
@@ -23,51 +25,11 @@ function tabs(training: Dictionary["learn"]["training"], isWorkshop: boolean): {
   return [
     { id: "apercu", label: training.tabOverview },
     { id: "points-cles", label: training.tabKeyPoints },
-    { id: "experience", label: training.tabExperience },
-    { id: "video", label: training.tabVideo },
+    { id: "cartes", label: training.tabCards },
+    { id: "quiz", label: training.tabQuiz },
+    { id: "video", label: `${training.tabVideo} · ${training.optionBadge}` },
     { id: "qualiopi", label: training.tabQualiopi },
   ];
-}
-
-function Flashcard({
-  question,
-  answer,
-  category,
-  index,
-  tapToReveal,
-}: {
-  question: string;
-  answer: string;
-  category?: string | null;
-  index: number;
-  tapToReveal: string;
-}) {
-  const [revealed, setRevealed] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={() => setRevealed((v) => !v)}
-      className={`flex min-h-[9rem] flex-col justify-between rounded-xl border p-4 text-left transition ${
-        revealed ? "border-accent bg-accent/10" : "border-border bg-surface hover:border-accent/50"
-      }`}
-    >
-      <div>
-        {category && (
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-accent-strong">{category}</span>
-        )}
-        <p className="mt-1 text-sm font-medium text-ink">
-          {index + 1}. {question}
-        </p>
-      </div>
-      {revealed ? (
-        <p className="mt-3 text-sm text-muted">{answer}</p>
-      ) : (
-        <span className="mt-3 self-start rounded-full border border-border px-3 py-1 text-xs font-semibold text-accent">
-          {tapToReveal}
-        </span>
-      )}
-    </button>
-  );
 }
 
 function MentoringButton({ topic, label }: { topic: string; label: string }) {
@@ -78,103 +40,22 @@ function MentoringButton({ topic, label }: { topic: string; label: string }) {
       onClick={() => requestMentoring(topic)}
       className="flex shrink-0 items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent-strong transition hover:bg-accent/20"
     >
-      💬 {label}
+      <Icon name="chat" className="h-3.5 w-3.5" />
+      {label}
     </button>
   );
 }
 
-function FormatTile({ icon, title, subtitle }: { icon: string; title: string; subtitle: string }) {
+function FormatTile({ icon, title, subtitle }: { icon: IconName; title: string; subtitle: string }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-2 text-xl">
-        {icon}
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-2 text-accent">
+        <Icon name={icon} className="h-5 w-5" />
       </span>
       <div>
         <h2 className="text-sm font-bold text-ink">{title}</h2>
         <p className="text-xs text-muted">{subtitle}</p>
       </div>
-    </div>
-  );
-}
-
-function QualiopiBadge({ label }: { label: string }) {
-  return (
-    <div className="flex w-fit items-center gap-2 rounded-full border border-accent/30 bg-accent/5 px-3.5 py-1.5 text-xs text-muted">
-      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-ink">
-        ✓
-      </span>
-      {label}
-    </div>
-  );
-}
-
-function QuizQuestion({
-  question,
-  options,
-  correctOptionId,
-  explanation,
-  index,
-  onAnswered,
-}: {
-  question: string;
-  options: { id: string; text: string }[];
-  correctOptionId: string;
-  explanation: string;
-  index: number;
-  onAnswered: (correct: boolean) => void;
-}) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const letters = ["A", "B", "C", "D"];
-
-  function pick(optionId: string) {
-    if (selected) return;
-    setSelected(optionId);
-    onAnswered(optionId === correctOptionId);
-  }
-
-  return (
-    <div className="rounded-xl border border-border bg-surface p-4">
-      <p className="text-sm font-semibold text-ink">
-        {index + 1}. {question}
-      </p>
-      <div className="mt-3 flex flex-col gap-2">
-        {options.map((opt, i) => {
-          const isCorrect = opt.id === correctOptionId;
-          const isSelected = opt.id === selected;
-          const showState = !!selected;
-          return (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => pick(opt.id)}
-              disabled={!!selected}
-              className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left text-sm transition disabled:cursor-not-allowed ${
-                showState && isCorrect
-                  ? "border-success bg-success/10 text-ink"
-                  : showState && isSelected && !isCorrect
-                    ? "border-danger bg-danger/10 text-ink"
-                    : "border-border bg-surface-2 text-ink hover:border-accent/50"
-              }`}
-            >
-              <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
-                  showState && isCorrect
-                    ? "border-success text-success"
-                    : showState && isSelected && !isCorrect
-                      ? "border-danger text-danger"
-                      : "border-border text-muted"
-                }`}
-              >
-                {letters[i] ?? i + 1}
-              </span>
-              {opt.text}
-              {showState && isCorrect && <span className="ml-auto text-success">✓</span>}
-              {showState && isSelected && !isCorrect && <span className="ml-auto text-danger">✗</span>}
-            </button>
-          );
-        })}
-      </div>
-      {selected && <p className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-muted">{explanation}</p>}
     </div>
   );
 }
@@ -187,6 +68,7 @@ export function TrainingView({ training }: { training: Training }) {
   const [tab, setTab] = useState<Tab>("apercu");
   const [quizScore, setQuizScore] = useState(0);
   const [quizAnswered, setQuizAnswered] = useState(0);
+  const [mastered, setMastered] = useState(0);
   const domains = training.domains as Domain[];
   const totalQuestions = training.comprehension_check.length;
 
@@ -198,20 +80,38 @@ export function TrainingView({ training }: { training: Training }) {
         <div className="flex flex-wrap items-center gap-2">
           {domains.map((d) => (
             <span key={d} className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent-strong">
-              <span aria-hidden>{DOMAIN_ICONS[d]}</span> {DOMAIN_LABELS[d] ?? d}
+              <Icon name={DOMAIN_ICONS[d]} className="inline h-3.5 w-3.5 align-[-2px]" /> {DOMAIN_LABELS[d] ?? d}
             </span>
           ))}
           {training.duration_minutes && (
             <span className="rounded-full border border-border bg-surface-2 px-3 py-1 text-xs text-muted">
-              ⏱ {training.duration_minutes} min
-            </span>
-          )}
-          {quizAnswered > 0 && (
-            <span className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent-strong">
-              ⚡ {quizScore * 10} XP
+              <Icon name="clock" className="inline h-3.5 w-3.5 align-[-2px]" /> {training.duration_minutes} min
             </span>
           )}
         </div>
+        {!isWorkshop && (
+          <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+            <button type="button" onClick={() => setTab("cartes")} className="border border-border bg-surface p-3 text-left hover:border-accent">
+              <span className="block font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{tr.progressCards}</span>
+              <span className="mt-1 block font-display text-3xl leading-none text-ink tabular-nums">
+                {mastered}
+                <span className="text-lg text-muted">/{training.flashcards.length}</span>
+              </span>
+            </button>
+            <button type="button" onClick={() => setTab("quiz")} className="border border-border bg-surface p-3 text-left hover:border-accent">
+              <span className="block font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{tr.progressQuiz}</span>
+              <span className="mt-1 block font-display text-3xl leading-none text-ink tabular-nums">
+                {quizScore}
+                <span className="text-lg text-muted">/{totalQuestions}</span>
+              </span>
+              {quizAnswered > 0 && quizAnswered < totalQuestions && (
+                <span className="mt-1 block font-mono text-[10px] text-muted">
+                  {quizAnswered}/{totalQuestions}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <ExportPdfButton
             kind="learn"
@@ -365,57 +265,36 @@ export function TrainingView({ training }: { training: Training }) {
         </div>
       )}
 
-      {tab === "experience" && (
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-3">
-            <FormatTile icon="🃏" title={tr.interactiveCards} subtitle={tr.interactiveCardsSubtitle} />
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {training.flashcards.map((f, i) => (
-                <Flashcard
-                  key={i}
-                  index={i}
-                  question={f.question}
-                  answer={f.answer}
-                  category={f.category}
-                  tapToReveal={tr.tapToReveal}
-                />
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-col gap-3">
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{tr.validationQuiz}</h2>
-              {quizAnswered > 0 && (
-                <span className="text-xs font-semibold text-accent-strong">
-                  {quizScore}/{quizAnswered} {tr.correct}
-                  {quizAnswered === totalQuestions ? ` ${tr.completed}` : ""}
-                </span>
-              )}
-            </div>
-            <div className="flex flex-col gap-3">
-              {training.comprehension_check.map((q, i) => (
-                <QuizQuestion
-                  key={i}
-                  index={i}
-                  question={q.question}
-                  options={q.options}
-                  correctOptionId={q.correctOptionId}
-                  explanation={q.explanation}
-                  onAnswered={(correct) => {
-                    setQuizAnswered((n) => n + 1);
-                    if (correct) setQuizScore((n) => n + 1);
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-          <QualiopiBadge label={tr.qualiopiCheckmark} />
+      {tab === "cartes" && (
+        <div className="flex flex-col gap-4">
+          <FormatTile icon="learn" title={tr.interactiveCards} subtitle={tr.interactiveCardsSubtitle} />
+          <FlashcardDeck cards={training.flashcards} tr={tr} onProgress={setMastered} />
+        </div>
+      )}
+
+      {tab === "quiz" && (
+        <div className="flex flex-col gap-4">
+          <FormatTile icon="checklist" title={tr.validationQuiz} subtitle={tr.qualiopiCheckmark} />
+          <QuizRunner
+            questions={training.comprehension_check}
+            tr={tr}
+            onScore={(score, answered) => {
+              setQuizScore(score);
+              setQuizAnswered(answered);
+            }}
+          />
         </div>
       )}
 
       {tab === "video" && (
         <div className="flex flex-col gap-4">
-          <FormatTile icon="🎬" title={tr.videoScript} subtitle={tr.videoScriptSubtitle} />
+          <FormatTile icon="film" title={tr.videoScript} subtitle={tr.videoScriptSubtitle} />
+          <p className="flex items-start gap-2 border border-dashed border-border-strong px-4 py-3 text-xs text-muted">
+            <span className="shrink-0 border border-accent/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-accent-strong">
+              {tr.optionBadge}
+            </span>
+            {tr.videoOptionHint}
+          </p>
           <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
             <h2 className="font-display text-lg text-ink">{training.video_script.title}</h2>
           </div>
@@ -429,7 +308,7 @@ export function TrainingView({ training }: { training: Training }) {
                   <span className="text-xs text-muted">{scene.durationSeconds}s</span>
                 </div>
                 <p className="mt-2 text-sm text-ink">{scene.narration}</p>
-                <p className="mt-2 text-xs text-muted">🎬 {scene.visualSuggestion}</p>
+                <p className="mt-2 flex gap-1.5 text-xs text-muted"><Icon name="film" className="mt-0.5 h-3.5 w-3.5 shrink-0" />{scene.visualSuggestion}</p>
               </div>
             ))}
           </div>

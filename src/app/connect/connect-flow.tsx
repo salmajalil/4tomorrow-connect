@@ -47,6 +47,11 @@ export function ConnectFlow({
   const [result, setResult] = useState<ModelOutput | null>(initialResult);
   const [errorMessage, setErrorMessage] = useState("");
   const [activeTransformationId, setActiveTransformationId] = useState<string | null>(transformationId);
+  // C02 — DB id of each match in `result.matches`, same order; absent on a
+  // rehydrated (page-reload) result since this route doesn't persist/return
+  // it — the assessment panel degrades gracefully to "not available yet"
+  // for those (see SupplierAssessmentPanel's matchId null-check).
+  const [matchIds, setMatchIds] = useState<(string | null)[]>([]);
 
   async function launchMatching() {
     setPhase("loading");
@@ -69,6 +74,7 @@ export function ConnectFlow({
         throw new Error(data.error || t.connect.error.unexpectedError);
       }
       setResult(data as ModelOutput);
+      setMatchIds(Array.isArray(data.matchIds) ? (data.matchIds as (string | null)[]) : []);
       if (data.transformationId) setActiveTransformationId(data.transformationId as string);
       setPhase("results");
     } catch (err) {
@@ -131,6 +137,8 @@ export function ConnectFlow({
         </div>
         <MatchResults
           result={result}
+          matchIds={matchIds}
+          transformationId={activeTransformationId}
           projectLabel={state.industry || t.connect.results.yourProject}
           storageKey={`connect-shortlist-${activeTransformationId ?? "draft"}`}
         />

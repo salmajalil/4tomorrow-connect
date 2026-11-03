@@ -120,6 +120,27 @@ export type Match = {
   created_at: string;
 };
 
+// C02 — pertinence fournisseur : voir src/lib/connect-supplier-calc.ts.
+// Stockées en jsonb (pas de taxonomie fixe de prérequis/critères).
+export type SupplierProofStatus = "vérifié" | "manquant" | "périmé";
+
+export type SupplierPrerequisiteJson = { label: string; met: boolean };
+export type SupplierCriterionJson = {
+  label: string;
+  score: number | null;
+  proofStatus: SupplierProofStatus;
+  proofDate: string | null;
+};
+
+export type SupplierAssessment = {
+  id: string;
+  match_id: string;
+  transformation_id: string;
+  prerequisites: SupplierPrerequisiteJson[];
+  criteria: SupplierCriterionJson[];
+  updated_at: string;
+};
+
 export type TechStackEntry = {
   name: string;
   maturity: string;
@@ -432,6 +453,10 @@ export type Database = {
       >;
       ecosystem_members: Table<EcosystemMember, Partial<EcosystemMember> & Pick<EcosystemMember, "name" | "type">>;
       matches: Table<Match, Partial<Match> & Pick<Match, "transformation_id" | "category" | "name" | "source">>;
+      supplier_assessments: Table<
+        SupplierAssessment,
+        Partial<SupplierAssessment> & Pick<SupplierAssessment, "match_id" | "transformation_id">
+      >;
       trajectories: Table<Trajectory, Partial<Trajectory> & Pick<Trajectory, "transformation_id" | "name">>;
       decision_criteria_weights: Table<
         DecisionCriteriaWeight,

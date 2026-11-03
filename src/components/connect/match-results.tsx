@@ -8,6 +8,7 @@ import { Icon } from "@/components/icons";
 import { useLanguage } from "@/components/language-provider";
 import { BRICKS, brickOf, type BrickKey } from "@/lib/ecosystem-bricks";
 import type { Dictionary } from "@/lib/i18n/dictionary";
+import { SupplierAssessmentPanel } from "@/components/connect/supplier-assessment-panel";
 
 // Shortlist kept in this browser: a light, per-viewer convenience until the
 // shortlist gets its own column in the database.
@@ -51,12 +52,16 @@ function FitGauge({ value, label }: { value: number; label: string }) {
 
 function MatchCard({
   match,
+  matchId,
+  transformationId,
   t,
   shortlisted,
   onToggle,
   brickLabel,
 }: {
   match: MatchOutput;
+  matchId: string | null;
+  transformationId: string | null;
   t: Dictionary;
   shortlisted: boolean;
   onToggle: () => void;
@@ -119,16 +124,27 @@ function MatchCard({
           )}
         </div>
       )}
+
+      {/* C02 — pertinence fournisseur : seulement pour les matches "supplier",
+          c'est le périmètre exact de la règle métier du brief. */}
+      {match.category === "supplier" && <SupplierAssessmentPanel matchId={matchId} transformationId={transformationId} />}
     </article>
   );
 }
 
 export function MatchResults({
   result,
+  matchIds,
+  transformationId = null,
   projectLabel,
   storageKey = "connect-shortlist",
 }: {
   result: ModelOutput;
+  // C02 — DB id of each match, same order as result.matches (see
+  // src/app/api/match/route.ts); absent/undefined entries just mean the
+  // assessment panel won't offer saving for that card.
+  matchIds?: (string | null)[];
+  transformationId?: string | null;
   projectLabel?: string;
   storageKey?: string;
 }) {
@@ -145,12 +161,15 @@ export function MatchResults({
   }, [result.matches]);
   const covered = BRICKS.filter((b) => counts[b.key] > 0).length;
 
-  const sorted = [...result.matches].sort((a, b) => (b.fit ?? 0) - (a.fit ?? 0));
+  // Carry each match's DB id along through sort/filter so the assessment
+  // panel still knows which row to save against after reordering.
+  const withIds = result.matches.map((m, i) => ({ match: m, matchId: matchIds?.[i] ?? null }));
+  const sorted = [...withIds].sort((a, b) => (b.match.fit ?? 0) - (a.match.fit ?? 0));
   const visible =
     active === "shortlist"
-      ? sorted.filter((m) => shortlist.includes(m.name))
+      ? sorted.filter((x) => shortlist.includes(x.match.name))
       : active
-        ? sorted.filter((m) => brickOf(m.category) === active)
+        ? sorted.filter((x) => brickOf(x.match.category) === active)
         : sorted;
 
   return (
@@ -262,10 +281,12 @@ export function MatchResults({
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {visible.map((m, i) => (
+            {visible.map(({ match: m, matchId }, i) => (
               <MatchCard
                 key={`${m.name}-${i}`}
                 match={m}
+                matchId={matchId}
+                transformationId={transformationId}
                 t={t}
                 shortlisted={shortlist.includes(m.name)}
                 onToggle={() => toggle(m.name)}

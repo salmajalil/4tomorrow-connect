@@ -136,6 +136,9 @@ export async function POST(request: Request) {
   // industry kept in sync with the latest run) — a multi-org workspace model
   // is out of scope for this first version.
   let transformationId: string | null = null;
+  // C02 — DB id of each persisted match, same order as result.matches;
+  // stays all-null if persistence is skipped/fails (see catch below).
+  let matchIds: (string | null)[] = result.matches.map(() => null);
   try {
     const { data: existingOrg } = await supabase
       .from("organizations")
@@ -223,22 +226,29 @@ export async function POST(request: Request) {
       // in the directory we injected — the FK would otherwise reject the
       // whole insert batch.
       const knownRegistryIds = new Set((registry ?? []).map((m) => m.id));
-      await supabase.from("matches").insert(
-        result.matches.map((m) => ({
-          transformation_id: txId,
-          category: m.category,
-          name: m.name,
-          reason: m.reason,
-          gap_addressed: m.gapAddressed,
-          website: m.website ?? null,
-          contact_email: m.contactEmail ?? null,
-          ecosystem_member_id:
-            m.source === "registry" && m.ecosystemMemberId && knownRegistryIds.has(m.ecosystemMemberId)
-              ? m.ecosystemMemberId
-              : null,
-          source: m.source,
-        }))
-      );
+      const { data: insertedMatches } = await supabase
+        .from("matches")
+        .insert(
+          result.matches.map((m) => ({
+            transformation_id: txId,
+            category: m.category,
+            name: m.name,
+            reason: m.reason,
+            gap_addressed: m.gapAddressed,
+            website: m.website ?? null,
+            contact_email: m.contactEmail ?? null,
+            ecosystem_member_id:
+              m.source === "registry" && m.ecosystemMemberId && knownRegistryIds.has(m.ecosystemMemberId)
+                ? m.ecosystemMemberId
+                : null,
+            source: m.source,
+          }))
+        )
+        // Rows come back in insertion order, matching result.matches 1:1 —
+        // used below (C02) to let the client assess a specific supplier
+        // without us having to change the AI-facing response shape.
+        .select("id");
+      if (insertedMatches) matchIds = insertedMatches.map((row) => row.id as string);
     }
 
     await setModuleStatus(supabase, txId, "connect", "done");
@@ -247,5 +257,8 @@ export async function POST(request: Request) {
     // results even if saving history fails. Not surfaced as a hard error.
   }
 
-  return NextResponse.json({ transformationId, ...result });
+  // matchIds[i] corresponds to result.matches[i] when persistence succeeded;
+  // null (the default, untouched on a persistence failure) means this match
+  // wasn't saved and C02 assessment isn't available for it this run.
+  return NextResponse.json({ transformationId, ...result, matchIds });
 }

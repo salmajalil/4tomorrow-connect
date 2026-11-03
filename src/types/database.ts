@@ -57,6 +57,11 @@ export type Transformation = {
   starting_actions: string[] | null;
   strategic_brief: string | null;
   good_ideas: string[];
+  // Bumped whenever selected_trajectory_id changes (see decide-flow.tsx's
+  // selectTrajectory). A CEO validation token snapshots this value at
+  // issuance; a mismatch at consumption means the decision moved since the
+  // link was sent — see src/lib/validation-token.ts.
+  decision_updated_at: string;
   created_at: string;
 };
 
@@ -74,6 +79,23 @@ export type Priority = {
   name: string;
   reason: string | null;
   weight: number | null;
+  created_at: string;
+};
+
+// D01 — the deterministic, server-computed half of the diagnostic (see
+// src/lib/decide-diagnostic-calc.ts). gap/priority/status are never set by
+// the AI: they're calculated from observed/target/importance/proofNote.
+export type CapabilityAssessment = {
+  id: string;
+  transformation_id: string;
+  domain: string;
+  observed: number;
+  target: number;
+  importance: number;
+  gap: number;
+  priority: number;
+  status: "vérifié" | "non vérifié";
+  proof_note: string;
   created_at: string;
 };
 
@@ -101,6 +123,27 @@ export type Match = {
   ecosystem_member_id: string | null;
   source: EcosystemMemberSource;
   created_at: string;
+};
+
+// C02 — pertinence fournisseur : voir src/lib/connect-supplier-calc.ts.
+// Stockées en jsonb (pas de taxonomie fixe de prérequis/critères).
+export type SupplierProofStatus = "vérifié" | "manquant" | "périmé";
+
+export type SupplierPrerequisiteJson = { label: string; met: boolean };
+export type SupplierCriterionJson = {
+  label: string;
+  score: number | null;
+  proofStatus: SupplierProofStatus;
+  proofDate: string | null;
+};
+
+export type SupplierAssessment = {
+  id: string;
+  match_id: string;
+  transformation_id: string;
+  prerequisites: SupplierPrerequisiteJson[];
+  criteria: SupplierCriterionJson[];
+  updated_at: string;
 };
 
 export type TechStackEntry = {
@@ -160,7 +203,16 @@ export type Trajectory = {
   priority_co2: number | null;
   priority_risk: number | null;
   priority_speed: number | null;
+  veto: boolean;
   created_at: string;
+};
+
+export type DecisionCriteriaWeight = {
+  id: string;
+  transformation_id: string;
+  axis: string;
+  weight: number;
+  updated_at: string;
 };
 
 export type Risk = {
@@ -170,6 +222,51 @@ export type Risk = {
   name: string;
   reason: string | null;
   module_origin: string;
+  // AR — jamais rempli par l'IA : saisis par l'utilisateur, ou null tant
+  // qu'il ne l'a pas fait (voir src/lib/risk-scoring.ts).
+  probability: number | null;
+  impact: number | null;
+  owner: string | null;
+  treatment: string | null;
+  created_at: string;
+};
+
+export type ActionStatus = "not_started" | "in_progress" | "done";
+
+export type Action = {
+  id: string;
+  transformation_id: string;
+  title: string;
+  owner: string | null;
+  due_date: string | null;
+  status: ActionStatus;
+  source_module: string | null;
+  created_at: string;
+};
+
+export type BenefitSource = "manual" | "business_case";
+
+export type BenefitExpectation = {
+  transformation_id: string;
+  expected_annual: number | null;
+  source: BenefitSource;
+  updated_at: string;
+};
+
+export type BenefitItem = {
+  id: string;
+  transformation_id: string;
+  label: string;
+  perimeter: string;
+  value: number;
+  created_at: string;
+};
+
+export type BenefitObservation = {
+  id: string;
+  transformation_id: string;
+  month: string;
+  value: number;
   created_at: string;
 };
 
@@ -286,6 +383,35 @@ export type Training = {
   created_at: string;
 };
 
+// F01 — the deterministic, server-computed skills gap (see
+// src/lib/learn-skills-calc.ts). gap/weighted/status are never set by the
+// AI: they're calculated from required/demonstrated/criticality/selfAssessed.
+export type SkillAssessment = {
+  id: string;
+  transformation_id: string;
+  role: string;
+  domain: string;
+  required: number;
+  demonstrated: number;
+  criticality: number;
+  self_assessed: boolean;
+  gap: number;
+  weighted: number;
+  status: "à confirmer" | "confirmé";
+  created_at: string;
+};
+
+// F01 — editable training catalog ("une formation proposée par écart"),
+// scoped per organization. A missing row for a domain falls back to
+// learn-skills-calc.ts's DEFAULT_TRAINING_SUGGESTIONS, never to the AI.
+export type TrainingSuggestion = {
+  id: string;
+  organization_id: string;
+  domain: string;
+  suggestion: string;
+  created_at: string;
+};
+
 export const DELIVERABLE_KINDS = [
   "roadmap",
   "action_plan",
@@ -357,6 +483,58 @@ export type MissionFeedback = {
   created_at: string;
 };
 
+// PROJET ET ÉQUIPE — membership/role on a transformation (0015_team_roles.sql).
+export type TransformationMemberRole = "consultant" | "client" | "expert" | "ceo";
+
+export type TransformationMember = {
+  id: string;
+  transformation_id: string;
+  user_id: string | null;
+  invited_email: string;
+  role: TransformationMemberRole;
+  domain: ModuleName | null;
+  invited_at: string;
+  accepted_at: string | null;
+  created_at: string;
+};
+
+// D05 — business case, option off by default. net_annual/payback_years/npv/
+// cumulative_by_year are always the output of src/lib/decide-business-case-
+// calc.ts's computeBusinessCase — never a value chosen by the AI.
+export type BusinessCase = {
+  id: string;
+  transformation_id: string;
+  trajectory_id: string;
+  enabled: boolean;
+  capex: number;
+  annual_gains: number;
+  annual_costs: number;
+  horizon_years: number;
+  discount_rate_percent: number | null;
+  net_annual: number;
+  payback_years: number | null;
+  npv: number | null;
+  cumulative_by_year: number[];
+  created_at: string;
+};
+
+export type ValidationOutcomeValue = "validated" | "needs_more_info" | "rejected";
+
+// L09 — CEO validation token. See src/lib/validation-token.ts for the
+// issuance/consumption rules this row is checked against.
+export type CeoValidationToken = {
+  id: string;
+  transformation_id: string;
+  trajectory_id: string;
+  decision_snapshot: string;
+  token: string;
+  expires_at: string;
+  used_at: string | null;
+  outcome: ValidationOutcomeValue | null;
+  outcome_note: string | null;
+  created_at: string;
+};
+
 // @supabase/postgrest-js requires every table entry to also carry a
 // `Relationships` array (used for typed embedded-resource joins, which this
 // project doesn't use) and the schema to declare `Views`/`Functions`, even
@@ -370,9 +548,22 @@ export type Database = {
       transformations: Table<Transformation, Partial<Transformation> & Pick<Transformation, "organization_id">>;
       gaps: Table<Gap, Partial<Gap> & Pick<Gap, "transformation_id" | "name">>;
       priorities: Table<Priority, Partial<Priority> & Pick<Priority, "transformation_id" | "name">>;
+      capability_assessments: Table<
+        CapabilityAssessment,
+        Partial<CapabilityAssessment> &
+          Pick<CapabilityAssessment, "transformation_id" | "domain" | "observed" | "target" | "importance" | "gap" | "priority" | "status">
+      >;
       ecosystem_members: Table<EcosystemMember, Partial<EcosystemMember> & Pick<EcosystemMember, "name" | "type">>;
       matches: Table<Match, Partial<Match> & Pick<Match, "transformation_id" | "category" | "name" | "source">>;
+      supplier_assessments: Table<
+        SupplierAssessment,
+        Partial<SupplierAssessment> & Pick<SupplierAssessment, "match_id" | "transformation_id">
+      >;
       trajectories: Table<Trajectory, Partial<Trajectory> & Pick<Trajectory, "transformation_id" | "name">>;
+      decision_criteria_weights: Table<
+        DecisionCriteriaWeight,
+        Partial<DecisionCriteriaWeight> & Pick<DecisionCriteriaWeight, "transformation_id" | "axis" | "weight">
+      >;
       risks: Table<Risk, Partial<Risk> & Pick<Risk, "transformation_id" | "name">>;
       opportunities: Table<Opportunity, Partial<Opportunity> & Pick<Opportunity, "transformation_id" | "name">>;
       roadmap_phases: Table<
@@ -390,6 +581,12 @@ export type Database = {
       >;
       profiles: Table<Profile, Partial<Profile> & Pick<Profile, "id">>;
       trainings: Table<Training, Partial<Training> & Pick<Training, "transformation_id" | "topic">>;
+      skill_assessments: Table<
+        SkillAssessment,
+        Partial<SkillAssessment> &
+          Pick<SkillAssessment, "transformation_id" | "role" | "domain" | "required" | "demonstrated" | "criticality" | "gap" | "weighted" | "status">
+      >;
+      training_suggestions: Table<TrainingSuggestion, Partial<TrainingSuggestion> & Pick<TrainingSuggestion, "organization_id" | "domain" | "suggestion">>;
       deliverables: Table<
         Deliverable,
         Partial<Deliverable> & Pick<Deliverable, "transformation_id" | "trajectory_id" | "kind" | "title">
@@ -397,6 +594,36 @@ export type Database = {
       mission_feedback: Table<
         MissionFeedback,
         Partial<MissionFeedback> & Pick<MissionFeedback, "transformation_id" | "trajectory_id" | "feedback_text">
+      >;
+      transformation_members: Table<
+        TransformationMember,
+        Partial<TransformationMember> & Pick<TransformationMember, "transformation_id" | "invited_email" | "role">
+      >;
+      actions: Table<Action, Partial<Action> & Pick<Action, "transformation_id" | "title">>;
+      benefit_expectations: Table<BenefitExpectation, Partial<BenefitExpectation> & Pick<BenefitExpectation, "transformation_id">>;
+      benefit_items: Table<BenefitItem, Partial<BenefitItem> & Pick<BenefitItem, "transformation_id" | "label" | "perimeter" | "value">>;
+      benefit_observations: Table<
+        BenefitObservation,
+        Partial<BenefitObservation> & Pick<BenefitObservation, "transformation_id" | "month" | "value">
+      >;
+      business_cases: Table<
+        BusinessCase,
+        Partial<BusinessCase> &
+          Pick<
+            BusinessCase,
+            | "transformation_id"
+            | "trajectory_id"
+            | "capex"
+            | "annual_gains"
+            | "annual_costs"
+            | "horizon_years"
+            | "net_annual"
+          >
+      >;
+      ceo_validation_tokens: Table<
+        CeoValidationToken,
+        Partial<CeoValidationToken> &
+          Pick<CeoValidationToken, "transformation_id" | "trajectory_id" | "decision_snapshot" | "token" | "expires_at">
       >;
     };
     Views: Record<string, never>;

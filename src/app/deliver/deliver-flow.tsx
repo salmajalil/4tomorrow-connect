@@ -5,20 +5,22 @@ import { DeliverHeader, type MissionPhase } from "@/components/deliver/deliver-h
 import { InputsTab } from "@/components/deliver/inputs-tab";
 import { DeliverablesTab } from "@/components/deliver/deliverables-tab";
 import { ControlTowerTab } from "@/components/deliver/control-tower-tab";
+import { BenefitsTab } from "@/components/deliver/benefits-tab";
 import { ModuleCrossLinks } from "@/components/module-cross-links";
 import { DELIVERABLE_KINDS, type DeliverableKind } from "@/lib/deliver";
 import { useLanguage } from "@/components/language-provider";
 import type { Dictionary } from "@/lib/i18n/dictionary";
-import type { Deliverable, RoadmapPhaseEntry } from "@/types/database";
+import type { BenefitExpectation, BenefitItem, BenefitObservation, Deliverable, RoadmapPhaseEntry } from "@/types/database";
 import type { Domain } from "@/lib/decide";
 
-type Tab = "inputs" | "deliverables" | "control-tower";
+type Tab = "inputs" | "deliverables" | "control-tower" | "benefits";
 
 function tabs(t: Dictionary["deliver"]["tabs"]): { id: Tab; label: string }[] {
   return [
     { id: "inputs", label: t.inputs },
     { id: "deliverables", label: t.deliverables },
     { id: "control-tower", label: t.controlTower },
+    { id: "benefits", label: t.benefits },
   ];
 }
 
@@ -39,6 +41,9 @@ export function DeliverFlow({
   initialDeliverables,
   roadmapPhases,
   priorities,
+  initialBenefitExpectation,
+  initialBenefitItems,
+  initialBenefitObservations,
 }: {
   transformationId: string;
   organizationId: string;
@@ -50,6 +55,9 @@ export function DeliverFlow({
   initialDeliverables: Partial<Record<DeliverableKind, Deliverable>>;
   roadmapPhases: RoadmapPhaseEntry[];
   priorities: { id: string; name: string; reason: string | null }[];
+  initialBenefitExpectation: BenefitExpectation | null;
+  initialBenefitItems: BenefitItem[];
+  initialBenefitObservations: BenefitObservation[];
 }) {
   const { t } = useLanguage();
   const TABS = tabs(t.deliver.tabs);
@@ -121,6 +129,15 @@ export function DeliverFlow({
             deliverablesReady={readyCount}
             priorities={priorities}
             milestonesCount={roadmapPhases.length}
+          />
+        )}
+
+        {tab === "benefits" && (
+          <BenefitsTab
+            transformationId={transformationId}
+            initialExpectation={initialBenefitExpectation}
+            initialItems={initialBenefitItems}
+            initialObservations={initialBenefitObservations}
           />
         )}
       </div>

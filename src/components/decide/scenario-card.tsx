@@ -8,7 +8,7 @@ import { RoadmapView } from "@/components/decide/roadmap-view";
 import { useLanguage } from "@/components/language-provider";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 
-export type ScenarioWithId = ScenarioOutput & { trajectoryId: string };
+export type ScenarioWithId = ScenarioOutput & { trajectoryId: string; veto: boolean };
 
 const SLOT_LABELS = ["A", "B", "C"];
 
@@ -66,6 +66,7 @@ export function ScenarioCard({
   onOpenDetail,
   recommended = false,
   compact = false,
+  onToggleVeto,
 }: {
   scenario: ScenarioWithId;
   index: number;
@@ -82,6 +83,10 @@ export function ScenarioCard({
   // alternatives are shown compact, one click away from comparison.
   recommended?: boolean;
   compact?: boolean;
+  // D04 — veto : écarte ce scénario du classement (il ne peut plus jamais
+  // finir premier, voir src/lib/decide-scenario-calc.ts). Optionnel : sans
+  // ce prop, pas de contrôle de veto affiché.
+  onToggleVeto?: () => void;
 }) {
   const { t } = useLanguage();
   const scenarios = t.decide.scenarios;
@@ -127,6 +132,7 @@ export function ScenarioCard({
         </span>
         {recommended && <span className="bg-accent px-2 py-0.5 text-accent-ink">{scenarios.recommended}</span>}
         {selected && !recommended && <span className="border border-accent px-2 py-0.5 text-accent-strong">{scenarios.chosen}</span>}
+        {scenario.veto && <span className="border border-danger px-2 py-0.5 text-danger">{scenarios.vetoed}</span>}
       </div>
 
       <div>
@@ -401,17 +407,31 @@ export function ScenarioCard({
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={onSelect}
-        className={`self-start rounded-lg px-5 py-2 text-sm font-semibold transition ${
-          selected
-            ? "bg-accent text-accent-ink"
-            : "border border-accent text-accent hover:bg-accent hover:text-accent-ink"
-        }`}
-      >
-        {selected ? scenarios.chosen : scenarios.chooseThis}
-      </button>
+      <div className="flex flex-wrap items-center gap-4">
+        <button
+          type="button"
+          onClick={onSelect}
+          className={`self-start rounded-lg px-5 py-2 text-sm font-semibold transition ${
+            selected
+              ? "bg-accent text-accent-ink"
+              : "border border-accent text-accent hover:bg-accent hover:text-accent-ink"
+          }`}
+        >
+          {selected ? scenarios.chosen : scenarios.chooseThis}
+        </button>
+        {onToggleVeto && (
+          <button
+            type="button"
+            onClick={onToggleVeto}
+            className={`text-xs font-medium underline-offset-4 hover:underline ${
+              scenario.veto ? "text-danger" : "text-muted"
+            }`}
+            title={scenarios.vetoHint}
+          >
+            {scenario.veto ? scenarios.unveto : scenarios.veto}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

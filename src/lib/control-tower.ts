@@ -5,8 +5,10 @@ import type {
   ModuleStatusValue,
   RecommendableModule,
   ModuleRelevance,
+  TransformationMember,
 } from "@/types/database";
 import { projectTitle } from "@/lib/text";
+import type { ActionStatus } from "@/types/database";
 
 export const MODULE_ORDER: ModuleName[] = ["decide", "connect", "learn", "deliver"];
 
@@ -23,13 +25,23 @@ export type ControlTowerProject = {
   moduleStatus: Record<ModuleName, ModuleStatusValue>;
   moduleRecommendations: { module: RecommendableModule; relevance: ModuleRelevance; reason: string | null }[];
   priorities: { name: string; reason: string | null }[];
-  risks: { id: string; name: string; reason: string | null }[];
+  risks: {
+    id: string;
+    name: string;
+    reason: string | null;
+    probability: number | null;
+    impact: number | null;
+    owner: string | null;
+    treatment: string | null;
+  }[];
   opportunities: { id: string; name: string; reason: string | null }[];
+  actions: { id: string; title: string; owner: string | null; due_date: string | null; status: ActionStatus; source_module: string | null }[];
   keyMetrics: { key: string; value: string | number }[];
   pendingValidationCount: number;
   matchesCount: number;
   progressPercent: number; // modules done / 4
   targetDate: string | null; // furthest roadmap_phases.end_date, if a roadmap exists
+  members: TransformationMember[];
 };
 
 // One aggregate fetch, called both for the initial server render and again
@@ -64,6 +76,7 @@ export async function fetchControlTowerProjects(
     { data: trajectories },
     { data: matches },
     { data: roadmapPhases },
+    { data: actions },
   ] = await Promise.all([
     supabase.from("module_status").select("transformation_id, module, status").in("transformation_id", txIds),
     supabase
@@ -71,7 +84,10 @@ export async function fetchControlTowerProjects(
       .select("transformation_id, module, relevance, reason")
       .in("transformation_id", txIds),
     supabase.from("priorities").select("transformation_id, name, reason").in("transformation_id", txIds),
-    supabase.from("risks").select("id, transformation_id, name, reason").in("transformation_id", txIds),
+    supabase
+      .from("risks")
+      .select("id, transformation_id, name, reason, probability, impact, owner, treatment")
+      .in("transformation_id", txIds),
     supabase
       .from("opportunities")
       .select("id, transformation_id, name, reason")
@@ -79,7 +95,22 @@ export async function fetchControlTowerProjects(
     supabase.from("trajectories").select("transformation_id, indicators").in("transformation_id", txIds),
     supabase.from("matches").select("id, transformation_id").in("transformation_id", txIds),
     supabase.from("roadmap_phases").select("transformation_id, end_date").in("transformation_id", txIds),
+    supabase
+      .from("actions")
+      .select("id, transformation_id, title, owner, due_date, status, source_module")
+      .in("transformation_id", txIds),
   ]);
+
+  // PROJET ET ÉQUIPE — best-effort: on a database that hasn't run
+  // 0012_team_roles.sql yet, this table doesn't exist and the call errors;
+  // treat that exactly like "no members" rather than failing the whole
+  // control tower fetch, so this stays safe to deploy ahead of the
+  // migration being applied.
+  const membersResult = await supabase
+    .from("transformation_members")
+    .select("id, transformation_id, user_id, invited_email, role, domain, invited_at, accepted_at, created_at")
+    .in("transformation_id", txIds);
+  const members = membersResult.data ?? [];
 
   return transformations.map((t) => {
     const moduleStatus = Object.fromEntries(MODULE_ORDER.map((m) => [m, "not_started" as ModuleStatusValue])) as Record<
@@ -132,11 +163,13 @@ export async function fetchControlTowerProjects(
       priorities: (priorities ?? []).filter((p) => p.transformation_id === t.id),
       risks: (risks ?? []).filter((r) => r.transformation_id === t.id),
       opportunities: (opportunities ?? []).filter((o) => o.transformation_id === t.id),
+      actions: (actions ?? []).filter((a) => a.transformation_id === t.id),
       keyMetrics,
       pendingValidationCount,
       matchesCount: (matches ?? []).filter((m) => m.transformation_id === t.id).length,
       progressPercent,
       targetDate,
+      members: members.filter((m) => m.transformation_id === t.id),
     };
   });
 }

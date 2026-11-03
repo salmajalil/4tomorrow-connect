@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ExportPdfButton } from "@/components/export-pdf-button";
+import { CeoValidationPanel } from "@/components/impact/ceo-validation-panel";
 import { MODULE_COLORS } from "@/lib/module-colors";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { ImpactIndicator, ImpactModule, ProjectImpact } from "@/lib/project-impact";
@@ -197,6 +198,8 @@ export function ImpactView({ project, t, language }: { project: ProjectImpact; t
           </div>
         </div>
       </section>
+
+      {project.trajectory && <CeoValidationPanel transformationId={project.transformationId} />}
 
       {/* Journey */}
       <section className="mt-14">

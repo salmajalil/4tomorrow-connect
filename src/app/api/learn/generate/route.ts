@@ -20,6 +20,16 @@ import {
 import { setModuleStatus } from "@/lib/module-status";
 import type { Training } from "@/types/database";
 import { getLanguage } from "@/lib/i18n/language";
+import {
+  computeSkillGaps,
+  validateSkillInputs,
+  SKILL_LEVEL_MIN,
+  SKILL_LEVEL_MAX,
+  CRITICALITY_MIN,
+  CRITICALITY_MAX,
+  DOMAINS as SKILL_DOMAINS,
+  type SkillAssessmentInput,
+} from "@/lib/learn-skills-calc";
 
 // web_search is used in every mode (real examples/insights) — same
 // headroom budget the scenarios route settled on after production timeout
@@ -74,6 +84,17 @@ async function runLearnCompletion(
     .join("\n");
 }
 
+// F01 — one skills-matrix cell (see src/lib/learn-skills-calc.ts). Optional:
+// most training generations carry none, same as D01's capabilities field.
+const skillAssessmentEntrySchema = z.object({
+  role: z.string().trim().min(1),
+  domain: z.enum(SKILL_DOMAINS),
+  required: z.number().int().min(SKILL_LEVEL_MIN).max(SKILL_LEVEL_MAX),
+  demonstrated: z.number().int().min(SKILL_LEVEL_MIN).max(SKILL_LEVEL_MAX),
+  criticality: z.number().int().min(CRITICALITY_MIN).max(CRITICALITY_MAX),
+  selfAssessed: z.boolean().default(false),
+});
+
 const requestSchema = z.object({
   transformationId: z.string().uuid().nullable().optional(),
   topic: z.string().trim().min(1, "Décris le sujet de la formation."),
@@ -83,6 +104,7 @@ const requestSchema = z.object({
   sourceDocName: z.string().trim().default(""),
   organization: z.string().trim().default(""),
   industry: z.string().trim().default(""),
+  skillAssessments: z.array(skillAssessmentEntrySchema).default([]),
 });
 
 export async function POST(request: Request) {
@@ -105,6 +127,15 @@ export async function POST(request: Request) {
     body = requestSchema.parse(json);
   } catch {
     return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
+  }
+
+  // F01 — validate the structured skills matrix before calling the AI at
+  // all, same reasoning as D01's diagnostic route: no point spending an AI
+  // call if the deterministic half is malformed.
+  const skillInputs: SkillAssessmentInput[] = body.skillAssessments;
+  const skillErrors = validateSkillInputs(skillInputs);
+  if (skillErrors.length > 0) {
+    return NextResponse.json({ error: skillErrors.join(" ") }, { status: 400 });
   }
 
   // Two doors, same connected project model: a transformationId reuses an
@@ -328,9 +359,30 @@ export async function POST(request: Request) {
     return saveFailedResponse();
   }
 
+  // F01 — the deterministic skills gaps (see src/lib/learn-skills-calc.ts).
+  // Computed above from the user's own required/demonstrated/criticality/
+  // selfAssessed; the AI never sees or touches these numbers.
+  const skillGaps = computeSkillGaps(skillInputs);
+  if (skillGaps.length > 0) {
+    await supabase.from("skill_assessments").insert(
+      skillGaps.map((s) => ({
+        transformation_id: transformationId,
+        role: s.role,
+        domain: s.domain,
+        required: s.required,
+        demonstrated: s.demonstrated,
+        criticality: s.criticality,
+        self_assessed: s.selfAssessed,
+        gap: s.gap,
+        weighted: s.weighted,
+        status: s.status,
+      }))
+    );
+  }
+
   await setModuleStatus(supabase, transformationId, "learn", "done");
 
-  return NextResponse.json({ transformationId, training });
+  return NextResponse.json({ transformationId, training, skillGaps });
 }
 
 function handleAnthropicError(err: unknown, language: "fr" | "en") {

@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Eyebrow } from "@/components/eyebrow";
 import { createClient } from "@/lib/supabase/client";
 import { DOMAIN_LABELS, DOMAIN_ICONS, type Domain } from "@/lib/decide";
+import type { CapabilityGapResult } from "@/lib/decide-diagnostic-calc";
+import { rankCapabilityGaps } from "@/lib/decide-diagnostic-calc";
 import { useLanguage } from "@/components/language-provider";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { ModuleRelevance, RecommendableModule } from "@/types/database";
@@ -23,6 +25,10 @@ export interface DiagnosticResult {
   startingRecommendation: string;
   startingActions: string[];
   moduleRecommendations: Record<RecommendableModule, { relevance: ModuleRelevance; reason: string }>;
+  // D01 — computed server-side (src/lib/decide-diagnostic-calc.ts), never
+  // by the AI. May be empty for a transformation created before this existed,
+  // or when the user left the capability assessment at its untouched default.
+  capabilityGaps: CapabilityGapResult[];
 }
 
 function moduleHref(module: RecommendableModule, transformationId: string): string | null {
@@ -281,6 +287,44 @@ export function DiagnosticView({
                 ))}
               </ul>
             </div>
+          </div>
+
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{diagnostic.capabilitiesTitle}</h2>
+            <p className="mt-1 text-xs text-muted">{diagnostic.capabilitiesHint}</p>
+            {result.capabilityGaps.length === 0 ? (
+              <p className="mt-2 text-sm text-muted">{diagnostic.capabilitiesEmpty}</p>
+            ) : (
+              <ul className="mt-2 flex flex-col gap-2">
+                {rankCapabilityGaps(result.capabilityGaps).map((c) => (
+                  <li key={c.domain} className="rounded-lg border border-border bg-surface p-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-medium text-ink">{DOMAIN_LABELS[c.domain]}</p>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
+                          c.status === "vérifié" ? "bg-success/15 text-success" : "bg-surface-2 text-muted"
+                        }`}
+                      >
+                        {c.status === "vérifié" ? diagnostic.capabilityStatusVerified : diagnostic.capabilityStatusUnverified}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-xs text-muted">
+                      {diagnostic.capabilityObserved} {c.observed}/5 · {diagnostic.capabilityTarget} {c.target}/5 ·{" "}
+                      {diagnostic.capabilityImportance} {c.importance}/5
+                    </p>
+                    <div className="mt-2 flex items-center gap-4 text-xs">
+                      <span className="text-ink">
+                        {diagnostic.capabilityGap} : <span className="font-semibold text-accent">{c.gap}</span>
+                      </span>
+                      <span className="text-ink">
+                        {diagnostic.capabilityPriority} : <span className="font-semibold text-accent">{c.priority}</span>
+                      </span>
+                    </div>
+                    {c.proofNote && <p className="mt-1.5 text-muted">{c.proofNote}</p>}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div>

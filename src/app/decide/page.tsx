@@ -53,6 +53,7 @@ export default async function DecidePage({
   let initialDiagnostic: DiagnosticResult | null = null;
   let initialScenarios: ScenarioWithId[] | null = null;
   let initialSelectedTrajectoryId: string | null = null;
+  let initialWeights: Record<string, number> | null = null;
 
   if (transformationId) {
     const { data: transformation } = await supabase
@@ -67,16 +68,21 @@ export default async function DecidePage({
     // actually saved — a project created before this persistence existed
     // won't have them, and just starts fresh at intake instead.
     if (transformation?.maturity_reading) {
-      const [{ data: gaps }, { data: priorities }, { data: risks }, { data: recs }] = await Promise.all([
-        supabase.from("gaps").select("name, reason").eq("transformation_id", transformationId),
-        supabase.from("priorities").select("name, reason, weight").eq("transformation_id", transformationId),
-        supabase
-          .from("risks")
-          .select("name, reason")
-          .eq("transformation_id", transformationId)
-          .is("trajectory_id", null),
-        supabase.from("module_recommendations").select("module, relevance, reason").eq("transformation_id", transformationId),
-      ]);
+      const [{ data: gaps }, { data: priorities }, { data: risks }, { data: recs }, { data: capabilityRows }] =
+        await Promise.all([
+          supabase.from("gaps").select("name, reason").eq("transformation_id", transformationId),
+          supabase.from("priorities").select("name, reason, weight").eq("transformation_id", transformationId),
+          supabase
+            .from("risks")
+            .select("name, reason")
+            .eq("transformation_id", transformationId)
+            .is("trajectory_id", null),
+          supabase.from("module_recommendations").select("module, relevance, reason").eq("transformation_id", transformationId),
+          supabase
+            .from("capability_assessments")
+            .select("domain, observed, target, importance, gap, priority, status, proof_note")
+            .eq("transformation_id", transformationId),
+        ]);
 
       const moduleRecommendations: DiagnosticResult["moduleRecommendations"] = {
         connect: { relevance: "possible", reason: "" },
@@ -103,6 +109,16 @@ export default async function DecidePage({
         startingRecommendation: transformation.starting_recommendation ?? "",
         startingActions: (transformation.starting_actions as string[]) ?? [],
         moduleRecommendations,
+        capabilityGaps: (capabilityRows ?? []).map((c) => ({
+          domain: c.domain as Domain,
+          observed: c.observed,
+          target: c.target,
+          importance: c.importance,
+          gap: c.gap,
+          priority: c.priority,
+          status: c.status as "vérifié" | "non vérifié",
+          proofNote: c.proof_note ?? "",
+        })),
       };
       initialSelectedTrajectoryId = transformation.selected_trajectory_id ?? null;
 
@@ -113,7 +129,7 @@ export default async function DecidePage({
       // pile up older runs and overload the comparison.
       const { data: latestTrajectories } = await supabase
         .from("trajectories")
-        .select("id, name, stance, description, tech_stack, scores, indicators, regulations, executive_briefing, briefing_highlights")
+        .select("id, name, stance, description, tech_stack, scores, indicators, regulations, executive_briefing, briefing_highlights, veto")
         .eq("transformation_id", transformationId)
         .order("created_at", { ascending: false })
         .limit(3);
@@ -121,15 +137,24 @@ export default async function DecidePage({
 
       if (trajectories && trajectories.length > 0) {
         const trajectoryIds = trajectories.map((t) => t.id);
-        const [{ data: allMatches }, { data: scenarioRisks }, { data: scenarioOpps }] = await Promise.all([
+        const [{ data: allMatches }, { data: scenarioRisks }, { data: scenarioOpps }, { data: weightRows }] = await Promise.all([
           supabase.from("matches").select("*").in("trajectory_id", trajectoryIds),
           supabase.from("risks").select("*").in("trajectory_id", trajectoryIds),
           supabase.from("opportunities").select("*").in("trajectory_id", trajectoryIds),
+          // D04 — pondération des critères, un jeu de poids par transformation,
+          // partagé entre ses 3 scénarios. Vide si l'utilisateur n'a encore
+          // rien ajusté : decide-flow.tsx part alors d'une répartition égale.
+          supabase.from("decision_criteria_weights").select("axis, weight").eq("transformation_id", transformationId),
         ]);
+
+        if (weightRows && weightRows.length > 0) {
+          initialWeights = Object.fromEntries(weightRows.map((w) => [w.axis, w.weight]));
+        }
 
         initialScenarios = trajectories.map(
           (traj): ScenarioWithId => ({
             trajectoryId: traj.id,
+            veto: traj.veto ?? false,
             name: traj.name,
             stance: traj.stance ?? "",
             description: traj.description ?? "",
@@ -176,6 +201,7 @@ export default async function DecidePage({
         initialDiagnostic={initialDiagnostic}
         initialScenarios={initialScenarios}
         initialSelectedTrajectoryId={initialSelectedTrajectoryId}
+        initialWeights={initialWeights}
       />
     </DecideThemeWrap>
   );

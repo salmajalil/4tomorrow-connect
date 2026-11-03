@@ -8,7 +8,15 @@ import {
   buildDiagnosticUserPrompt,
   parseDiagnosticOutput,
   DecideParseError,
+  DOMAINS,
 } from "@/lib/decide";
+import {
+  computeCapabilityGaps,
+  validateCapabilityInputs,
+  CAPABILITY_LEVEL_MIN,
+  CAPABILITY_LEVEL_MAX,
+  type CapabilityAssessmentInput,
+} from "@/lib/decide-diagnostic-calc";
 import { setModuleStatus } from "@/lib/module-status";
 import { getLanguage } from "@/lib/i18n/language";
 import type { RecommendableModule } from "@/types/database";
@@ -17,6 +25,20 @@ import type { RecommendableModule } from "@/types/database";
 // that path (one search round), even though the default no-search path
 // finishes in a few seconds.
 export const maxDuration = 120;
+
+const capabilityEntrySchema = z.object({
+  observed: z.number().int().min(CAPABILITY_LEVEL_MIN).max(CAPABILITY_LEVEL_MAX),
+  target: z.number().int().min(CAPABILITY_LEVEL_MIN).max(CAPABILITY_LEVEL_MAX),
+  importance: z.number().int().min(CAPABILITY_LEVEL_MIN).max(CAPABILITY_LEVEL_MAX),
+  proofNote: z.string().trim().default(""),
+});
+
+// Keyed by domain, but kept as a plain string-keyed record (not z.enum)
+// so `.default({})` type-checks — an empty/missing assessment just means
+// no capability_assessments rows get written this time. Unknown keys (not
+// one of DOMAINS) are dropped when building capabilityInputs below, rather
+// than rejecting the whole request.
+const capabilitiesSchema = z.record(z.string(), capabilityEntrySchema).default({});
 
 const requestSchema = z.object({
   organization: z.string().trim().default(""),
@@ -27,6 +49,7 @@ const requestSchema = z.object({
   regulations: z.string().trim().default(""),
   uploadedDocText: z.string().trim().default(""),
   enrichWithWebSearch: z.boolean().default(false),
+  capabilities: capabilitiesSchema,
 });
 
 export async function POST(request: Request) {
@@ -49,6 +72,19 @@ export async function POST(request: Request) {
     body = requestSchema.parse(json);
   } catch {
     return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
+  }
+
+  // D01 — validate the structured assessment before calling the AI at all:
+  // no point spending an AI call if the deterministic half is malformed.
+  // Unknown keys (not a real domain) are silently dropped rather than
+  // rejected — a stray/outdated key from a client shouldn't block the rest.
+  const domainSet = new Set<string>(DOMAINS);
+  const capabilityInputs: CapabilityAssessmentInput[] = Object.entries(body.capabilities)
+    .filter(([domain]) => domainSet.has(domain))
+    .map(([domain, entry]) => ({ domain: domain as (typeof DOMAINS)[number], ...entry }));
+  const capabilityErrors = validateCapabilityInputs(capabilityInputs);
+  if (capabilityErrors.length > 0) {
+    return NextResponse.json({ error: capabilityErrors.join(" ") }, { status: 400 });
   }
 
   if (!body.challenges && !body.objectives && !body.uploadedDocText) {
@@ -207,7 +243,27 @@ export async function POST(request: Request) {
     }))
   );
 
+  // D01 — the deterministic capability gaps (see src/lib/decide-diagnostic-calc.ts).
+  // Computed above from the user's own observed/target/importance/proofNote;
+  // the AI never sees or touches these numbers.
+  const capabilityGaps = computeCapabilityGaps(capabilityInputs);
+  if (capabilityGaps.length > 0) {
+    await supabase.from("capability_assessments").insert(
+      capabilityGaps.map((c) => ({
+        transformation_id: transformationId,
+        domain: c.domain,
+        observed: c.observed,
+        target: c.target,
+        importance: c.importance,
+        gap: c.gap,
+        priority: c.priority,
+        status: c.status,
+        proof_note: c.proofNote,
+      }))
+    );
+  }
+
   await setModuleStatus(supabase, transformationId, "decide", "in_progress");
 
-  return NextResponse.json({ transformationId, ...result });
+  return NextResponse.json({ transformationId, ...result, capabilityGaps });
 }

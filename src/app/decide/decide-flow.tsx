@@ -8,6 +8,7 @@ import { ModuleCrossLinks } from "@/components/module-cross-links";
 import { ScenarioComparator } from "@/components/decide/scenario-comparator";
 import { RadarChart } from "@/components/decide/radar-chart";
 import { ScenarioCard, type ScenarioWithId } from "@/components/decide/scenario-card";
+import { BusinessCaseForm } from "@/components/decide/business-case-form";
 import { Eyebrow } from "@/components/eyebrow";
 import { ExportPdfButton } from "@/components/export-pdf-button";
 import { createClient } from "@/lib/supabase/client";
@@ -122,9 +123,12 @@ export function DecideFlow({
   async function selectTrajectory(trajectoryId: string) {
     setSelectedTrajectoryId(trajectoryId);
     if (!diagnostic) return;
+    // decision_updated_at is bumped here so a CEO validation link issued
+    // before this change is invalidated (see src/lib/validation-token.ts /
+    // L09 "refusé ... si la décision a changé depuis l'envoi").
     await createClient()
       .from("transformations")
-      .update({ selected_trajectory_id: trajectoryId })
+      .update({ selected_trajectory_id: trajectoryId, decision_updated_at: new Date().toISOString() })
       .eq("id", diagnostic.transformationId);
   }
 
@@ -542,6 +546,7 @@ export function DecideFlow({
           onToggleVeto={() => toggleVeto(scenario.trajectoryId)}
           detail
         />
+        <BusinessCaseForm transformationId={diagnostic.transformationId} trajectoryId={scenario.trajectoryId} />
       </div>
     );
   }

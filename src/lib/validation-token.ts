@@ -1,0 +1,76 @@
+// L09 — Validation CEO : jeton à usage unique, lié à la décision et à sa
+// version, 72h. Logique pure (émission du contenu du jeton + règles de
+// consommation) — la génération du secret aléatoire et la lecture/écriture
+// en base restent dans la route API qui appelle ces fonctions.
+//
+// Règles (brief VALIDATION CEO) :
+//   lien à usage unique, durée limitée (72h), lié à la décision ET sa version ;
+//   ouvrir le lien ne valide rien : confirmation explicite obligatoire ;
+//   refusé si déjà servi, expiré, ou si la décision a changé depuis l'envoi.
+// Pure module, no "server-only" guard — see decide-business-case-calc.ts for
+// why (unit-tested directly, nothing secret in here).
+
+export const VALIDATION_TOKEN_TTL_MS = 72 * 60 * 60 * 1000;
+
+export type ValidationOutcome = "validated" | "needs_more_info" | "rejected";
+
+export interface ValidationTokenRecord {
+  transformationId: string;
+  trajectoryId: string;
+  decisionSnapshot: string; // ISO timestamp, copie de transformations.decision_updated_at à l'émission
+  expiresAt: string; // ISO timestamp
+  usedAt: string | null;
+}
+
+export interface CurrentDecisionState {
+  transformationId: string;
+  trajectoryId: string | null; // selected_trajectory_id actuel
+  decisionUpdatedAt: string; // ISO timestamp actuel
+}
+
+export interface ConsumeResult {
+  ok: boolean;
+  reason: string | null;
+}
+
+/** Calcule l'expiration d'un nouveau jeton émis à `issuedAt`. */
+export function computeExpiresAt(issuedAt: Date): string {
+  return new Date(issuedAt.getTime() + VALIDATION_TOKEN_TTL_MS).toISOString();
+}
+
+/**
+ * Vérifie si une confirmation explicite sur un jeton doit être acceptée.
+ * Fonction pure : ne touche jamais la base, ne marque rien "used" — c'est à
+ * l'appelant de persister `usedAt`/`outcome` une fois `ok: true` retourné.
+ */
+export function evaluateConsumption(
+  token: ValidationTokenRecord,
+  current: CurrentDecisionState,
+  now: Date,
+  explicitlyConfirmed: boolean
+): ConsumeResult {
+  if (!explicitlyConfirmed) {
+    return { ok: false, reason: "Confirmation explicite requise : ouvrir le lien ne valide rien." };
+  }
+  if (token.usedAt !== null) {
+    return { ok: false, reason: "Ce lien a déjà été utilisé." };
+  }
+  if (now.getTime() > Date.parse(token.expiresAt)) {
+    return { ok: false, reason: "Ce lien a expiré. Demandez-en un nouveau." };
+  }
+  if (token.transformationId !== current.transformationId) {
+    return { ok: false, reason: "Ce lien concerne un autre projet." };
+  }
+  if (current.trajectoryId !== token.trajectoryId) {
+    return { ok: false, reason: "La décision a changé depuis l'envoi de ce lien. Un nouveau lien est nécessaire." };
+  }
+  if (current.decisionUpdatedAt !== token.decisionSnapshot) {
+    return { ok: false, reason: "La décision a changé depuis l'envoi de ce lien. Un nouveau lien est nécessaire." };
+  }
+  return { ok: true, reason: null };
+}
+
+/** True si un jeton (non consommé) est encore valide pour être affiché, sans le consommer. */
+export function isTokenStillUsable(token: ValidationTokenRecord, current: CurrentDecisionState, now: Date): ConsumeResult {
+  return evaluateConsumption(token, current, now, true);
+}

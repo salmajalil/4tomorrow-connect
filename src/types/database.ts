@@ -57,6 +57,11 @@ export type Transformation = {
   starting_actions: string[] | null;
   strategic_brief: string | null;
   good_ideas: string[];
+  // Bumped whenever selected_trajectory_id changes (see decide-flow.tsx's
+  // selectTrajectory). A CEO validation token snapshots this value at
+  // issuance; a mismatch at consumption means the decision moved since the
+  // link was sent — see src/lib/validation-token.ts.
+  decision_updated_at: string;
   created_at: string;
 };
 
@@ -478,7 +483,7 @@ export type MissionFeedback = {
   created_at: string;
 };
 
-// PROJET ET ÉQUIPE — membership/role on a transformation (0012_team_roles.sql).
+// PROJET ET ÉQUIPE — membership/role on a transformation (0015_team_roles.sql).
 export type TransformationMemberRole = "consultant" | "client" | "expert" | "ceo";
 
 export type TransformationMember = {
@@ -490,6 +495,43 @@ export type TransformationMember = {
   domain: ModuleName | null;
   invited_at: string;
   accepted_at: string | null;
+  created_at: string;
+};
+
+// D05 — business case, option off by default. net_annual/payback_years/npv/
+// cumulative_by_year are always the output of src/lib/decide-business-case-
+// calc.ts's computeBusinessCase — never a value chosen by the AI.
+export type BusinessCase = {
+  id: string;
+  transformation_id: string;
+  trajectory_id: string;
+  enabled: boolean;
+  capex: number;
+  annual_gains: number;
+  annual_costs: number;
+  horizon_years: number;
+  discount_rate_percent: number | null;
+  net_annual: number;
+  payback_years: number | null;
+  npv: number | null;
+  cumulative_by_year: number[];
+  created_at: string;
+};
+
+export type ValidationOutcomeValue = "validated" | "needs_more_info" | "rejected";
+
+// L09 — CEO validation token. See src/lib/validation-token.ts for the
+// issuance/consumption rules this row is checked against.
+export type CeoValidationToken = {
+  id: string;
+  transformation_id: string;
+  trajectory_id: string;
+  decision_snapshot: string;
+  token: string;
+  expires_at: string;
+  used_at: string | null;
+  outcome: ValidationOutcomeValue | null;
+  outcome_note: string | null;
   created_at: string;
 };
 
@@ -563,6 +605,25 @@ export type Database = {
       benefit_observations: Table<
         BenefitObservation,
         Partial<BenefitObservation> & Pick<BenefitObservation, "transformation_id" | "month" | "value">
+      >;
+      business_cases: Table<
+        BusinessCase,
+        Partial<BusinessCase> &
+          Pick<
+            BusinessCase,
+            | "transformation_id"
+            | "trajectory_id"
+            | "capex"
+            | "annual_gains"
+            | "annual_costs"
+            | "horizon_years"
+            | "net_annual"
+          >
+      >;
+      ceo_validation_tokens: Table<
+        CeoValidationToken,
+        Partial<CeoValidationToken> &
+          Pick<CeoValidationToken, "transformation_id" | "trajectory_id" | "decision_snapshot" | "token" | "expires_at">
       >;
     };
     Views: Record<string, never>;

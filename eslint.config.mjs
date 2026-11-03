@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Nested agent worktree checkouts (.claude/worktrees/*) — not product
+    // code, each one is linted on its own branch instead.
+    ".claude/**",
   ]),
 ]);
 

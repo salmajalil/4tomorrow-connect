@@ -433,6 +433,21 @@ export type MissionFeedback = {
   created_at: string;
 };
 
+// PROJET ET ÉQUIPE — membership/role on a transformation (0012_team_roles.sql).
+export type TransformationMemberRole = "consultant" | "client" | "expert" | "ceo";
+
+export type TransformationMember = {
+  id: string;
+  transformation_id: string;
+  user_id: string | null;
+  invited_email: string;
+  role: TransformationMemberRole;
+  domain: ModuleName | null;
+  invited_at: string;
+  accepted_at: string | null;
+  created_at: string;
+};
+
 // @supabase/postgrest-js requires every table entry to also carry a
 // `Relationships` array (used for typed embedded-resource joins, which this
 // project doesn't use) and the schema to declare `Views`/`Functions`, even
@@ -492,6 +507,10 @@ export type Database = {
       mission_feedback: Table<
         MissionFeedback,
         Partial<MissionFeedback> & Pick<MissionFeedback, "transformation_id" | "trajectory_id" | "feedback_text">
+      >;
+      transformation_members: Table<
+        TransformationMember,
+        Partial<TransformationMember> & Pick<TransformationMember, "transformation_id" | "invited_email" | "role">
       >;
     };
     Views: Record<string, never>;

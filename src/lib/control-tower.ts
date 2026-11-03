@@ -5,6 +5,7 @@ import type {
   ModuleStatusValue,
   RecommendableModule,
   ModuleRelevance,
+  TransformationMember,
 } from "@/types/database";
 import { projectTitle } from "@/lib/text";
 
@@ -30,6 +31,7 @@ export type ControlTowerProject = {
   matchesCount: number;
   progressPercent: number; // modules done / 4
   targetDate: string | null; // furthest roadmap_phases.end_date, if a roadmap exists
+  members: TransformationMember[];
 };
 
 // One aggregate fetch, called both for the initial server render and again
@@ -80,6 +82,17 @@ export async function fetchControlTowerProjects(
     supabase.from("matches").select("id, transformation_id").in("transformation_id", txIds),
     supabase.from("roadmap_phases").select("transformation_id, end_date").in("transformation_id", txIds),
   ]);
+
+  // PROJET ET ÉQUIPE — best-effort: on a database that hasn't run
+  // 0012_team_roles.sql yet, this table doesn't exist and the call errors;
+  // treat that exactly like "no members" rather than failing the whole
+  // control tower fetch, so this stays safe to deploy ahead of the
+  // migration being applied.
+  const membersResult = await supabase
+    .from("transformation_members")
+    .select("id, transformation_id, user_id, invited_email, role, domain, invited_at, accepted_at, created_at")
+    .in("transformation_id", txIds);
+  const members = membersResult.data ?? [];
 
   return transformations.map((t) => {
     const moduleStatus = Object.fromEntries(MODULE_ORDER.map((m) => [m, "not_started" as ModuleStatusValue])) as Record<
@@ -137,6 +150,7 @@ export async function fetchControlTowerProjects(
       matchesCount: (matches ?? []).filter((m) => m.transformation_id === t.id).length,
       progressPercent,
       targetDate,
+      members: members.filter((m) => m.transformation_id === t.id),
     };
   });
 }

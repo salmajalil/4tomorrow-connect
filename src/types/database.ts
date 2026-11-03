@@ -312,6 +312,35 @@ export type Training = {
   created_at: string;
 };
 
+// F01 — the deterministic, server-computed skills gap (see
+// src/lib/learn-skills-calc.ts). gap/weighted/status are never set by the
+// AI: they're calculated from required/demonstrated/criticality/selfAssessed.
+export type SkillAssessment = {
+  id: string;
+  transformation_id: string;
+  role: string;
+  domain: string;
+  required: number;
+  demonstrated: number;
+  criticality: number;
+  self_assessed: boolean;
+  gap: number;
+  weighted: number;
+  status: "à confirmer" | "confirmé";
+  created_at: string;
+};
+
+// F01 — editable training catalog ("une formation proposée par écart"),
+// scoped per organization. A missing row for a domain falls back to
+// learn-skills-calc.ts's DEFAULT_TRAINING_SUGGESTIONS, never to the AI.
+export type TrainingSuggestion = {
+  id: string;
+  organization_id: string;
+  domain: string;
+  suggestion: string;
+  created_at: string;
+};
+
 export const DELIVERABLE_KINDS = [
   "roadmap",
   "action_plan",
@@ -425,6 +454,12 @@ export type Database = {
       >;
       profiles: Table<Profile, Partial<Profile> & Pick<Profile, "id">>;
       trainings: Table<Training, Partial<Training> & Pick<Training, "transformation_id" | "topic">>;
+      skill_assessments: Table<
+        SkillAssessment,
+        Partial<SkillAssessment> &
+          Pick<SkillAssessment, "transformation_id" | "role" | "domain" | "required" | "demonstrated" | "criticality" | "gap" | "weighted" | "status">
+      >;
+      training_suggestions: Table<TrainingSuggestion, Partial<TrainingSuggestion> & Pick<TrainingSuggestion, "organization_id" | "domain" | "suggestion">>;
       deliverables: Table<
         Deliverable,
         Partial<Deliverable> & Pick<Deliverable, "transformation_id" | "trajectory_id" | "kind" | "title">

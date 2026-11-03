@@ -6,6 +6,7 @@ import {
   pickWinner,
   computeSensitivity,
   equalWeights,
+  canShowRadar,
   type ScenarioScoreInput,
 } from "./decide-scenario-calc";
 
@@ -135,5 +136,23 @@ describe("equalWeights", () => {
 
   it("returns an empty object for no axes", () => {
     expect(equalWeights([])).toEqual({});
+  });
+});
+
+describe("canShowRadar", () => {
+  it("rejects below 3 axes (no shape)", () => {
+    expect(canShowRadar(0)).toBe(false);
+    expect(canShowRadar(2)).toBe(false);
+  });
+
+  it("accepts 3 to 6 axes (brief D04: ≤ 6 critères)", () => {
+    expect(canShowRadar(3)).toBe(true);
+    expect(canShowRadar(5)).toBe(true);
+    expect(canShowRadar(6)).toBe(true);
+  });
+
+  it("rejects above 6 axes (too cramped to read)", () => {
+    expect(canShowRadar(7)).toBe(false);
+    expect(canShowRadar(12)).toBe(false);
   });
 });

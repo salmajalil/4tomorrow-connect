@@ -132,6 +132,11 @@ export function computeSensitivity(
   return { stable: flips.length === 0, flips };
 }
 
+/** Vue radar en option (brief D04) : illisible en dessous de 3 axes (pas de forme) ou au-delà de 6 (axes trop serrés). */
+export function canShowRadar(axesCount: number): boolean {
+  return axesCount >= 3 && axesCount <= 6;
+}
+
 /** Répartit 100% également entre les axes donnés — le point de départ par défaut avant tout ajustement manuel. */
 export function equalWeights(axes: string[]): Record<string, number> {
   if (axes.length === 0) return {};

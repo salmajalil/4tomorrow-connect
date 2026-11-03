@@ -6,6 +6,7 @@ import { IntakeForm, type IntakeState } from "@/components/decide/intake-form";
 import { DiagnosticView, type DiagnosticResult } from "@/components/decide/diagnostic-view";
 import { ModuleCrossLinks } from "@/components/module-cross-links";
 import { ScenarioComparator } from "@/components/decide/scenario-comparator";
+import { RadarChart } from "@/components/decide/radar-chart";
 import { ScenarioCard, type ScenarioWithId } from "@/components/decide/scenario-card";
 import { Eyebrow } from "@/components/eyebrow";
 import { ExportPdfButton } from "@/components/export-pdf-button";
@@ -19,6 +20,7 @@ import {
   rankScenarios,
   computeSensitivity,
   validateWeights,
+  canShowRadar,
   type ScenarioScoreInput,
 } from "@/lib/decide-scenario-calc";
 
@@ -95,6 +97,10 @@ export function DecideFlow({
   // connus, sauf si l'utilisateur en a déjà enregistré (initialWeights).
   const [weights, setWeights] = useState<Record<string, number> | null>(initialWeights);
   const [weightsError, setWeightsError] = useState("");
+  // D04 — vue radar en option (≤ 6 critères) : le comparateur en barres reste
+  // la vue par défaut (c'est elle qui est sûre sur mobile), le radar est un
+  // choix explicite de l'utilisateur.
+  const [compareView, setCompareView] = useState<"bars" | "radar">("bars");
 
   // Previously UI-only ("selected" just highlighted a card) — Deliver needs
   // to know which trajectory was actually chosen to know what to execute,
@@ -429,17 +435,53 @@ export function DecideFlow({
 
         {axes.length > 0 && scenarios.length > 1 && (
           <div className="mt-8">
-            <ScenarioComparator
-              axes={axes}
-              axisLabel={axisLabel}
-              scenarios={scenarios.map((s, i) => ({
-                label: `${t.decide.scenarios.stanceShort[i] ?? ""} · ${s.name}`,
-                scores: s.radarScores,
-              }))}
-              recommendedIndex={recommendedIndex}
-              title={t.decide.scenarios.compareTitle}
-              hint={t.decide.scenarios.compareHint}
-            />
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">
+                {t.decide.scenarios.compareViewLabel}
+              </p>
+              {canShowRadar(axes.length) && (
+                <div className="flex gap-1 rounded-lg border border-border bg-surface-2 p-0.5 text-xs font-medium">
+                  <button
+                    type="button"
+                    onClick={() => setCompareView("bars")}
+                    className={`rounded-md px-3 py-1 transition ${compareView === "bars" ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink"}`}
+                  >
+                    {t.decide.scenarios.compareViewBars}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCompareView("radar")}
+                    className={`rounded-md px-3 py-1 transition ${compareView === "radar" ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink"}`}
+                  >
+                    {t.decide.scenarios.compareViewRadar}
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="mt-3">
+              {compareView === "radar" && canShowRadar(axes.length) ? (
+                <RadarChart
+                  axes={axes.map(axisLabel)}
+                  series={scenarios.map((s) => ({
+                    label: s.name,
+                    values: axes.map((axis) => s.radarScores[axis] ?? 0),
+                    veto: s.veto,
+                  }))}
+                />
+              ) : (
+                <ScenarioComparator
+                  axes={axes}
+                  axisLabel={axisLabel}
+                  scenarios={scenarios.map((s, i) => ({
+                    label: `${t.decide.scenarios.stanceShort[i] ?? ""} · ${s.name}`,
+                    scores: s.radarScores,
+                  }))}
+                  recommendedIndex={recommendedIndex}
+                  title={t.decide.scenarios.compareTitle}
+                  hint={t.decide.scenarios.compareHint}
+                />
+              )}
+            </div>
           </div>
         )}
 

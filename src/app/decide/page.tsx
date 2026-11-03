@@ -53,6 +53,7 @@ export default async function DecidePage({
   let initialDiagnostic: DiagnosticResult | null = null;
   let initialScenarios: ScenarioWithId[] | null = null;
   let initialSelectedTrajectoryId: string | null = null;
+  let initialWeights: Record<string, number> | null = null;
 
   if (transformationId) {
     const { data: transformation } = await supabase
@@ -128,7 +129,7 @@ export default async function DecidePage({
       // pile up older runs and overload the comparison.
       const { data: latestTrajectories } = await supabase
         .from("trajectories")
-        .select("id, name, stance, description, tech_stack, scores, indicators, regulations, executive_briefing, briefing_highlights")
+        .select("id, name, stance, description, tech_stack, scores, indicators, regulations, executive_briefing, briefing_highlights, veto")
         .eq("transformation_id", transformationId)
         .order("created_at", { ascending: false })
         .limit(3);
@@ -136,15 +137,24 @@ export default async function DecidePage({
 
       if (trajectories && trajectories.length > 0) {
         const trajectoryIds = trajectories.map((t) => t.id);
-        const [{ data: allMatches }, { data: scenarioRisks }, { data: scenarioOpps }] = await Promise.all([
+        const [{ data: allMatches }, { data: scenarioRisks }, { data: scenarioOpps }, { data: weightRows }] = await Promise.all([
           supabase.from("matches").select("*").in("trajectory_id", trajectoryIds),
           supabase.from("risks").select("*").in("trajectory_id", trajectoryIds),
           supabase.from("opportunities").select("*").in("trajectory_id", trajectoryIds),
+          // D04 — pondération des critères, un jeu de poids par transformation,
+          // partagé entre ses 3 scénarios. Vide si l'utilisateur n'a encore
+          // rien ajusté : decide-flow.tsx part alors d'une répartition égale.
+          supabase.from("decision_criteria_weights").select("axis, weight").eq("transformation_id", transformationId),
         ]);
+
+        if (weightRows && weightRows.length > 0) {
+          initialWeights = Object.fromEntries(weightRows.map((w) => [w.axis, w.weight]));
+        }
 
         initialScenarios = trajectories.map(
           (traj): ScenarioWithId => ({
             trajectoryId: traj.id,
+            veto: traj.veto ?? false,
             name: traj.name,
             stance: traj.stance ?? "",
             description: traj.description ?? "",
@@ -191,6 +201,7 @@ export default async function DecidePage({
         initialDiagnostic={initialDiagnostic}
         initialScenarios={initialScenarios}
         initialSelectedTrajectoryId={initialSelectedTrajectoryId}
+        initialWeights={initialWeights}
       />
     </DecideThemeWrap>
   );

@@ -233,7 +233,10 @@ export async function POST(request: Request) {
   await setModuleStatus(supabase, transformationId, "decide", "in_progress");
 
   return NextResponse.json({
-    scenarios: persistedScenarios.map(({ trajectoryId, scenario }) => ({ trajectoryId, ...scenario })),
+    // D04 — veto starts false for every freshly generated scenario; the
+    // user toggles it afterwards (see decide-flow.tsx), persisted straight
+    // to trajectories.veto. Never set by the AI.
+    scenarios: persistedScenarios.map(({ trajectoryId, scenario }) => ({ trajectoryId, veto: false, ...scenario })),
     ...(persistedScenarios.length < 3
       ? {
           warning:

@@ -177,7 +177,16 @@ export type Trajectory = {
   priority_co2: number | null;
   priority_risk: number | null;
   priority_speed: number | null;
+  veto: boolean;
   created_at: string;
+};
+
+export type DecisionCriteriaWeight = {
+  id: string;
+  transformation_id: string;
+  axis: string;
+  weight: number;
+  updated_at: string;
 };
 
 export type Risk = {
@@ -395,6 +404,10 @@ export type Database = {
       ecosystem_members: Table<EcosystemMember, Partial<EcosystemMember> & Pick<EcosystemMember, "name" | "type">>;
       matches: Table<Match, Partial<Match> & Pick<Match, "transformation_id" | "category" | "name" | "source">>;
       trajectories: Table<Trajectory, Partial<Trajectory> & Pick<Trajectory, "transformation_id" | "name">>;
+      decision_criteria_weights: Table<
+        DecisionCriteriaWeight,
+        Partial<DecisionCriteriaWeight> & Pick<DecisionCriteriaWeight, "transformation_id" | "axis" | "weight">
+      >;
       risks: Table<Risk, Partial<Risk> & Pick<Risk, "transformation_id" | "name">>;
       opportunities: Table<Opportunity, Partial<Opportunity> & Pick<Opportunity, "transformation_id" | "name">>;
       roadmap_phases: Table<

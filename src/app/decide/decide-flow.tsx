@@ -14,6 +14,13 @@ import { parseJsonResponse } from "@/lib/parse-json-response";
 import type { Domain } from "@/lib/decide";
 import { useLanguage } from "@/components/language-provider";
 import type { Dictionary } from "@/lib/i18n/dictionary";
+import {
+  equalWeights,
+  rankScenarios,
+  computeSensitivity,
+  validateWeights,
+  type ScenarioScoreInput,
+} from "@/lib/decide-scenario-calc";
 
 type Phase = "intake" | "diagnostic-loading" | "diagnostic" | "scenarios-loading" | "scenarios" | "scenario-detail";
 
@@ -64,10 +71,12 @@ export function DecideFlow({
   initialDiagnostic = null,
   initialScenarios = null,
   initialSelectedTrajectoryId = null,
+  initialWeights = null,
 }: {
   initialDiagnostic?: DiagnosticResult | null;
   initialScenarios?: ScenarioWithId[] | null;
   initialSelectedTrajectoryId?: string | null;
+  initialWeights?: Record<string, number> | null;
 }) {
   const { t } = useLanguage();
   const [phase, setPhase] = useState<Phase>(initialPhase(!!initialScenarios, !!initialDiagnostic));
@@ -80,6 +89,12 @@ export function DecideFlow({
   const [scenarios, setScenarios] = useState<ScenarioWithId[] | null>(initialScenarios);
   const [selectedTrajectoryId, setSelectedTrajectoryId] = useState<string | null>(initialSelectedTrajectoryId);
   const [detailTrajectoryId, setDetailTrajectoryId] = useState<string | null>(null);
+  // D04 — poids des critères (somme = 100), un jeu par transformation. null
+  // tant qu'on ne connaît pas encore les axes (avant la génération des
+  // scénarios) ; initialisé à une répartition égale dès que les axes sont
+  // connus, sauf si l'utilisateur en a déjà enregistré (initialWeights).
+  const [weights, setWeights] = useState<Record<string, number> | null>(initialWeights);
+  const [weightsError, setWeightsError] = useState("");
 
   // Previously UI-only ("selected" just highlighted a card) — Deliver needs
   // to know which trajectory was actually chosen to know what to execute,
@@ -105,6 +120,41 @@ export function DecideFlow({
       .from("transformations")
       .update({ selected_trajectory_id: trajectoryId })
       .eq("id", diagnostic.transformationId);
+  }
+
+  // D04 — veto : un scénario écarté ne peut plus jamais être recommandé
+  // (voir src/lib/decide-scenario-calc.ts, rankScenarios). Purement
+  // déclaratif côté utilisateur, jamais décidé par l'IA.
+  async function toggleVeto(trajectoryId: string) {
+    if (!scenarios) return;
+    const next = scenarios.map((s) => (s.trajectoryId === trajectoryId ? { ...s, veto: !s.veto } : s));
+    setScenarios(next);
+    const updated = next.find((s) => s.trajectoryId === trajectoryId);
+    if (!updated) return;
+    await createClient().from("trajectories").update({ veto: updated.veto }).eq("id", trajectoryId);
+  }
+
+  // D04 — poids = 100 % obligatoire (brief). On valide avant de persister ;
+  // un poids invalide reste affiché mais n'est pas enregistré tant que la
+  // somme ne fait pas 100.
+  async function updateWeight(axis: string, value: number) {
+    if (!weights || !diagnostic) return;
+    const next = { ...weights, [axis]: value };
+    setWeights(next);
+    const errors = validateWeights(next);
+    setWeightsError(errors[0] ?? "");
+    if (errors.length > 0) return;
+    const supabase = createClient();
+    await Promise.all(
+      Object.entries(next).map(([a, w]) =>
+        supabase
+          .from("decision_criteria_weights")
+          .upsert(
+            { transformation_id: diagnostic.transformationId, axis: a, weight: w, updated_at: new Date().toISOString() },
+            { onConflict: "transformation_id,axis" }
+          )
+      )
+    );
   }
 
   async function runDiagnostic(intake: IntakeState) {
@@ -237,11 +287,25 @@ export function DecideFlow({
 
   if (phase === "scenarios" && scenarios && diagnostic) {
     const axes = Array.from(new Set(scenarios.flatMap((s) => Object.keys(s.radarScores))));
+    // D04 — poids des critères : répartition égale par défaut tant que
+    // l'utilisateur n'a rien ajusté (et rien enregistré en base).
+    const activeWeights = weights && Object.keys(weights).length > 0 ? weights : equalWeights(axes);
+    const scoreInputs: ScenarioScoreInput[] = scenarios.map((s) => ({
+      trajectoryId: s.trajectoryId,
+      scores: s.radarScores,
+      veto: s.veto,
+    }));
+    const weightErrors = validateWeights(activeWeights);
+    const ranked = weightErrors.length === 0 ? rankScenarios(scoreInputs, activeWeights) : [];
+    const sensitivity = weightErrors.length === 0 ? computeSensitivity(scoreInputs, activeWeights) : { stable: true, flips: [] };
     // One recommendation up front: the client's chosen trajectory if there is
-    // one, otherwise the balanced middle scenario. The two others stay one
-    // click away, compact, below the side-by-side comparison.
+    // one, otherwise the deterministic winner (D04 — weighted score, a
+    // vetoed option never finishes first). The two others stay one click
+    // away, compact, below the side-by-side comparison.
     const selectedIndex = scenarios.findIndex((s) => s.trajectoryId === selectedTrajectoryId);
-    const recommendedIndex = selectedIndex >= 0 ? selectedIndex : Math.min(1, scenarios.length - 1);
+    const rankedWinnerIndex = ranked.length > 0 ? scenarios.findIndex((s) => s.trajectoryId === ranked[0].trajectoryId) : -1;
+    const recommendedIndex =
+      selectedIndex >= 0 ? selectedIndex : rankedWinnerIndex >= 0 ? rankedWinnerIndex : Math.min(1, scenarios.length - 1);
     const recommendedScenario = scenarios[recommendedIndex];
     const labels = t.decide.axisLabels as Record<string, string>;
     const axisLabel = (axis: string) => {
@@ -299,6 +363,41 @@ export function DecideFlow({
           </p>
         )}
 
+        {axes.length > 0 && scenarios.length > 1 && (
+          <section className="mt-6 border border-border bg-surface p-5 sm:p-6">
+            <p className="font-display text-xl text-ink">{t.decide.scenarios.weightingTitle}</p>
+            <p className="mt-1 text-xs text-muted">{t.decide.scenarios.weightingHint}</p>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {axes.map((axis) => (
+                <label key={axis} className="flex items-center justify-between gap-3 text-sm text-body">
+                  <span>{axisLabel(axis)}</span>
+                  <span className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={activeWeights[axis] ?? 0}
+                      onChange={(e) => updateWeight(axis, Number(e.target.value))}
+                      className="w-16 rounded border border-border bg-surface-2 px-2 py-1 text-right text-sm tabular-nums"
+                    />
+                    <span className="text-muted">%</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {weightsError && <p className="mt-3 text-xs text-danger">{weightsError}</p>}
+            {weightErrors.length > 0 && !weightsError && (
+              <p className="mt-3 text-xs text-danger">{weightErrors[0]}</p>
+            )}
+            {!sensitivity.stable && (
+              <div className="mt-4 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2">
+                <p className="text-sm font-medium text-ink">{t.decide.scenarios.sensitivityTitle}</p>
+                <p className="mt-1 text-xs text-muted">{t.decide.scenarios.sensitivityHint}</p>
+              </div>
+            )}
+          </section>
+        )}
+
         {selectedTrajectoryId && (
           <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-accent/40 bg-accent/10 px-4 py-3">
             <p className="text-sm text-ink">{t.decide.scenarios.trajectoryChosen}</p>
@@ -323,6 +422,7 @@ export function DecideFlow({
             selected={selectedTrajectoryId === recommendedScenario.trajectoryId}
             onSelect={() => chooseAndOpen(recommendedScenario.trajectoryId)}
             onOpenDetail={() => openDetail(recommendedScenario.trajectoryId)}
+            onToggleVeto={() => toggleVeto(recommendedScenario.trajectoryId)}
             recommended
           />
         </section>
@@ -359,6 +459,7 @@ export function DecideFlow({
                     selected={selectedTrajectoryId === s.trajectoryId}
                     onSelect={() => chooseAndOpen(s.trajectoryId)}
                     onOpenDetail={() => openDetail(s.trajectoryId)}
+                    onToggleVeto={() => toggleVeto(s.trajectoryId)}
                     compact
                   />
                 )
@@ -396,6 +497,7 @@ export function DecideFlow({
           co2SliderLabel={fifthAxisLabel(diagnostic.domains, t.decide.axisLabels)}
           selected={selectedTrajectoryId === scenario.trajectoryId}
           onSelect={() => selectTrajectory(scenario.trajectoryId)}
+          onToggleVeto={() => toggleVeto(scenario.trajectoryId)}
           detail
         />
       </div>

@@ -5,11 +5,30 @@ import { Eyebrow } from "@/components/eyebrow";
 import { extractFileText } from "@/lib/extract-file-text";
 import { useLanguage } from "@/components/language-provider";
 import type { Dictionary } from "@/lib/i18n/dictionary";
+import { DOMAINS, DOMAIN_LABELS, type Domain } from "@/lib/decide";
+import { CAPABILITY_LEVEL_MAX, CAPABILITY_LEVEL_MIN } from "@/lib/decide-diagnostic-calc";
 
 export type RiskTolerance = "low" | "medium" | "high";
 export type ProjectScope = "local" | "national" | "global";
 export type Urgency = "immediate" | "planned" | "long_term";
 export type OrganizationSize = "small" | "medium" | "large" | "enterprise";
+
+export interface CapabilityFormEntry {
+  observed: number;
+  target: number;
+  importance: number;
+  proofNote: string;
+}
+
+export type CapabilityFormState = Record<Domain, CapabilityFormEntry>;
+
+// observed === target by default (gap 0): an untouched capability must
+// never produce a fabricated gap/priority — only what the user actually
+// adjusts counts as a real assessment.
+function defaultCapabilities(): CapabilityFormState {
+  const entry: CapabilityFormEntry = { observed: 3, target: 3, importance: 3, proofNote: "" };
+  return DOMAINS.reduce((acc, d) => ({ ...acc, [d]: { ...entry } }), {} as CapabilityFormState);
+}
 
 export interface IntakeState {
   organization: string;
@@ -28,6 +47,10 @@ export interface IntakeState {
   horizonYears: number;
   organizationSize: OrganizationSize;
   enrichWithWebSearch: boolean;
+  // D01 — the structured, chiffrée capability assessment. Optional-feeling
+  // in the UI (sensible defaults, nothing required) but always sent: the
+  // diagnostic's gaps/priorities are computed from this, never from the AI.
+  capabilities: CapabilityFormState;
 }
 
 // Folded into the free-text "constraints" sent to the diagnostic/scenario
@@ -85,6 +108,7 @@ export function IntakeForm({
     horizonYears: 3,
     organizationSize: "medium",
     enrichWithWebSearch: false,
+    capabilities: defaultCapabilities(),
   });
   const [uploadError, setUploadError] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -391,6 +415,82 @@ export function IntakeForm({
               ))}
             </select>
           </label>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-5 rounded-xl border border-border bg-surface p-4">
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted">{intake.capabilitiesTitle}</span>
+          <p className="mt-1 text-xs text-muted">{intake.capabilitiesHint}</p>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          {DOMAINS.map((domain) => {
+            const entry = state.capabilities[domain];
+            const update = (patch: Partial<CapabilityFormEntry>) =>
+              setState((s) => ({
+                ...s,
+                capabilities: { ...s.capabilities, [domain]: { ...s.capabilities[domain], ...patch } },
+              }));
+            return (
+              <div key={domain} className="flex flex-col gap-3 rounded-lg border border-border bg-surface-2/40 p-3">
+                <p className="text-sm font-semibold text-ink">{DOMAIN_LABELS[domain]}</p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <label className="flex flex-col gap-1 text-xs">
+                    <span className="flex items-center justify-between font-medium text-muted">
+                      <span>{intake.capabilityObserved}</span>
+                      <span className="text-accent">{entry.observed}</span>
+                    </span>
+                    <input
+                      type="range"
+                      min={CAPABILITY_LEVEL_MIN}
+                      max={CAPABILITY_LEVEL_MAX}
+                      value={entry.observed}
+                      onChange={(e) => update({ observed: Number(e.target.value) })}
+                      className="accent-[var(--accent)]"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs">
+                    <span className="flex items-center justify-between font-medium text-muted">
+                      <span>{intake.capabilityTarget}</span>
+                      <span className="text-accent">{entry.target}</span>
+                    </span>
+                    <input
+                      type="range"
+                      min={CAPABILITY_LEVEL_MIN}
+                      max={CAPABILITY_LEVEL_MAX}
+                      value={entry.target}
+                      onChange={(e) => update({ target: Number(e.target.value) })}
+                      className="accent-[var(--accent)]"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs">
+                    <span className="flex items-center justify-between font-medium text-muted">
+                      <span>{intake.capabilityImportance}</span>
+                      <span className="text-accent">{entry.importance}</span>
+                    </span>
+                    <input
+                      type="range"
+                      min={CAPABILITY_LEVEL_MIN}
+                      max={CAPABILITY_LEVEL_MAX}
+                      value={entry.importance}
+                      onChange={(e) => update({ importance: Number(e.target.value) })}
+                      className="accent-[var(--accent)]"
+                    />
+                  </label>
+                </div>
+                <label className="flex flex-col gap-1 text-xs">
+                  <span className="font-medium text-muted">{intake.capabilityProof}</span>
+                  <input
+                    value={entry.proofNote}
+                    onChange={(e) => update({ proofNote: e.target.value })}
+                    placeholder={intake.capabilityProofPlaceholder}
+                    className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+                  />
+                </label>
+              </div>
+            );
+          })}
         </div>
       </div>
 

@@ -77,6 +77,23 @@ export type Priority = {
   created_at: string;
 };
 
+// D01 — the deterministic, server-computed half of the diagnostic (see
+// src/lib/decide-diagnostic-calc.ts). gap/priority/status are never set by
+// the AI: they're calculated from observed/target/importance/proofNote.
+export type CapabilityAssessment = {
+  id: string;
+  transformation_id: string;
+  domain: string;
+  observed: number;
+  target: number;
+  importance: number;
+  gap: number;
+  priority: number;
+  status: "vérifié" | "non vérifié";
+  proof_note: string;
+  created_at: string;
+};
+
 export type EcosystemMember = {
   id: string;
   created_by: string | null;
@@ -370,6 +387,11 @@ export type Database = {
       transformations: Table<Transformation, Partial<Transformation> & Pick<Transformation, "organization_id">>;
       gaps: Table<Gap, Partial<Gap> & Pick<Gap, "transformation_id" | "name">>;
       priorities: Table<Priority, Partial<Priority> & Pick<Priority, "transformation_id" | "name">>;
+      capability_assessments: Table<
+        CapabilityAssessment,
+        Partial<CapabilityAssessment> &
+          Pick<CapabilityAssessment, "transformation_id" | "domain" | "observed" | "target" | "importance" | "gap" | "priority" | "status">
+      >;
       ecosystem_members: Table<EcosystemMember, Partial<EcosystemMember> & Pick<EcosystemMember, "name" | "type">>;
       matches: Table<Match, Partial<Match> & Pick<Match, "transformation_id" | "category" | "name" | "source">>;
       trajectories: Table<Trajectory, Partial<Trajectory> & Pick<Trajectory, "transformation_id" | "name">>;

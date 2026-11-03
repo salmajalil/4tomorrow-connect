@@ -67,16 +67,21 @@ export default async function DecidePage({
     // actually saved — a project created before this persistence existed
     // won't have them, and just starts fresh at intake instead.
     if (transformation?.maturity_reading) {
-      const [{ data: gaps }, { data: priorities }, { data: risks }, { data: recs }] = await Promise.all([
-        supabase.from("gaps").select("name, reason").eq("transformation_id", transformationId),
-        supabase.from("priorities").select("name, reason, weight").eq("transformation_id", transformationId),
-        supabase
-          .from("risks")
-          .select("name, reason")
-          .eq("transformation_id", transformationId)
-          .is("trajectory_id", null),
-        supabase.from("module_recommendations").select("module, relevance, reason").eq("transformation_id", transformationId),
-      ]);
+      const [{ data: gaps }, { data: priorities }, { data: risks }, { data: recs }, { data: capabilityRows }] =
+        await Promise.all([
+          supabase.from("gaps").select("name, reason").eq("transformation_id", transformationId),
+          supabase.from("priorities").select("name, reason, weight").eq("transformation_id", transformationId),
+          supabase
+            .from("risks")
+            .select("name, reason")
+            .eq("transformation_id", transformationId)
+            .is("trajectory_id", null),
+          supabase.from("module_recommendations").select("module, relevance, reason").eq("transformation_id", transformationId),
+          supabase
+            .from("capability_assessments")
+            .select("domain, observed, target, importance, gap, priority, status, proof_note")
+            .eq("transformation_id", transformationId),
+        ]);
 
       const moduleRecommendations: DiagnosticResult["moduleRecommendations"] = {
         connect: { relevance: "possible", reason: "" },
@@ -103,6 +108,16 @@ export default async function DecidePage({
         startingRecommendation: transformation.starting_recommendation ?? "",
         startingActions: (transformation.starting_actions as string[]) ?? [],
         moduleRecommendations,
+        capabilityGaps: (capabilityRows ?? []).map((c) => ({
+          domain: c.domain as Domain,
+          observed: c.observed,
+          target: c.target,
+          importance: c.importance,
+          gap: c.gap,
+          priority: c.priority,
+          status: c.status as "vérifié" | "non vérifié",
+          proofNote: c.proof_note ?? "",
+        })),
       };
       initialSelectedTrajectoryId = transformation.selected_trajectory_id ?? null;
 

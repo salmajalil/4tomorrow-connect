@@ -217,6 +217,51 @@ export type Risk = {
   name: string;
   reason: string | null;
   module_origin: string;
+  // AR — jamais rempli par l'IA : saisis par l'utilisateur, ou null tant
+  // qu'il ne l'a pas fait (voir src/lib/risk-scoring.ts).
+  probability: number | null;
+  impact: number | null;
+  owner: string | null;
+  treatment: string | null;
+  created_at: string;
+};
+
+export type ActionStatus = "not_started" | "in_progress" | "done";
+
+export type Action = {
+  id: string;
+  transformation_id: string;
+  title: string;
+  owner: string | null;
+  due_date: string | null;
+  status: ActionStatus;
+  source_module: string | null;
+  created_at: string;
+};
+
+export type BenefitSource = "manual" | "business_case";
+
+export type BenefitExpectation = {
+  transformation_id: string;
+  expected_annual: number | null;
+  source: BenefitSource;
+  updated_at: string;
+};
+
+export type BenefitItem = {
+  id: string;
+  transformation_id: string;
+  label: string;
+  perimeter: string;
+  value: number;
+  created_at: string;
+};
+
+export type BenefitObservation = {
+  id: string;
+  transformation_id: string;
+  month: string;
+  value: number;
   created_at: string;
 };
 
@@ -511,6 +556,13 @@ export type Database = {
       transformation_members: Table<
         TransformationMember,
         Partial<TransformationMember> & Pick<TransformationMember, "transformation_id" | "invited_email" | "role">
+      >;
+      actions: Table<Action, Partial<Action> & Pick<Action, "transformation_id" | "title">>;
+      benefit_expectations: Table<BenefitExpectation, Partial<BenefitExpectation> & Pick<BenefitExpectation, "transformation_id">>;
+      benefit_items: Table<BenefitItem, Partial<BenefitItem> & Pick<BenefitItem, "transformation_id" | "label" | "perimeter" | "value">>;
+      benefit_observations: Table<
+        BenefitObservation,
+        Partial<BenefitObservation> & Pick<BenefitObservation, "transformation_id" | "month" | "value">
       >;
     };
     Views: Record<string, never>;

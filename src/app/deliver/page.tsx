@@ -6,7 +6,7 @@ import { getDictionary } from "@/lib/i18n/dictionary";
 import { DeliverStartOptions } from "@/components/deliver/deliver-start-options";
 import { DeliverThemeWrap } from "@/components/deliver/deliver-theme";
 import { DeliverFlow } from "./deliver-flow";
-import type { DeliverableKind, Deliverable } from "@/types/database";
+import type { DeliverableKind, Deliverable, BenefitExpectation, BenefitItem, BenefitObservation } from "@/types/database";
 import type { Domain } from "@/lib/decide";
 import { projectTitle as toProjectTitle } from "@/lib/text";
 
@@ -87,7 +87,14 @@ export default async function DeliverPage({
   const org = (orgs ?? []).find((o) => o.id === transformation.organization_id);
   const trajectoryId = transformation.selected_trajectory_id as string;
 
-  const [{ data: deliverableRows }, { data: phases }, { data: priorities }] = await Promise.all([
+  const [
+    { data: deliverableRows },
+    { data: phases },
+    { data: priorities },
+    { data: benefitExpectation },
+    { data: benefitItems },
+    { data: benefitObservations },
+  ] = await Promise.all([
     supabase
       .from("deliverables")
       .select("*")
@@ -99,6 +106,9 @@ export default async function DeliverPage({
       .eq("trajectory_id", trajectoryId)
       .order("order_index"),
     supabase.from("priorities").select("id, name, reason").eq("transformation_id", transformation.id),
+    supabase.from("benefit_expectations").select("*").eq("transformation_id", transformation.id).maybeSingle(),
+    supabase.from("benefit_items").select("*").eq("transformation_id", transformation.id).order("created_at"),
+    supabase.from("benefit_observations").select("*").eq("transformation_id", transformation.id).order("month"),
   ]);
 
   const deliverables: Partial<Record<DeliverableKind, Deliverable>> = {};
@@ -125,6 +135,9 @@ export default async function DeliverPage({
         initialDeliverables={deliverables}
         roadmapPhases={phases ?? []}
         priorities={priorities ?? []}
+        initialBenefitExpectation={(benefitExpectation as BenefitExpectation | null) ?? null}
+        initialBenefitItems={(benefitItems as BenefitItem[] | null) ?? []}
+        initialBenefitObservations={(benefitObservations as BenefitObservation[] | null) ?? []}
       />
     </DeliverThemeWrap>
   );

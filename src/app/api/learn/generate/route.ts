@@ -20,6 +20,7 @@ import {
 import { setModuleStatus } from "@/lib/module-status";
 import type { Training } from "@/types/database";
 import { getLanguage } from "@/lib/i18n/language";
+import { streamJsonResponse } from "@/lib/streaming-json-response";
 import {
   computeSkillGaps,
   validateSkillInputs,
@@ -229,165 +230,153 @@ export async function POST(request: Request) {
     linkedObjectives: linkedObjectives || undefined,
     linkedDomains: linkedDomains.length > 0 ? (linkedDomains as Domain[]) : undefined,
   });
+  const finalTransformationId = transformationId;
 
-  function maxTokensResponse() {
+  function maxTokensMessage(): string {
     // Distinct from a parse failure — the model was cut off mid-answer.
     // Surfacing this separately (instead of falling into the generic
     // LearnParseError message below) makes a real future regression
     // diagnosable from the error text alone, without a Vercel log dive.
-    return NextResponse.json(
-      {
-        error:
-          language === "en"
-            ? "Generation was interrupted before completion (content too long). Try again, ideally with a more focused topic."
-            : "La génération a été interrompue avant la fin (contenu trop long). Réessaie, idéalement avec un sujet plus ciblé.",
-      },
-      { status: 502 }
-    );
+    return language === "en"
+      ? "Generation was interrupted before completion (content too long). Try again, ideally with a more focused topic."
+      : "La génération a été interrompue avant la fin (contenu trop long). Réessaie, idéalement avec un sujet plus ciblé.";
   }
 
-  function saveFailedResponse() {
-    return NextResponse.json(
-      {
-        error:
-          language === "en"
-            ? "Couldn't save the generated training. Try again."
-            : "Impossible d'enregistrer la formation générée. Réessaie.",
-      },
-      { status: 500 }
-    );
-  }
+  // The slow part (the AI call(s), then the save) — wrapped so the
+  // connection stays visibly alive throughout instead of one long silent
+  // wait, which is exactly the "connexion coupée" failure the comment above
+  // runLearnCompletion already documents (see src/lib/streaming-json-response.ts).
+  // Thrown errors below become the same { error } body callers already expect.
+  return streamJsonResponse(async () => {
+    let trainingRow: Partial<Training> & Pick<Training, "transformation_id" | "topic">;
 
-  let trainingRow: Partial<Training> & Pick<Training, "transformation_id" | "topic">;
+    if (mode === "workshop") {
+      const workshopSystem = buildWorkshopSystemPrompt(hasLinkedDiagnostic, language);
 
-  if (mode === "workshop") {
-    const workshopSystem = buildWorkshopSystemPrompt(hasLinkedDiagnostic, language);
-
-    let workshopRaw: string;
-    try {
-      workshopRaw = await runLearnCompletion(anthropic, workshopSystem, userPrompt, 8000, 1);
-    } catch (err) {
-      if (err instanceof LearnMaxTokensError) return maxTokensResponse();
-      return handleAnthropicError(err, language);
-    }
-
-    let result: WorkshopOutput;
-    try {
-      result = parseWorkshopOutput(workshopRaw);
-    } catch (err) {
-      if (err instanceof LearnParseError) {
-        return NextResponse.json({ error: err.message }, { status: 502 });
+      let workshopRaw: string;
+      try {
+        workshopRaw = await runLearnCompletion(anthropic, workshopSystem, userPrompt, 8000, 1);
+      } catch (err) {
+        if (err instanceof LearnMaxTokensError) throw new Error(maxTokensMessage());
+        throw new Error(anthropicErrorMessage(err, language));
       }
-      throw err;
-    }
 
-    trainingRow = {
-      transformation_id: transformationId,
-      topic: body.topic,
-      mode,
-      domains: result.domains,
-      audience: body.audience || null,
-      objectives: result.objectives,
-      prerequisites: result.prerequisites,
-      duration_minutes: result.durationMinutes,
-      executive_summary: { addressedChallenge: "", summary: "", summaryHighlights: [], actionPlan: [] },
-      key_insights: [],
-      business_implications: [],
-      flashcards: [],
-      comprehension_check: [],
-      video_script: { title: "", scenes: [] },
-      source_doc_name: body.sourceDocName || null,
-      workshop_intro: result.workshopIntro,
-      workshop_support: result.workshopSupport,
-      workshop_steps: result.workshopSteps,
-    };
-  } else {
-    const coreSystem = buildLearnCoreSystemPrompt(mode, !!body.sourceDocText, hasLinkedDiagnostic, language);
-    const interactiveSystem = buildLearnInteractiveSystemPrompt(mode, !!body.sourceDocText, hasLinkedDiagnostic, language);
-
-    let coreRaw: string;
-    let interactiveRaw: string;
-    try {
-      [coreRaw, interactiveRaw] = await Promise.all([
-        runLearnCompletion(anthropic, coreSystem, userPrompt, 6000, 2),
-        runLearnCompletion(anthropic, interactiveSystem, userPrompt, 10000, 1),
-      ]);
-    } catch (err) {
-      if (err instanceof LearnMaxTokensError) return maxTokensResponse();
-      return handleAnthropicError(err, language);
-    }
-
-    let result: TrainingOutput;
-    try {
-      result = { ...parseLearnCoreOutput(coreRaw), ...parseLearnInteractiveOutput(interactiveRaw) };
-    } catch (err) {
-      if (err instanceof LearnParseError) {
-        return NextResponse.json({ error: err.message }, { status: 502 });
+      let result: WorkshopOutput;
+      try {
+        result = parseWorkshopOutput(workshopRaw);
+      } catch (err) {
+        if (err instanceof LearnParseError) throw new Error(err.message);
+        throw err;
       }
-      throw err;
+
+      trainingRow = {
+        transformation_id: finalTransformationId,
+        topic: body.topic,
+        mode,
+        domains: result.domains,
+        audience: body.audience || null,
+        objectives: result.objectives,
+        prerequisites: result.prerequisites,
+        duration_minutes: result.durationMinutes,
+        executive_summary: { addressedChallenge: "", summary: "", summaryHighlights: [], actionPlan: [] },
+        key_insights: [],
+        business_implications: [],
+        flashcards: [],
+        comprehension_check: [],
+        video_script: { title: "", scenes: [] },
+        source_doc_name: body.sourceDocName || null,
+        workshop_intro: result.workshopIntro,
+        workshop_support: result.workshopSupport,
+        workshop_steps: result.workshopSteps,
+      };
+    } else {
+      const coreSystem = buildLearnCoreSystemPrompt(mode, !!body.sourceDocText, hasLinkedDiagnostic, language);
+      const interactiveSystem = buildLearnInteractiveSystemPrompt(mode, !!body.sourceDocText, hasLinkedDiagnostic, language);
+
+      let coreRaw: string;
+      let interactiveRaw: string;
+      try {
+        [coreRaw, interactiveRaw] = await Promise.all([
+          runLearnCompletion(anthropic, coreSystem, userPrompt, 6000, 2),
+          runLearnCompletion(anthropic, interactiveSystem, userPrompt, 10000, 1),
+        ]);
+      } catch (err) {
+        if (err instanceof LearnMaxTokensError) throw new Error(maxTokensMessage());
+        throw new Error(anthropicErrorMessage(err, language));
+      }
+
+      let result: TrainingOutput;
+      try {
+        result = { ...parseLearnCoreOutput(coreRaw), ...parseLearnInteractiveOutput(interactiveRaw) };
+      } catch (err) {
+        if (err instanceof LearnParseError) throw new Error(err.message);
+        throw err;
+      }
+
+      trainingRow = {
+        transformation_id: finalTransformationId,
+        topic: body.topic,
+        mode,
+        domains: result.domains,
+        audience: body.audience || null,
+        objectives: result.objectives,
+        prerequisites: result.prerequisites,
+        duration_minutes: result.durationMinutes,
+        executive_summary: result.executiveSummary,
+        key_insights: result.keyInsights,
+        business_implications: result.businessImplications,
+        flashcards: result.flashcards,
+        comprehension_check: result.comprehensionCheck,
+        video_script: result.videoScript,
+        source_doc_name: body.sourceDocName || null,
+        workshop_intro: null,
+        workshop_support: null,
+        workshop_steps: null,
+      };
     }
 
-    trainingRow = {
-      transformation_id: transformationId,
-      topic: body.topic,
-      mode,
-      domains: result.domains,
-      audience: body.audience || null,
-      objectives: result.objectives,
-      prerequisites: result.prerequisites,
-      duration_minutes: result.durationMinutes,
-      executive_summary: result.executiveSummary,
-      key_insights: result.keyInsights,
-      business_implications: result.businessImplications,
-      flashcards: result.flashcards,
-      comprehension_check: result.comprehensionCheck,
-      video_script: result.videoScript,
-      source_doc_name: body.sourceDocName || null,
-      workshop_intro: null,
-      workshop_support: null,
-      workshop_steps: null,
-    };
-  }
+    const { data: training, error: trainingError } = await supabase
+      .from("trainings")
+      .insert(trainingRow)
+      .select("*")
+      .single();
 
-  const { data: training, error: trainingError } = await supabase
-    .from("trainings")
-    .insert(trainingRow)
-    .select("*")
-    .single();
+    if (trainingError || !training) {
+      throw new Error(
+        language === "en" ? "Couldn't save the generated training. Try again." : "Impossible d'enregistrer la formation générée. Réessaie."
+      );
+    }
 
-  if (trainingError || !training) {
-    return saveFailedResponse();
-  }
+    // F01 — the deterministic skills gaps (see src/lib/learn-skills-calc.ts).
+    // Computed above from the user's own required/demonstrated/criticality/
+    // selfAssessed; the AI never sees or touches these numbers.
+    const skillGaps = computeSkillGaps(skillInputs);
+    await Promise.all([
+      skillGaps.length > 0
+        ? supabase.from("skill_assessments").insert(
+            skillGaps.map((s) => ({
+              transformation_id: finalTransformationId,
+              role: s.role,
+              domain: s.domain,
+              required: s.required,
+              demonstrated: s.demonstrated,
+              criticality: s.criticality,
+              self_assessed: s.selfAssessed,
+              gap: s.gap,
+              weighted: s.weighted,
+              status: s.status,
+            }))
+          )
+        : Promise.resolve(),
+      setModuleStatus(supabase, finalTransformationId, "learn", "done"),
+    ]);
 
-  // F01 — the deterministic skills gaps (see src/lib/learn-skills-calc.ts).
-  // Computed above from the user's own required/demonstrated/criticality/
-  // selfAssessed; the AI never sees or touches these numbers.
-  const skillGaps = computeSkillGaps(skillInputs);
-  if (skillGaps.length > 0) {
-    await supabase.from("skill_assessments").insert(
-      skillGaps.map((s) => ({
-        transformation_id: transformationId,
-        role: s.role,
-        domain: s.domain,
-        required: s.required,
-        demonstrated: s.demonstrated,
-        criticality: s.criticality,
-        self_assessed: s.selfAssessed,
-        gap: s.gap,
-        weighted: s.weighted,
-        status: s.status,
-      }))
-    );
-  }
-
-  await setModuleStatus(supabase, transformationId, "learn", "done");
-
-  return NextResponse.json({ transformationId, training, skillGaps });
+    return { transformationId: finalTransformationId, training, skillGaps };
+  });
 }
 
-function handleAnthropicError(err: unknown, language: "fr" | "en") {
+function anthropicErrorMessage(err: unknown, language: "fr" | "en"): string {
   if (err instanceof Anthropic.APIError) {
-    const status = err.status === 401 || err.status === 403 ? 502 : (err.status ?? 502);
     // Include the real status/message in the user-facing error — the app
     // has no admin log viewer, so a screenshot of this is the only way to
     // diagnose a production failure without a Vercel dashboard detour.
@@ -395,23 +384,11 @@ function handleAnthropicError(err: unknown, language: "fr" | "en") {
       language === "en"
         ? `${err.status ?? "network"} — ${err.message ?? "unknown error"}`.slice(0, 200)
         : `${err.status ?? "réseau"} — ${err.message ?? "erreur inconnue"}`.slice(0, 200);
-    return NextResponse.json(
-      {
-        error:
-          language === "en"
-            ? `The training engine couldn't respond (${detail}). Try again in a moment.`
-            : `Le moteur de formation n'a pas pu répondre (${detail}). Réessaie dans un instant.`,
-      },
-      { status }
-    );
+    return language === "en"
+      ? `The training engine couldn't respond (${detail}). Try again in a moment.`
+      : `Le moteur de formation n'a pas pu répondre (${detail}). Réessaie dans un instant.`;
   }
-  return NextResponse.json(
-    {
-      error:
-        language === "en"
-          ? "The training engine took too long to respond. Try again."
-          : "Le moteur de formation a mis trop de temps à répondre. Réessaie.",
-    },
-    { status: 504 }
-  );
+  return language === "en"
+    ? "The training engine took too long to respond. Try again."
+    : "Le moteur de formation a mis trop de temps à répondre. Réessaie.";
 }

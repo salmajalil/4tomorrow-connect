@@ -13,6 +13,7 @@ import {
 import { loadMissionContext } from "@/lib/deliver-context";
 import { setModuleStatus } from "@/lib/module-status";
 import { getLanguage } from "@/lib/i18n/language";
+import { streamJsonResponse } from "@/lib/streaming-json-response";
 
 export const maxDuration = 60;
 
@@ -57,85 +58,76 @@ export async function POST(request: Request) {
   }
 
   const anthropic = getAnthropicClient();
-  let response;
-  try {
-    response = await anthropic.messages.create({
-      model: MATCHING_MODEL,
-      max_tokens: 4000,
-      system: buildDeliverableSystemPrompt(body.kind, language),
-      messages: [
-        { role: "user", content: buildDeliverableUserPrompt({ ...mission.context, sourceDocText: body.sourceDocText || undefined }) },
-      ],
-    });
-  } catch (err) {
-    return handleAnthropicError(err, language);
-  }
 
-  let result;
-  try {
-    const rawText = response.content
-      .filter((block): block is Anthropic.TextBlock => block.type === "text")
-      .map((block) => block.text)
-      .join("\n");
-    result = parseDeliverableOutput(body.kind, rawText);
-  } catch (err) {
-    if (err instanceof DeliverParseError) {
-      return NextResponse.json({ error: err.message }, { status: 502 });
+  // The slow part (the AI call, then the save) — wrapped so the connection
+  // stays visibly alive throughout instead of one long silent wait (see
+  // src/lib/streaming-json-response.ts). Thrown errors below become the
+  // same { error } body callers already expect.
+  return streamJsonResponse(async () => {
+    let response;
+    try {
+      response = await anthropic.messages.create({
+        model: MATCHING_MODEL,
+        max_tokens: 4000,
+        system: buildDeliverableSystemPrompt(body.kind, language),
+        messages: [
+          { role: "user", content: buildDeliverableUserPrompt({ ...mission.context, sourceDocText: body.sourceDocText || undefined }) },
+        ],
+      });
+    } catch (err) {
+      throw new Error(anthropicErrorMessage(err, language));
     }
-    throw err;
-  }
 
-  const { data: deliverable, error: insertError } = await supabase
-    .from("deliverables")
-    .upsert(
-      {
-        transformation_id: mission.transformationId,
-        trajectory_id: mission.trajectoryId,
-        kind: body.kind,
-        title: result.title,
-        content: result.content,
-      },
-      { onConflict: "transformation_id,trajectory_id,kind" }
-    )
-    .select("*")
-    .single();
+    let result;
+    try {
+      const rawText = response.content
+        .filter((block): block is Anthropic.TextBlock => block.type === "text")
+        .map((block) => block.text)
+        .join("\n");
+      result = parseDeliverableOutput(body.kind, rawText);
+    } catch (err) {
+      if (err instanceof DeliverParseError) throw new Error(err.message);
+      throw err;
+    }
 
-  if (insertError || !deliverable) {
-    return NextResponse.json(
-      { error: language === "en" ? "Couldn't save the deliverable. Try again." : "Impossible d'enregistrer le livrable. Réessaie." },
-      { status: 500 }
-    );
-  }
+    const { data: deliverable, error: insertError } = await supabase
+      .from("deliverables")
+      .upsert(
+        {
+          transformation_id: mission.transformationId,
+          trajectory_id: mission.trajectoryId,
+          kind: body.kind,
+          title: result.title,
+          content: result.content,
+        },
+        { onConflict: "transformation_id,trajectory_id,kind" }
+      )
+      .select("*")
+      .single();
 
-  await setModuleStatus(supabase, mission.transformationId, "deliver", "in_progress");
+    if (insertError || !deliverable) {
+      throw new Error(
+        language === "en" ? "Couldn't save the deliverable. Try again." : "Impossible d'enregistrer le livrable. Réessaie."
+      );
+    }
 
-  return NextResponse.json({ deliverable });
+    await setModuleStatus(supabase, mission.transformationId, "deliver", "in_progress");
+
+    return { deliverable };
+  });
 }
 
-function handleAnthropicError(err: unknown, language: "fr" | "en") {
+function anthropicErrorMessage(err: unknown, language: "fr" | "en"): string {
   if (err instanceof Anthropic.APIError) {
-    const status = err.status === 401 || err.status === 403 ? 502 : (err.status ?? 502);
     const detail =
       language === "en"
         ? `${err.status ?? "network"} — ${err.message ?? "unknown error"}`.slice(0, 200)
         : `${err.status ?? "réseau"} — ${err.message ?? "erreur inconnue"}`.slice(0, 200);
-    return NextResponse.json(
-      {
-        error:
-          language === "en"
-            ? `The deliverables engine couldn't respond (${detail}). Try again in a moment.`
-            : `Le moteur de livrables n'a pas pu répondre (${detail}). Réessaie dans un instant.`,
-      },
-      { status }
-    );
+    return language === "en"
+      ? `The deliverables engine couldn't respond (${detail}). Try again in a moment.`
+      : `Le moteur de livrables n'a pas pu répondre (${detail}). Réessaie dans un instant.`;
   }
-  return NextResponse.json(
-    {
-      error:
-        language === "en"
-          ? "The deliverables engine took too long to respond. Try again."
-          : "Le moteur de livrables a mis trop de temps à répondre. Réessaie.",
-    },
-    { status: 504 }
-  );
+  return language === "en"
+    ? "The deliverables engine took too long to respond. Try again."
+    : "Le moteur de livrables a mis trop de temps à répondre. Réessaie.";
 }

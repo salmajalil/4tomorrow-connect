@@ -11,6 +11,7 @@ import {
 } from "@/lib/deliver";
 import { loadMissionContext } from "@/lib/deliver-context";
 import { getLanguage } from "@/lib/i18n/language";
+import { streamJsonResponse } from "@/lib/streaming-json-response";
 
 export const maxDuration = 60;
 
@@ -49,82 +50,77 @@ export async function POST(request: Request) {
   }
 
   const anthropic = getAnthropicClient();
-  let response;
-  try {
-    response = await anthropic.messages.create({
-      model: MATCHING_MODEL,
-      max_tokens: 3000,
-      system: buildRecalibrationSystemPrompt(language),
-      messages: [
-        {
-          role: "user",
-          content: buildRecalibrationUserPrompt({
-            ...mission.context,
-            feedbackText: body.feedbackText,
-            phaseNames: mission.phaseNames,
-          }),
-        },
-      ],
-    });
-  } catch (err) {
-    if (err instanceof Anthropic.APIError) {
-      const status = err.status === 401 || err.status === 403 ? 502 : (err.status ?? 502);
-      const detail =
+
+  // The slow part (the AI call, then the save) — wrapped so the connection
+  // stays visibly alive throughout instead of one long silent wait (see
+  // src/lib/streaming-json-response.ts). Thrown errors below become the
+  // same { error } body callers already expect.
+  return streamJsonResponse(async () => {
+    let response;
+    try {
+      response = await anthropic.messages.create({
+        model: MATCHING_MODEL,
+        max_tokens: 3000,
+        system: buildRecalibrationSystemPrompt(language),
+        messages: [
+          {
+            role: "user",
+            content: buildRecalibrationUserPrompt({
+              ...mission.context,
+              feedbackText: body.feedbackText,
+              phaseNames: mission.phaseNames,
+            }),
+          },
+        ],
+      });
+    } catch (err) {
+      if (err instanceof Anthropic.APIError) {
+        const detail =
+          language === "en"
+            ? `${err.status ?? "network"} — ${err.message ?? "unknown error"}`.slice(0, 200)
+            : `${err.status ?? "réseau"} — ${err.message ?? "erreur inconnue"}`.slice(0, 200);
+        throw new Error(
+          language === "en"
+            ? `The recalibration engine couldn't respond (${detail}). Try again.`
+            : `Le moteur de recalibration n'a pas pu répondre (${detail}). Réessaie.`
+        );
+      }
+      throw new Error(
         language === "en"
-          ? `${err.status ?? "network"} — ${err.message ?? "unknown error"}`.slice(0, 200)
-          : `${err.status ?? "réseau"} — ${err.message ?? "erreur inconnue"}`.slice(0, 200);
-      return NextResponse.json(
-        {
-          error:
-            language === "en"
-              ? `The recalibration engine couldn't respond (${detail}). Try again.`
-              : `Le moteur de recalibration n'a pas pu répondre (${detail}). Réessaie.`,
-        },
-        { status }
+          ? "The recalibration engine took too long to respond. Try again."
+          : "Le moteur de recalibration a mis trop de temps à répondre. Réessaie."
       );
     }
-    return NextResponse.json(
-      {
-        error:
-          language === "en"
-            ? "The recalibration engine took too long to respond. Try again."
-            : "Le moteur de recalibration a mis trop de temps à répondre. Réessaie.",
-      },
-      { status: 504 }
-    );
-  }
 
-  let summary;
-  try {
-    const rawText = response.content
-      .filter((block): block is Anthropic.TextBlock => block.type === "text")
-      .map((block) => block.text)
-      .join("\n");
-    summary = parseRecalibrationOutput(rawText);
-  } catch (err) {
-    if (err instanceof DeliverParseError) {
-      return NextResponse.json({ error: err.message }, { status: 502 });
+    let summary;
+    try {
+      const rawText = response.content
+        .filter((block): block is Anthropic.TextBlock => block.type === "text")
+        .map((block) => block.text)
+        .join("\n");
+      summary = parseRecalibrationOutput(rawText);
+    } catch (err) {
+      if (err instanceof DeliverParseError) throw new Error(err.message);
+      throw err;
     }
-    throw err;
-  }
 
-  const { data: feedback, error: insertError } = await supabase
-    .from("mission_feedback")
-    .insert({
-      transformation_id: mission.transformationId,
-      trajectory_id: mission.trajectoryId,
-      feedback_text: body.feedbackText,
-      ai_summary: summary,
-    })
-    .select("*")
-    .single();
+    const { data: feedback, error: insertError } = await supabase
+      .from("mission_feedback")
+      .insert({
+        transformation_id: mission.transformationId,
+        trajectory_id: mission.trajectoryId,
+        feedback_text: body.feedbackText,
+        ai_summary: summary,
+      })
+      .select("*")
+      .single();
 
-  if (insertError || !feedback) {
-    return NextResponse.json(
-      { error: language === "en" ? "Couldn't save the feedback. Try again." : "Impossible d'enregistrer le feedback. Réessaie." },
-      { status: 500 }
-    );
-  }
+    if (insertError || !feedback) {
+      throw new Error(
+        language === "en" ? "Couldn't save the feedback. Try again." : "Impossible d'enregistrer le feedback. Réessaie."
+      );
+    }
 
-  return NextResponse.json({ feedback });
+    return { feedback };
+  });
 }

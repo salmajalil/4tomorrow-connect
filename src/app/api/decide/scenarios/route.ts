@@ -14,6 +14,7 @@ import {
 } from "@/lib/decide";
 import { setModuleStatus } from "@/lib/module-status";
 import { getLanguage } from "@/lib/i18n/language";
+import { streamJsonResponse } from "@/lib/streaming-json-response";
 import type { EcosystemMember } from "@/types/database";
 
 // Headroom above MATCHING_TIMEOUT_MS (src/lib/anthropic.ts, 170s) — same
@@ -61,189 +62,196 @@ export async function POST(request: Request) {
     );
   }
 
-  const [{ data: org }, { data: gaps }, { data: priorities }, { data: registry }] = await Promise.all([
-    supabase.from("organizations").select("name, industry").eq("id", transformation.organization_id).maybeSingle(),
-    supabase.from("gaps").select("name, reason").eq("transformation_id", transformationId),
-    supabase.from("priorities").select("name, reason").eq("transformation_id", transformationId),
-    supabase.from("ecosystem_members").select("*").order("created_at", { ascending: false }).limit(200),
-  ]);
-
-  const domains = (transformation.domains as Domain[]) ?? [];
   const anthropic = getAnthropicClient();
-  const userPrompt = buildScenariosUserPrompt({
-    domains,
-    organization: org?.name ?? "",
-    industry: org?.industry ?? "",
-    challenges: transformation.challenges ?? "",
-    objectives: transformation.objectives ?? "",
-    constraints: transformation.constraints ?? "",
-    gaps: (gaps ?? []).map((g) => ({ name: g.name, reason: g.reason ?? "" })),
-    priorities: (priorities ?? []).map((p) => ({ name: p.name, reason: p.reason ?? "" })),
-  });
 
-  // One scenario per call, in parallel — a single call generating all 3 full
-  // scenarios exceeded the production timeout budget (see decide.ts comment
-  // above buildScenarioSystemPrompt). Wall-clock time here is bounded by the
-  // slowest of the 3, not their sum.
-  const slots: ScenarioSlot[] = [1, 2, 3];
-  const settled = await Promise.allSettled(
-    slots.map(async (slot) => {
-      const system = buildScenarioSystemPrompt((registry ?? []) as EcosystemMember[], slot, language);
-      const createCall = () =>
-        anthropic.messages.create({
-          model: MATCHING_MODEL,
-          // max_tokens covers the whole call, search rounds included, not
-          // just the final block — 3000 was tuned for CONNECT's single-
-          // category match and was too tight for one full scenario (tech
-          // stack + suppliers + regulations + briefing + risks/
-          // opportunities): the model was hitting the cap mid-JSON, which
-          // surfaced as "no <RESULT_JSON> found" in production.
-          max_tokens: 5000,
-          system,
-          messages: [{ role: "user", content: userPrompt }],
-          tools: [{ type: "web_search_20260318", name: "web_search", max_uses: 2 }],
-        });
+  // The slow part (3 parallel AI calls, then the persistence writes) —
+  // wrapped so the connection stays visibly alive throughout instead of one
+  // long silent wait (see src/lib/streaming-json-response.ts). Thrown
+  // errors below become the same { error } body callers already expect.
+  return streamJsonResponse(async () => {
+    const [{ data: org }, { data: gaps }, { data: priorities }, { data: registry }] = await Promise.all([
+      supabase.from("organizations").select("name, industry").eq("id", transformation.organization_id).maybeSingle(),
+      supabase.from("gaps").select("name, reason").eq("transformation_id", transformationId),
+      supabase.from("priorities").select("name, reason").eq("transformation_id", transformationId),
+      supabase.from("ecosystem_members").select("*").order("created_at", { ascending: false }).limit(200),
+    ]);
 
-      // getAnthropicClient() forces maxRetries: 0 (see src/lib/anthropic.ts —
-      // that's about avoiding the SDK silently doubling a timeout, not about
-      // never retrying at all). 3 parallel calls firing right after each
-      // other legitimately hits transient 429/529 in production; one manual
-      // retry with a short backoff for exactly those two statuses uses the
-      // 180s budget's remaining headroom instead of failing the whole batch.
-      let response;
-      try {
-        response = await createCall();
-      } catch (err) {
-        if (err instanceof Anthropic.APIError && (err.status === 429 || err.status === 529)) {
-          await new Promise((resolve) => setTimeout(resolve, 3000));
+    const domains = (transformation.domains as Domain[]) ?? [];
+    const userPrompt = buildScenariosUserPrompt({
+      domains,
+      organization: org?.name ?? "",
+      industry: org?.industry ?? "",
+      challenges: transformation.challenges ?? "",
+      objectives: transformation.objectives ?? "",
+      constraints: transformation.constraints ?? "",
+      gaps: (gaps ?? []).map((g) => ({ name: g.name, reason: g.reason ?? "" })),
+      priorities: (priorities ?? []).map((p) => ({ name: p.name, reason: p.reason ?? "" })),
+    });
+
+    // One scenario per call, in parallel — a single call generating all 3 full
+    // scenarios exceeded the production timeout budget (see decide.ts comment
+    // above buildScenarioSystemPrompt). Wall-clock time here is bounded by the
+    // slowest of the 3, not their sum.
+    const slots: ScenarioSlot[] = [1, 2, 3];
+    const settled = await Promise.allSettled(
+      slots.map(async (slot) => {
+        const system = buildScenarioSystemPrompt((registry ?? []) as EcosystemMember[], slot, language);
+        const createCall = () =>
+          anthropic.messages.create({
+            model: MATCHING_MODEL,
+            // max_tokens covers the whole call, search rounds included, not
+            // just the final block — 3000 was tuned for CONNECT's single-
+            // category match and was too tight for one full scenario (tech
+            // stack + suppliers + regulations + briefing + risks/
+            // opportunities): the model was hitting the cap mid-JSON, which
+            // surfaced as "no <RESULT_JSON> found" in production. Left as-is
+            // here for the same reason diagnostic's budget wasn't trimmed —
+            // cutting it back risks that exact truncation bug returning.
+            max_tokens: 5000,
+            system,
+            messages: [{ role: "user", content: userPrompt }],
+            tools: [{ type: "web_search_20260318", name: "web_search", max_uses: 2 }],
+          });
+
+        // getAnthropicClient() forces maxRetries: 0 (see src/lib/anthropic.ts —
+        // that's about avoiding the SDK silently doubling a timeout, not about
+        // never retrying at all). 3 parallel calls firing right after each
+        // other legitimately hits transient 429/529 in production; one manual
+        // retry with a short backoff for exactly those two statuses uses the
+        // 180s budget's remaining headroom instead of failing the whole batch.
+        let response;
+        try {
           response = await createCall();
-        } else {
-          throw err;
+        } catch (err) {
+          if (err instanceof Anthropic.APIError && (err.status === 429 || err.status === 529)) {
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+            response = await createCall();
+          } else {
+            throw err;
+          }
         }
-      }
 
-      const rawText = response.content
-        .filter((block): block is Anthropic.TextBlock => block.type === "text")
-        .map((block) => block.text)
-        .join("\n");
-      return parseScenarioOutput(rawText);
-    })
-  );
-
-  const scenarios: ScenarioOutput[] = settled
-    .filter((r): r is PromiseFulfilledResult<ScenarioOutput> => r.status === "fulfilled")
-    .map((r) => r.value);
-
-  if (scenarios.length === 0) {
-    const firstError = settled.find((r): r is PromiseRejectedResult => r.status === "rejected")?.reason;
-    if (firstError instanceof Anthropic.APIError) {
-      const status = firstError.status === 401 || firstError.status === 403 ? 502 : (firstError.status ?? 502);
-      return NextResponse.json(
-        {
-          error:
-            language === "en"
-              ? "The scenario engine couldn't respond. Try again in a moment."
-              : "Le moteur de scénarios n'a pas pu répondre. Réessaie dans un instant.",
-        },
-        { status }
-      );
-    }
-    if (firstError instanceof DecideParseError) {
-      return NextResponse.json({ error: firstError.message }, { status: 502 });
-    }
-    return NextResponse.json(
-      {
-        error:
-          language === "en"
-            ? "The scenario engine took too long to respond. Try again."
-            : "Le moteur de scénarios a mis trop de temps à répondre. Réessaie.",
-      },
-      { status: 504 }
-    );
-  }
-
-  const knownRegistryIds = new Set((registry ?? []).map((m) => m.id));
-  const persistedScenarios: { trajectoryId: string; scenario: ScenarioOutput }[] = [];
-
-  for (const scenario of scenarios) {
-    const { data: trajectory, error: trajectoryError } = await supabase
-      .from("trajectories")
-      .insert({
-        transformation_id: transformationId,
-        name: scenario.name,
-        stance: scenario.stance,
-        description: scenario.description,
-        tech_stack: scenario.techStack,
-        scores: scenario.radarScores,
-        indicators: scenario.indicators,
-        regulations: scenario.regulations,
-        executive_briefing: scenario.executiveBriefing,
-        briefing_highlights: scenario.briefingHighlights,
+        const rawText = response.content
+          .filter((block): block is Anthropic.TextBlock => block.type === "text")
+          .map((block) => block.text)
+          .join("\n");
+        return parseScenarioOutput(rawText);
       })
-      .select("id")
-      .single();
+    );
 
-    if (trajectoryError || !trajectory) continue;
-    const trajectoryId: string = trajectory.id;
-    persistedScenarios.push({ trajectoryId, scenario });
+    const scenarios: ScenarioOutput[] = settled
+      .filter((r): r is PromiseFulfilledResult<ScenarioOutput> => r.status === "fulfilled")
+      .map((r) => r.value);
 
-    if (scenario.suppliers.length > 0) {
-      await supabase.from("matches").insert(
-        scenario.suppliers.map((s) => ({
-          transformation_id: transformationId,
-          trajectory_id: trajectoryId,
-          category: s.category,
-          name: s.name,
-          reason: s.reason,
-          website: s.website ?? null,
-          contact_email: s.contactEmail ?? null,
-          ecosystem_member_id:
-            s.source === "registry" && s.ecosystemMemberId && knownRegistryIds.has(s.ecosystemMemberId)
-              ? s.ecosystemMemberId
-              : null,
-          source: s.source,
-        }))
+    if (scenarios.length === 0) {
+      const firstError = settled.find((r): r is PromiseRejectedResult => r.status === "rejected")?.reason;
+      if (firstError instanceof Anthropic.APIError) {
+        throw new Error(
+          language === "en"
+            ? "The scenario engine couldn't respond. Try again in a moment."
+            : "Le moteur de scénarios n'a pas pu répondre. Réessaie dans un instant."
+        );
+      }
+      if (firstError instanceof DecideParseError) throw new Error(firstError.message);
+      throw new Error(
+        language === "en"
+          ? "The scenario engine took too long to respond. Try again."
+          : "Le moteur de scénarios a mis trop de temps à répondre. Réessaie."
       );
     }
 
-    if (scenario.risksSpecific.length > 0) {
-      await supabase.from("risks").insert(
-        scenario.risksSpecific.map((r) => ({
-          transformation_id: transformationId,
-          trajectory_id: trajectoryId,
-          name: r.name,
-          reason: r.reason,
-        }))
-      );
-    }
+    const knownRegistryIds = new Set((registry ?? []).map((m) => m.id));
 
-    if (scenario.opportunitiesSpecific.length > 0) {
-      await supabase.from("opportunities").insert(
-        scenario.opportunitiesSpecific.map((o) => ({
-          transformation_id: transformationId,
-          trajectory_id: trajectoryId,
-          name: o.name,
-          reason: o.reason,
-          module_origin: "decide",
-        }))
-      );
-    }
-  }
+    // Each scenario's own insert chain (trajectory, then its matches/risks/
+    // opportunities) runs independently of the others — in parallel rather
+    // than one scenario fully persisted before the next starts.
+    const persistResults = await Promise.all(
+      scenarios.map(async (scenario) => {
+        const { data: trajectory, error: trajectoryError } = await supabase
+          .from("trajectories")
+          .insert({
+            transformation_id: transformationId,
+            name: scenario.name,
+            stance: scenario.stance,
+            description: scenario.description,
+            tech_stack: scenario.techStack,
+            scores: scenario.radarScores,
+            indicators: scenario.indicators,
+            regulations: scenario.regulations,
+            executive_briefing: scenario.executiveBriefing,
+            briefing_highlights: scenario.briefingHighlights,
+          })
+          .select("id")
+          .single();
 
-  await setModuleStatus(supabase, transformationId, "decide", "in_progress");
+        if (trajectoryError || !trajectory) return null;
+        const trajectoryId: string = trajectory.id;
 
-  return NextResponse.json({
-    // D04 — veto starts false for every freshly generated scenario; the
-    // user toggles it afterwards (see decide-flow.tsx), persisted straight
-    // to trajectories.veto. Never set by the AI.
-    scenarios: persistedScenarios.map(({ trajectoryId, scenario }) => ({ trajectoryId, veto: false, ...scenario })),
-    ...(persistedScenarios.length < 3
-      ? {
-          warning:
-            language === "en"
-              ? `${persistedScenarios.length} of 3 scenario(s) generated — the others failed, you can retry.`
-              : `${persistedScenarios.length} scénario(s) sur 3 généré(s) — les autres ont échoué, tu peux réessayer.`,
-        }
-      : {}),
+        await Promise.all([
+          scenario.suppliers.length > 0
+            ? supabase.from("matches").insert(
+                scenario.suppliers.map((s) => ({
+                  transformation_id: transformationId,
+                  trajectory_id: trajectoryId,
+                  category: s.category,
+                  name: s.name,
+                  reason: s.reason,
+                  website: s.website ?? null,
+                  contact_email: s.contactEmail ?? null,
+                  ecosystem_member_id:
+                    s.source === "registry" && s.ecosystemMemberId && knownRegistryIds.has(s.ecosystemMemberId)
+                      ? s.ecosystemMemberId
+                      : null,
+                  source: s.source,
+                }))
+              )
+            : Promise.resolve(),
+          scenario.risksSpecific.length > 0
+            ? supabase.from("risks").insert(
+                scenario.risksSpecific.map((r) => ({
+                  transformation_id: transformationId,
+                  trajectory_id: trajectoryId,
+                  name: r.name,
+                  reason: r.reason,
+                }))
+              )
+            : Promise.resolve(),
+          scenario.opportunitiesSpecific.length > 0
+            ? supabase.from("opportunities").insert(
+                scenario.opportunitiesSpecific.map((o) => ({
+                  transformation_id: transformationId,
+                  trajectory_id: trajectoryId,
+                  name: o.name,
+                  reason: o.reason,
+                  module_origin: "decide",
+                }))
+              )
+            : Promise.resolve(),
+        ]);
+
+        return { trajectoryId, scenario };
+      })
+    );
+
+    const persistedScenarios = persistResults.filter(
+      (r): r is { trajectoryId: string; scenario: ScenarioOutput } => r !== null
+    );
+
+    await setModuleStatus(supabase, transformationId, "decide", "in_progress");
+
+    return {
+      // D04 — veto starts false for every freshly generated scenario; the
+      // user toggles it afterwards (see decide-flow.tsx), persisted straight
+      // to trajectories.veto. Never set by the AI.
+      scenarios: persistedScenarios.map(({ trajectoryId, scenario }) => ({ trajectoryId, veto: false, ...scenario })),
+      ...(persistedScenarios.length < 3
+        ? {
+            warning:
+              language === "en"
+                ? `${persistedScenarios.length} of 3 scenario(s) generated — the others failed, you can retry.`
+                : `${persistedScenarios.length} scénario(s) sur 3 généré(s) — les autres ont échoué, tu peux réessayer.`,
+          }
+        : {}),
+    };
   });
 }

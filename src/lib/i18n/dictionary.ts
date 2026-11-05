@@ -37,6 +37,8 @@ const fr = {
       remove: "Retirer",
       add: "Ajouter",
       anErrorOccurred: "Une erreur est survenue.",
+      networkErrorRetry:
+        "La connexion a été coupée pendant la génération (réseau mobile instable sur une requête longue). Réessaie, idéalement en Wi-Fi.",
       loading: "Un instant...",
       unvalidated: "Non validé",
       benefit: "Bénéfice",
@@ -1001,6 +1003,7 @@ const en: Dictionary = {
       remove: "Remove",
       add: "Add",
       anErrorOccurred: "An error occurred.",
+      networkErrorRetry: "The connection dropped during generation (unstable mobile network on a long request). Try again, ideally on Wi-Fi.",
       loading: "One moment...",
       unvalidated: "Unvalidated",
       benefit: "Benefit",

@@ -12,6 +12,7 @@ import {
 } from "@/lib/decide";
 import { setModuleStatus } from "@/lib/module-status";
 import { getLanguage } from "@/lib/i18n/language";
+import { streamJsonResponse } from "@/lib/streaming-json-response";
 import type { TrajectoryIndicators } from "@/types/database";
 
 // The roadmap prompt just needs human-readable indicator text, not the
@@ -82,120 +83,121 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   const anthropic = getAnthropicClient();
-  let response;
-  try {
-    response = await anthropic.messages.create({
-      model: MATCHING_MODEL,
-      // 3000 was truncating mid-JSON before the closing <RESULT_JSON> tag —
-      // same root cause as the scenarios route: 3-5 phases each with up to
-      // 6 deliverables, 6 actions and 4 KPIs (every one a full, specific
-      // sentence per the "never generic" rule) adds up past that budget.
-      max_tokens: 4500,
-      system: buildRoadmapSystemPrompt(language),
-      messages: [
-        {
-          role: "user",
-          content: buildRoadmapUserPrompt({
-            domains: (transformation?.domains as Domain[]) ?? [],
-            scenarioName: trajectory.name,
-            scenarioStance: trajectory.stance ?? "",
-            scenarioDescription: trajectory.description ?? "",
-            indicators: flattenIndicators((trajectory.indicators as TrajectoryIndicators) ?? {}),
-            priorityCost: body.priorityCost,
-            priorityCo2OrEquivalent: body.priorityCo2,
-            priorityRisk: body.priorityRisk,
-            prioritySpeed: body.prioritySpeed,
-          }),
-        },
-      ],
-    });
-  } catch (err) {
-    if (err instanceof Anthropic.APIError) {
-      const status = err.status === 401 || err.status === 403 ? 502 : (err.status ?? 502);
-      return NextResponse.json(
-        {
-          error:
-            language === "en"
-              ? "The roadmap engine couldn't respond. Try again in a moment."
-              : "Le moteur de roadmap n'a pas pu répondre. Réessaie dans un instant.",
-        },
-        { status }
+
+  // The slow part (the AI call, then the roadmap writes) — wrapped so the
+  // connection stays visibly alive throughout instead of one long silent
+  // wait (see src/lib/streaming-json-response.ts). Thrown errors below
+  // become the same { error } body callers already expect.
+  return streamJsonResponse(async () => {
+    let response;
+    try {
+      response = await anthropic.messages.create({
+        model: MATCHING_MODEL,
+        // 3000 was truncating mid-JSON before the closing <RESULT_JSON> tag —
+        // same root cause as the scenarios route: 3-5 phases each with up to
+        // 6 deliverables, 6 actions and 4 KPIs (every one a full, specific
+        // sentence per the "never generic" rule) adds up past that budget.
+        // Left as-is rather than trimmed further — same reasoning as
+        // diagnostic/scenarios: that's a real, previously-hit truncation
+        // floor, not headroom.
+        max_tokens: 4500,
+        system: buildRoadmapSystemPrompt(language),
+        messages: [
+          {
+            role: "user",
+            content: buildRoadmapUserPrompt({
+              domains: (transformation?.domains as Domain[]) ?? [],
+              scenarioName: trajectory.name,
+              scenarioStance: trajectory.stance ?? "",
+              scenarioDescription: trajectory.description ?? "",
+              indicators: flattenIndicators((trajectory.indicators as TrajectoryIndicators) ?? {}),
+              priorityCost: body.priorityCost,
+              priorityCo2OrEquivalent: body.priorityCo2,
+              priorityRisk: body.priorityRisk,
+              prioritySpeed: body.prioritySpeed,
+            }),
+          },
+        ],
+      });
+    } catch (err) {
+      if (err instanceof Anthropic.APIError) {
+        throw new Error(
+          language === "en"
+            ? "The roadmap engine couldn't respond. Try again in a moment."
+            : "Le moteur de roadmap n'a pas pu répondre. Réessaie dans un instant."
+        );
+      }
+      throw new Error(
+        language === "en"
+          ? "The roadmap engine took too long to respond. Try again."
+          : "Le moteur de roadmap a mis trop de temps à répondre. Réessaie."
       );
     }
-    return NextResponse.json(
-      {
-        error:
-          language === "en"
-            ? "The roadmap engine took too long to respond. Try again."
-            : "Le moteur de roadmap a mis trop de temps à répondre. Réessaie.",
-      },
-      { status: 504 }
-    );
-  }
 
-  const rawText = response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("\n");
+    const rawText = response.content
+      .filter((block): block is Anthropic.TextBlock => block.type === "text")
+      .map((block) => block.text)
+      .join("\n");
 
-  let result;
-  try {
-    result = parseRoadmapOutput(rawText);
-  } catch (err) {
-    if (err instanceof DecideParseError) {
-      return NextResponse.json({ error: err.message }, { status: 502 });
+    let result;
+    try {
+      result = parseRoadmapOutput(rawText);
+    } catch (err) {
+      if (err instanceof DecideParseError) throw new Error(err.message);
+      throw err;
     }
-    throw err;
-  }
 
-  // Compute real calendar dates server-side (never trust the model's own
-  // date arithmetic) by accumulating each phase's duration sequentially
-  // from the chosen start date.
-  let cursor = new Date(`${body.startDate}T00:00:00Z`);
-  const phasesWithDates = result.phases.map((phase, index) => {
-    const start = new Date(cursor);
-    const end = new Date(cursor);
-    end.setUTCDate(end.getUTCDate() + phase.durationWeeks * 7);
-    cursor = new Date(end);
-    return {
-      transformation_id: trajectory.transformation_id,
-      trajectory_id: trajectory.id,
-      phase_name: phase.name,
-      start_date: start.toISOString().slice(0, 10),
-      end_date: end.toISOString().slice(0, 10),
-      deliverables: phase.deliverables,
-      actions: phase.actions,
-      kpis: phase.kpis,
-      order_index: index,
-    };
+    // Compute real calendar dates server-side (never trust the model's own
+    // date arithmetic) by accumulating each phase's duration sequentially
+    // from the chosen start date.
+    let cursor = new Date(`${body.startDate}T00:00:00Z`);
+    const phasesWithDates = result.phases.map((phase, index) => {
+      const start = new Date(cursor);
+      const end = new Date(cursor);
+      end.setUTCDate(end.getUTCDate() + phase.durationWeeks * 7);
+      cursor = new Date(end);
+      return {
+        transformation_id: trajectory.transformation_id,
+        trajectory_id: trajectory.id,
+        phase_name: phase.name,
+        start_date: start.toISOString().slice(0, 10),
+        end_date: end.toISOString().slice(0, 10),
+        deliverables: phase.deliverables,
+        actions: phase.actions,
+        kpis: phase.kpis,
+        order_index: index,
+      };
+    });
+
+    // Support "Regenerate roadmap": clear this scenario's previous phases
+    // first — must happen before the insert below, so stays sequential.
+    await supabase.from("roadmap_phases").delete().eq("trajectory_id", trajectory.id);
+    const { data: inserted, error: insertError } = await supabase
+      .from("roadmap_phases")
+      .insert(phasesWithDates)
+      .select("*");
+
+    if (insertError) {
+      throw new Error(
+        language === "en" ? "Couldn't save the roadmap. Try again." : "Impossible d'enregistrer la roadmap. Réessaie."
+      );
+    }
+
+    // Independent of each other and of the insert above's result.
+    await Promise.all([
+      supabase
+        .from("trajectories")
+        .update({
+          roadmap_start_date: body.startDate,
+          priority_cost: body.priorityCost,
+          priority_co2: body.priorityCo2,
+          priority_risk: body.priorityRisk,
+          priority_speed: body.prioritySpeed,
+        })
+        .eq("id", trajectory.id),
+      setModuleStatus(supabase, trajectory.transformation_id, "decide", "done"),
+    ]);
+
+    return { phases: inserted ?? phasesWithDates };
   });
-
-  // Support "Regenerate roadmap": clear this scenario's previous phases first.
-  await supabase.from("roadmap_phases").delete().eq("trajectory_id", trajectory.id);
-  const { data: inserted, error: insertError } = await supabase
-    .from("roadmap_phases")
-    .insert(phasesWithDates)
-    .select("*");
-
-  if (insertError) {
-    return NextResponse.json(
-      { error: language === "en" ? "Couldn't save the roadmap. Try again." : "Impossible d'enregistrer la roadmap. Réessaie." },
-      { status: 500 }
-    );
-  }
-
-  await supabase
-    .from("trajectories")
-    .update({
-      roadmap_start_date: body.startDate,
-      priority_cost: body.priorityCost,
-      priority_co2: body.priorityCo2,
-      priority_risk: body.priorityRisk,
-      priority_speed: body.prioritySpeed,
-    })
-    .eq("id", trajectory.id);
-
-  await setModuleStatus(supabase, trajectory.transformation_id, "decide", "done");
-
-  return NextResponse.json({ phases: inserted ?? phasesWithDates });
 }

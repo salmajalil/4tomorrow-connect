@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useLanguage } from "@/components/language-provider";
 import { useTomorrowController } from "@/components/assistant/tomorrow-context";
 import { SearchIcon } from "@/components/icons";
+import { parseJsonResponse } from "@/lib/parse-json-response";
 import type { ChatMessage } from "@/lib/assistant";
 
 // Floating site-wide widget — always mounted (see src/app/layout.tsx), so it
@@ -55,8 +56,7 @@ export function TomorrowChat() {
           body: JSON.stringify({ messages: nextMessages, pathname, webSearchEnabled: webSearch }),
         });
       }
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t.assistant.errorFallback);
+      const { data } = await parseJsonResponse(res);
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.assistant.errorFallback);

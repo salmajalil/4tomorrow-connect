@@ -10,6 +10,7 @@ import {
   BrandThemeParseError,
 } from "@/lib/brand-theme";
 import { getLanguage } from "@/lib/i18n/language";
+import { streamJsonResponse } from "@/lib/streaming-json-response";
 import type { BrandTheme } from "@/types/database";
 
 export const maxDuration = 60;
@@ -72,67 +73,66 @@ export async function POST(request: Request) {
   const hasSite = !!body.siteUrl;
   const system = buildBrandThemeSystemPrompt(hasSite);
   const userPrompt = buildBrandThemeUserPrompt(body);
+  const finalOrganizationId = organizationId;
 
-  let raw: string;
-  try {
-    const response = await anthropic.messages.create({
-      model: MATCHING_MODEL,
-      max_tokens: 1200,
-      system,
-      messages: [{ role: "user", content: userPrompt }],
-      ...(hasSite ? { tools: [{ type: "web_search_20260318" as const, name: "web_search", max_uses: 3 }] } : {}),
-    });
-    raw = response.content
-      .filter((block): block is Anthropic.TextBlock => block.type === "text")
-      .map((block) => block.text)
-      .join("\n");
-  } catch (err) {
-    if (err instanceof Anthropic.APIError) {
-      return NextResponse.json(
-        {
-          error:
-            language === "en"
-              ? `Couldn't analyze the brand (${err.status ?? "network"}). Try again.`
-              : `Impossible d'analyser la marque (${err.status ?? "réseau"}). Réessaie.`,
-        },
-        { status: err.status === 401 || err.status === 403 ? 502 : (err.status ?? 502) }
+  // The slow part (the AI call, then the save) — wrapped so the connection
+  // stays visibly alive throughout instead of one long silent wait (see
+  // src/lib/streaming-json-response.ts). Thrown errors below become the
+  // same { error } body callers already expect.
+  return streamJsonResponse(async () => {
+    let raw: string;
+    try {
+      const response = await anthropic.messages.create({
+        model: MATCHING_MODEL,
+        max_tokens: 1200,
+        system,
+        messages: [{ role: "user", content: userPrompt }],
+        ...(hasSite ? { tools: [{ type: "web_search_20260318" as const, name: "web_search", max_uses: 3 }] } : {}),
+      });
+      raw = response.content
+        .filter((block): block is Anthropic.TextBlock => block.type === "text")
+        .map((block) => block.text)
+        .join("\n");
+    } catch (err) {
+      if (err instanceof Anthropic.APIError) {
+        throw new Error(
+          language === "en"
+            ? `Couldn't analyze the brand (${err.status ?? "network"}). Try again.`
+            : `Impossible d'analyser la marque (${err.status ?? "réseau"}). Réessaie.`
+        );
+      }
+      throw new Error(
+        language === "en" ? "The request took too long. Try again." : "La requête a mis trop de temps. Réessaie."
       );
     }
-    return NextResponse.json(
-      { error: language === "en" ? "The request took too long. Try again." : "La requête a mis trop de temps. Réessaie." },
-      { status: 504 }
-    );
-  }
 
-  let parsed;
-  try {
-    parsed = parseBrandThemeOutput(raw);
-  } catch (err) {
-    if (err instanceof BrandThemeParseError) {
-      return NextResponse.json({ error: err.message }, { status: 502 });
+    let parsed;
+    try {
+      parsed = parseBrandThemeOutput(raw);
+    } catch (err) {
+      if (err instanceof BrandThemeParseError) throw new Error(err.message);
+      throw err;
     }
-    throw err;
-  }
 
-  const theme: BrandTheme = {
-    ...parsed,
-    sourceLabel: body.siteUrl || body.docName || "",
-    generatedAt: new Date().toISOString(),
-  };
+    const theme: BrandTheme = {
+      ...parsed,
+      sourceLabel: body.siteUrl || body.docName || "",
+      generatedAt: new Date().toISOString(),
+    };
 
-  const { error: updateError } = await supabase
-    .from("organizations")
-    .update({ brand_theme: theme })
-    .eq("id", organizationId);
+    const { error: updateError } = await supabase
+      .from("organizations")
+      .update({ brand_theme: theme })
+      .eq("id", finalOrganizationId);
 
-  if (updateError) {
-    return NextResponse.json(
-      { error: language === "en" ? "Couldn't save the theme. Try again." : "Impossible d'enregistrer le thème. Réessaie." },
-      { status: 500 }
-    );
-  }
+    if (updateError) {
+      throw new Error(
+        language === "en" ? "Couldn't save the theme. Try again." : "Impossible d'enregistrer le thème. Réessaie."
+      );
+    }
 
-  return NextResponse.json({ theme });
+    return { theme };
+  });
 }
 
 // Clears the saved brand theme so the app reverts to 4 Tomorrow's default.

@@ -4,6 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
 import { buildAssistantSystemPrompt, type ChatMessage } from "@/lib/assistant";
 import { getLanguage } from "@/lib/i18n/language";
+import { streamJsonResponse } from "@/lib/streaming-json-response";
 
 // Tomorrow's chat — still lightweight (no database reads), but now has
 // web_search for real-world lookups (see buildAssistantSystemPrompt), so
@@ -42,51 +43,47 @@ export async function POST(request: Request) {
         : {}),
     });
 
-  let response;
-  try {
+  // Wrapped so the connection stays visibly alive for the AI call's whole
+  // duration instead of one long silent wait (see
+  // src/lib/streaming-json-response.ts) — web_search can take this well
+  // past what a quiet connection survives on mobile. Thrown errors below
+  // become the same { error } body callers already expect.
+  return streamJsonResponse(async () => {
+    let response;
     try {
-      response = await createCall();
-    } catch (err) {
-      // Same transient-overload retry as every other Anthropic call in the
-      // app (see learn.ts) — Tomorrow is the most visible, most-used
-      // surface, so a single 429/529 blip showing as a dead chat bubble is
-      // the worst possible place to skip this.
-      if (err instanceof Anthropic.APIError && (err.status === 429 || err.status === 529)) {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+      try {
         response = await createCall();
-      } else {
-        throw err;
+      } catch (err) {
+        // Same transient-overload retry as every other Anthropic call in the
+        // app (see learn.ts) — Tomorrow is the most visible, most-used
+        // surface, so a single 429/529 blip showing as a dead chat bubble is
+        // the worst possible place to skip this.
+        if (err instanceof Anthropic.APIError && (err.status === 429 || err.status === 529)) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          response = await createCall();
+        } else {
+          throw err;
+        }
       }
-    }
-  } catch (err) {
-    if (err instanceof Anthropic.APIError) {
-      const status = err.status === 401 || err.status === 403 ? 502 : (err.status ?? 502);
-      return NextResponse.json(
-        {
-          error:
-            language === "en"
-              ? "Tomorrow couldn't reply. Try again in a moment."
-              : "Tomorrow n'a pas pu répondre. Réessaie dans un instant.",
-        },
-        { status }
+    } catch (err) {
+      if (err instanceof Anthropic.APIError) {
+        throw new Error(
+          language === "en"
+            ? "Tomorrow couldn't reply. Try again in a moment."
+            : "Tomorrow n'a pas pu répondre. Réessaie dans un instant."
+        );
+      }
+      throw new Error(
+        language === "en" ? "Tomorrow took too long to respond. Try again." : "Tomorrow a mis trop de temps à répondre. Réessaie."
       );
     }
-    return NextResponse.json(
-      {
-        error:
-          language === "en"
-            ? "Tomorrow took too long to respond. Try again."
-            : "Tomorrow a mis trop de temps à répondre. Réessaie.",
-      },
-      { status: 504 }
-    );
-  }
 
-  const reply = response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("\n")
-    .trim();
+    const reply = response.content
+      .filter((block): block is Anthropic.TextBlock => block.type === "text")
+      .map((block) => block.text)
+      .join("\n")
+      .trim();
 
-  return NextResponse.json({ reply: reply || "..." });
+    return { reply: reply || "..." };
+  });
 }

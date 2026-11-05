@@ -142,20 +142,33 @@ export function RoadmapView({
   async function generate() {
     setGenerating(true);
     setError("");
-    try {
-      const res = await fetch("/api/decide/roadmap", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trajectoryId, startDate, priorityCost, priorityCo2, priorityRisk, prioritySpeed }),
-      });
-      const { data } = await parseJsonResponse(res);
-      if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
-      setPhases(data.phases as RoadmapPhase[]);
-      setActiveIndex(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.common.anErrorOccurred);
-    } finally {
-      setGenerating(false);
+
+    // Same mobile-network reality Decide's scenario/diagnostic generation
+    // already accounts for: a long call can finish server-side while the
+    // connection drops first, surfacing as a network-level TypeError rather
+    // than a real server error (those come back with a JSON body). Only
+    // that case gets an automatic retry.
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const res = await fetch("/api/decide/roadmap", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ trajectoryId, startDate, priorityCost, priorityCo2, priorityRisk, prioritySpeed }),
+        });
+        const { data } = await parseJsonResponse(res);
+        if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
+        setPhases(data.phases as RoadmapPhase[]);
+        setActiveIndex(null);
+        setGenerating(false);
+        return;
+      } catch (err) {
+        const isNetworkError = err instanceof TypeError;
+        if (isNetworkError && attempt < maxAttempts) continue;
+        setError(isNetworkError ? t.decide.networkErrorRetry : err instanceof Error ? err.message : t.common.anErrorOccurred);
+        setGenerating(false);
+        return;
+      }
     }
   }
 

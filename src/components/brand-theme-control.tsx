@@ -17,23 +17,34 @@ export function BrandThemeControl() {
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Same network-drop retry as Decide's scenarios call — a web-search-backed
+  // call can see the connection dropped by mobile Safari mid-flight even
+  // when the server finishes cleanly; only that network-level failure
+  // (TypeError), never a real server error, gets an automatic retry.
   async function analyze(body: { siteUrl?: string; docText?: string; docName?: string }) {
     setLoading(true);
     setError("");
-    try {
-      const res = await fetch("/api/brand/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const { data } = await parseJsonResponse(res);
-      if (!res.ok) throw new Error((data.error as string) || bt.error);
-      applyTheme(data.theme as BrandTheme);
-      setOpen(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : bt.error);
-    } finally {
-      setLoading(false);
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const res = await fetch("/api/brand/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const { data } = await parseJsonResponse(res);
+        if (!res.ok) throw new Error((data.error as string) || bt.error);
+        applyTheme(data.theme as BrandTheme);
+        setOpen(false);
+        setLoading(false);
+        return;
+      } catch (err) {
+        const isNetworkError = err instanceof TypeError;
+        if (isNetworkError && attempt < maxAttempts) continue;
+        setError(isNetworkError ? t.common.networkErrorRetry : err instanceof Error ? err.message : bt.error);
+        setLoading(false);
+        return;
+      }
     }
   }
 

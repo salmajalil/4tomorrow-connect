@@ -38,23 +38,34 @@ export function ControlTowerTab({
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
 
+  // Same network-drop retry as Decide's scenarios call — a long AI
+  // generation can see the connection dropped by mobile Safari mid-flight
+  // even when the server finishes cleanly; only that network-level failure
+  // (TypeError), never a real server error, gets an automatic retry.
   async function sendFeedback() {
     setSending(true);
     setError("");
-    try {
-      const res = await fetch("/api/deliver/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transformationId, feedbackText }),
-      });
-      const { data } = await parseJsonResponse(res);
-      if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
-      setProposal(data.feedback as MissionFeedback);
-      setApplied(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.common.anErrorOccurred);
-    } finally {
-      setSending(false);
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const res = await fetch("/api/deliver/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ transformationId, feedbackText }),
+        });
+        const { data } = await parseJsonResponse(res);
+        if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
+        setProposal(data.feedback as MissionFeedback);
+        setApplied(false);
+        setSending(false);
+        return;
+      } catch (err) {
+        const isNetworkError = err instanceof TypeError;
+        if (isNetworkError && attempt < maxAttempts) continue;
+        setError(isNetworkError ? t.common.networkErrorRetry : err instanceof Error ? err.message : t.common.anErrorOccurred);
+        setSending(false);
+        return;
+      }
     }
   }
 

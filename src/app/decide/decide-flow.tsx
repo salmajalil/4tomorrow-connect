@@ -171,19 +171,32 @@ export function DecideFlow({
     setLastIntake(intake);
     setPhase("diagnostic-loading");
     setDiagnosticError("");
-    try {
-      const res = await fetch("/api/decide/diagnostic", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(intake),
-      });
-      const { data } = await parseJsonResponse(res);
-      if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
-      setDiagnostic(data as DiagnosticResult);
-      setPhase("diagnostic");
-    } catch (err) {
-      setDiagnosticError(err instanceof Error ? err.message : t.common.anErrorOccurred);
-      setPhase("diagnostic-loading"); // stay, error block replaces spinner below
+
+    // Same mobile-network reality runScenarios already accounts for below:
+    // a long call can finish server-side while the connection drops first,
+    // which surfaces as a network-level TypeError, not a real server error
+    // (those come back with a JSON body). Only that case gets an automatic
+    // retry.
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const res = await fetch("/api/decide/diagnostic", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(intake),
+        });
+        const { data } = await parseJsonResponse(res);
+        if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
+        setDiagnostic(data as DiagnosticResult);
+        setPhase("diagnostic");
+        return;
+      } catch (err) {
+        const isNetworkError = err instanceof TypeError;
+        if (isNetworkError && attempt < maxAttempts) continue;
+        setDiagnosticError(isNetworkError ? t.decide.networkErrorRetry : err instanceof Error ? err.message : t.common.anErrorOccurred);
+        setPhase("diagnostic-loading"); // stay, error block replaces spinner below
+        return;
+      }
     }
   }
 

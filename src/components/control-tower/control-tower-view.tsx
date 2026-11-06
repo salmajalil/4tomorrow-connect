@@ -19,6 +19,7 @@ import type {
   TransformationMemberRole,
 } from "@/types/database";
 import { computeRiskSeverity } from "@/lib/risk-scoring";
+import { RiskMatrix } from "@/components/control-tower/risk-matrix";
 
 function moduleHref(module: ModuleName, transformationId: string): string | null {
   if (module === "decide") return "/decide";
@@ -601,6 +602,7 @@ function ProjectCard({
 
       {panel === "risks" && (
         <div className="flex flex-col gap-3 border-t border-border pt-4">
+          <RiskMatrix risks={project.risks} ct={ct} />
           {project.risks.map((r) => (
             <RiskRow key={r.id} risk={r} ct={ct} />
           ))}

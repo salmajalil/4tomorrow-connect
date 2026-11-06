@@ -21,6 +21,7 @@ import {
   suggestTrainingForGap,
   type Domain,
   type SkillAssessmentInput,
+  type SkillGapResult,
 } from "@/lib/learn-skills-calc";
 
 export interface LearnIntakeState {
@@ -50,6 +51,88 @@ interface SkillRow extends SkillAssessmentInput {
 
 function defaultSkillRow(): SkillRow {
   return { id: nextSkillRowId(), role: "", domain: "manufacturing", required: 3, demonstrated: 1, criticality: 3, selfAssessed: false };
+}
+
+// F01 — one card per role×domain cell, replacing the earlier flat table.
+// The segmented bar shows both numbers at once on a single 0-4 scale:
+// filled accent = demonstrated (achieved), filled danger/40 = the gap still
+// to close up to the required level, empty = above what's required. Numbers
+// themselves (gap, priorité) are never recomputed here — straight from
+// computeSkillGaps()/rankSkillGaps() in src/lib/learn-skills-calc.ts.
+function SkillGapCard({
+  result: r,
+  skillsT,
+  suggestion,
+  onUseTopic,
+}: {
+  result: SkillGapResult;
+  skillsT: Dictionary["learn"]["skills"];
+  suggestion: string | null;
+  onUseTopic: () => void;
+}) {
+  const toConfirm = r.status === "à confirmer";
+  return (
+    <div
+      className={`flex flex-col gap-3 rounded-xl border p-4 ${
+        r.gap > 0 ? "border-danger/30 bg-danger/5" : "border-border bg-surface"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-ink">{r.role}</p>
+          <p className="text-xs text-muted">{DOMAIN_LABELS[r.domain]}</p>
+        </div>
+        <span
+          className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+            toConfirm ? "bg-surface-2 text-muted" : "bg-success/15 text-success"
+          }`}
+        >
+          {toConfirm ? skillsT.statusToConfirm : skillsT.statusConfirmed}
+        </span>
+      </div>
+
+      <div className="flex gap-0.5" aria-hidden>
+        {Array.from({ length: SKILL_LEVEL_MAX }, (_, i) => {
+          const level = i + 1;
+          const filled = level <= r.demonstrated ? "bg-accent" : level <= r.required ? "bg-danger/40" : "bg-border";
+          return <span key={i} className={`h-2 flex-1 rounded-full ${filled}`} />;
+        })}
+      </div>
+      <div className="flex items-center justify-between text-[11px] text-muted">
+        <span>
+          {skillsT.demonstrated} {r.demonstrated}/{SKILL_LEVEL_MAX}
+        </span>
+        <span>
+          {skillsT.required} {r.required}/{SKILL_LEVEL_MAX}
+        </span>
+      </div>
+
+      {r.gap > 0 && (
+        <div className="flex items-center gap-3 border-t border-border/60 pt-2.5 text-xs">
+          <span className="font-semibold text-ink">
+            {skillsT.gap} {r.gap}
+          </span>
+          <span className="text-muted">·</span>
+          <span className="text-muted">
+            {skillsT.priority} <span className="font-semibold text-ink">{r.weighted}</span>
+          </span>
+        </div>
+      )}
+
+      {suggestion && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-accent/10 px-3 py-2 text-xs">
+          <span className="text-ink">{suggestion}</span>
+          <button
+            type="button"
+            onClick={onUseTopic}
+            className="shrink-0 rounded-lg border border-border bg-surface px-2.5 py-1 font-medium text-ink transition hover:border-accent/50"
+          >
+            {skillsT.useTopic}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function modeOptions(intake: Dictionary["learn"]["intake"]): {
@@ -428,60 +511,24 @@ export function LearnIntakeForm({
         {rankedSkillResults.length > 0 && (
           <div className="flex flex-col gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted">{skillsT.resultsTitle}</span>
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-border text-muted">
-                    <th className="px-3 py-2 font-medium">{skillsT.role}</th>
-                    <th className="px-3 py-2 font-medium">{skillsT.domain}</th>
-                    <th className="px-3 py-2 font-medium">{skillsT.gap}</th>
-                    <th className="px-3 py-2 font-medium">{skillsT.priority}</th>
-                    <th className="px-3 py-2 font-medium">{skillsT.status}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rankedSkillResults.map((r, i) => (
-                    <tr key={`${r.role}-${r.domain}-${i}`} className="border-b border-border last:border-0">
-                      <td className="px-3 py-2 text-ink">{r.role}</td>
-                      <td className="px-3 py-2 text-muted">{DOMAIN_LABELS[r.domain]}</td>
-                      <td className="px-3 py-2 text-ink">{r.gap}</td>
-                      <td className="px-3 py-2 text-ink">{r.weighted}</td>
-                      <td className="px-3 py-2">
-                        <span className={r.status === "à confirmer" ? "text-muted" : "text-success"}>
-                          {r.status === "à confirmer" ? skillsT.statusToConfirm : skillsT.statusConfirmed}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {topGaps.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted">{skillsT.topGapsTitle}</span>
-            <div className="flex flex-col gap-2">
-              {topGaps.map((gap) => {
-                const suggestion = suggestTrainingForGap(gap.domain, catalog) ?? DEFAULT_TRAINING_SUGGESTIONS[gap.domain];
+            <p className="text-[11px] text-muted">{skillsT.topGapsTitle}</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {rankedSkillResults.map((r, i) => {
+                // The top (highest-priority) gap in r's domain gets the suggested
+                // training surfaced directly on its own card — never more than one
+                // per domain (see topGapPerDomain in learn-skills-calc.ts).
+                const isTopGapForDomain = topGaps.some((g) => g.domain === r.domain && g.role === r.role && g.gap > 0);
+                const suggestion = isTopGapForDomain
+                  ? (suggestTrainingForGap(r.domain, catalog) ?? DEFAULT_TRAINING_SUGGESTIONS[r.domain])
+                  : null;
                 return (
-                  <div
-                    key={gap.domain}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-surface-2/40 px-3 py-2 text-xs"
-                  >
-                    <span>
-                      <span className="font-medium text-ink">{DOMAIN_LABELS[gap.domain]}</span>{" "}
-                      <span className="text-muted">— {suggestion}</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setState((s) => ({ ...s, topic: suggestion }))}
-                      className="rounded-lg border border-border bg-surface px-3 py-1.5 font-medium text-ink transition hover:border-accent/50"
-                    >
-                      {skillsT.useTopic}
-                    </button>
-                  </div>
+                  <SkillGapCard
+                    key={`${r.role}-${r.domain}-${i}`}
+                    result={r}
+                    skillsT={skillsT}
+                    suggestion={suggestion}
+                    onUseTopic={() => suggestion && setState((s) => ({ ...s, topic: suggestion }))}
+                  />
                 );
               })}
             </div>

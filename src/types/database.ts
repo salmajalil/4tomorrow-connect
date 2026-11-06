@@ -244,6 +244,19 @@ export type Action = {
   created_at: string;
 };
 
+// Connecter — "Demander un rendez-vous". match_id nullable: a request can
+// target a candidate that was never persisted to `matches`.
+export type MeetingRequest = {
+  id: string;
+  transformation_id: string;
+  match_id: string | null;
+  partner_name: string;
+  requester_name: string;
+  requester_email: string;
+  message: string;
+  created_at: string;
+};
+
 export type BenefitSource = "manual" | "business_case";
 
 export type BenefitExpectation = {
@@ -555,6 +568,11 @@ export type Database = {
       >;
       ecosystem_members: Table<EcosystemMember, Partial<EcosystemMember> & Pick<EcosystemMember, "name" | "type">>;
       matches: Table<Match, Partial<Match> & Pick<Match, "transformation_id" | "category" | "name" | "source">>;
+      meeting_requests: Table<
+        MeetingRequest,
+        Partial<MeetingRequest> &
+          Pick<MeetingRequest, "transformation_id" | "partner_name" | "requester_name" | "requester_email">
+      >;
       supplier_assessments: Table<
         SupplierAssessment,
         Partial<SupplierAssessment> & Pick<SupplierAssessment, "match_id" | "transformation_id">

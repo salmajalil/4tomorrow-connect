@@ -50,6 +50,115 @@ function FitGauge({ value, label }: { value: number; label: string }) {
   );
 }
 
+// Connecter — "Demander un rendez-vous". No mailer exists anywhere in this
+// codebase (same finding as the team-invite feature) — this only records
+// the request server-side; requestMeetingNotice says so plainly instead of
+// pretending a mail went out.
+function RequestMeetingForm({
+  matchId,
+  transformationId,
+  partnerName,
+  t,
+  onClose,
+}: {
+  matchId: string | null;
+  transformationId: string | null;
+  partnerName: string;
+  t: Dictionary;
+  onClose: () => void;
+}) {
+  const r = t.connect.results;
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!transformationId) return null;
+
+  async function submit() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/connect/request-meeting", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transformationId,
+          matchId,
+          partnerName,
+          requesterName: name,
+          requesterEmail: email,
+          message,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error || r.requestMeetingError);
+        return;
+      }
+      setDone(true);
+    } catch {
+      setError(r.requestMeetingError);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="flex flex-col gap-1.5 border-t border-border pt-3 text-xs">
+        <p className="font-medium text-success">✓ {r.requestMeetingSuccess}</p>
+        <p className="text-muted">{r.requestMeetingNotice}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2.5 border-t border-border pt-3 text-xs">
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder={r.requestMeetingName}
+        className="rounded-lg border border-border bg-surface px-3 py-2 text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+      />
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder={r.requestMeetingEmail}
+        className="rounded-lg border border-border bg-surface px-3 py-2 text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+      />
+      <textarea
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        placeholder={r.requestMeetingMessagePlaceholder}
+        rows={2}
+        className="resize-none rounded-lg border border-border bg-surface px-3 py-2 text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+      />
+      {error && <p className="text-danger">{error}</p>}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={submitting || !name.trim() || !email.trim()}
+          onClick={() => void submit()}
+          className="rounded-lg bg-accent px-3 py-1.5 font-medium text-accent-ink transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {submitting ? r.requestMeetingSubmitting : r.requestMeetingSubmit}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg border border-border px-3 py-1.5 font-medium text-ink transition hover:border-accent/50"
+        >
+          {r.requestMeetingCancel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function MatchCard({
   match,
   matchId,
@@ -69,6 +178,7 @@ function MatchCard({
 }) {
   const r = t.connect.results;
   const [open, setOpen] = useState(false);
+  const [requesting, setRequesting] = useState(false);
   const brick = BRICKS.find((b) => b.key === brickOf(match.category));
   return (
     <article className={`flex flex-col gap-3 border bg-surface p-4 transition ${shortlisted ? "border-accent" : "border-border"}`}>
@@ -123,6 +233,25 @@ function MatchCard({
             </a>
           )}
         </div>
+      )}
+
+      {transformationId && !requesting && (
+        <button
+          type="button"
+          onClick={() => setRequesting(true)}
+          className="self-start border-t border-border pt-3 text-xs font-medium text-accent-strong underline-offset-4 hover:underline"
+        >
+          {r.requestMeeting}
+        </button>
+      )}
+      {requesting && (
+        <RequestMeetingForm
+          matchId={matchId}
+          transformationId={transformationId}
+          partnerName={match.name}
+          t={t}
+          onClose={() => setRequesting(false)}
+        />
       )}
 
       {/* C02 — pertinence fournisseur : seulement pour les matches "supplier",

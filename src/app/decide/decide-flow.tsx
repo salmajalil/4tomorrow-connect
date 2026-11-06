@@ -70,6 +70,16 @@ function initialPhase(hasScenarios: boolean, hasDiagnostic: boolean): Phase {
   return "intake";
 }
 
+// D04 — same axes computation as the scenarios render (`Array.from(new
+// Set(scenarios.flatMap(...)))`); duplicated rather than shared because one
+// runs before the component has `scenarios` in state (initial render /
+// rehydration) and the other right after a fresh generation response.
+function defaultCompareView(scenarios: ScenarioWithId[] | null): "bars" | "radar" {
+  if (!scenarios || scenarios.length === 0) return "bars";
+  const axesCount = new Set(scenarios.flatMap((s) => Object.keys(s.radarScores))).size;
+  return canShowRadar(axesCount) ? "radar" : "bars";
+}
+
 export function DecideFlow({
   initialDiagnostic = null,
   initialScenarios = null,
@@ -98,10 +108,11 @@ export function DecideFlow({
   // connus, sauf si l'utilisateur en a déjà enregistré (initialWeights).
   const [weights, setWeights] = useState<Record<string, number> | null>(initialWeights);
   const [weightsError, setWeightsError] = useState("");
-  // D04 — vue radar en option (≤ 6 critères) : le comparateur en barres reste
-  // la vue par défaut (c'est elle qui est sûre sur mobile), le radar est un
-  // choix explicite de l'utilisateur.
-  const [compareView, setCompareView] = useState<"bars" | "radar">("bars");
+  // D04 — vue radar par défaut quand elle reste lisible (≤ 6 critères,
+  // canShowRadar) ; au-delà, repli automatique sur le comparateur en barres
+  // (c'est lui qui est sûr au-delà de 6 axes). L'utilisateur garde la main
+  // via le bouton bars/radar, ce n'est qu'un choix initial.
+  const [compareView, setCompareView] = useState<"bars" | "radar">(() => defaultCompareView(initialScenarios));
 
   // Previously UI-only ("selected" just highlighted a card) — Deliver needs
   // to know which trajectory was actually chosen to know what to execute,
@@ -224,6 +235,7 @@ export function DecideFlow({
         const { data } = await parseJsonResponse(res);
         if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
         setScenarios(data.scenarios as ScenarioWithId[]);
+        setCompareView(defaultCompareView(data.scenarios as ScenarioWithId[]));
         if (data.warning) setScenariosWarning(data.warning as string);
         setPhase("scenarios");
         return;

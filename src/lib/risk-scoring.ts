@@ -31,6 +31,21 @@ export function computeRiskSeverity(input: RiskScoreInput): RiskScoreResult {
   return { status: "évalué", severity: probability * impact };
 }
 
+export type RiskZone = "faible" | "modéré" | "élevé" | "critique";
+
+/**
+ * Palier ISO 31000 à partir de la sévérité (1-25) : faible (1-4), modéré
+ * (5-9), élevé (10-14), critique (15-25). Pure, jamais d'IA — la sévérité
+ * elle-même vient toujours de computeRiskSeverity, jamais inventée ici.
+ */
+export function riskZone(severity: number | null): RiskZone | null {
+  if (severity === null) return null;
+  if (severity <= 4) return "faible";
+  if (severity <= 9) return "modéré";
+  if (severity <= 14) return "élevé";
+  return "critique";
+}
+
 /** Trie les risques par sévérité décroissante ; les non évalués passent en dernier, puis par nom. */
 export function rankRisksBySeverity<T extends { name: string; probability: number | null; impact: number | null }>(
   risks: T[]

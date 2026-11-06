@@ -216,6 +216,11 @@ export function SupplierAssessmentPanel({
           >
             {saving ? a.saving : a.save}
           </button>
+
+          <details className="text-[10.5px]">
+            <summary className="cursor-pointer font-medium uppercase tracking-wide text-muted">{a.howCalculatedTitle}</summary>
+            <p className="mt-1.5 text-muted">{a.howCalculatedBody}</p>
+          </details>
         </div>
       )}
     </div>

@@ -127,6 +127,15 @@ export function DiagnosticView({
   const [showRecommendationFull, setShowRecommendationFull] = useState(false);
   const topPriority = [...result.priorities].sort((a, b) => b.weight - a.weight)[0];
   const topRisk = result.risks[0];
+  // D01's own headline figure — computed, not generated: the count of
+  // capabilities with a real gap (gap > 0) and the single highest-priority
+  // one, straight from decide-diagnostic-calc.ts's output. Falls back to the
+  // AI's top weighted priority when no capability assessment was filled in
+  // (capabilityGaps is empty for transformations created before D01, or when
+  // the intake's capability sliders were left untouched).
+  const rankedCapabilities = rankCapabilityGaps(result.capabilityGaps);
+  const gapsToClose = rankedCapabilities.filter((c) => c.gap > 0);
+  const topCapability = gapsToClose[0];
 
   return (
     <div className="flex flex-col gap-8">
@@ -143,6 +152,18 @@ export function DiagnosticView({
             </span>
           ))}
         </div>
+        {topCapability ? (
+          <p className="mt-4 font-display text-2xl text-ink">
+            <span className="text-accent">{gapsToClose.length}</span> {diagnostic.headlineGapsSuffix}{" "}
+            <span className="text-muted">
+              — {diagnostic.headlineTopCapability} {DOMAIN_LABELS[topCapability.domain]}
+            </span>
+          </p>
+        ) : topPriority ? (
+          <p className="mt-4 font-display text-2xl text-ink">
+            {diagnostic.headlineTopPriority} <span className="text-accent">{topPriority.name}</span>
+          </p>
+        ) : null}
       </div>
 
       {result.maturityHighlights.length > 0 ? (
@@ -325,6 +346,12 @@ export function DiagnosticView({
                 ))}
               </ul>
             )}
+            <details className="mt-3 text-xs">
+              <summary className="cursor-pointer font-semibold uppercase tracking-wide text-muted">
+                {diagnostic.howCalculatedTitle}
+              </summary>
+              <p className="mt-2 text-muted">{diagnostic.capabilitiesHint}</p>
+            </details>
           </div>
 
           <div>

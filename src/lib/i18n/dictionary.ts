@@ -949,6 +949,11 @@ const fr = {
       ceoReport: "Synthèse CEO · 1 page",
       detailedReport: "Rapport détaillé",
       notFound: "Ce projet est introuvable ou ne t'appartient pas.",
+      howCalculatedTitle: "Comment c'est calculé",
+      howCalculatedHeadline: "Le chiffre en titre vient directement du scénario retenu dans Décider — jamais recalculé ici.",
+      howCalculatedConfidence: "La barre de confiance compte, sur tous les indicateurs de la page, combien sont vérifiés, estimés ou encore inconnus.",
+      howCalculatedBenefit: "Le gain estimé vient du module Livrer (bénéfices réalisés vs. attendus) s'il existe, sinon il reste vide plutôt qu'inventé.",
+      howCalculatedModules: "L'avancement par module vient du statut déjà enregistré dans la Tour de contrôle, jamais recalculé ici non plus.",
     },
     ecosystemJoin: {
       title: "Rejoindre l'écosystème",
@@ -1916,6 +1921,11 @@ const en: Dictionary = {
       ceoReport: "CEO summary · 1 page",
       detailedReport: "Detailed report",
       notFound: "This project can't be found or isn't yours.",
+      howCalculatedTitle: "How this is calculated",
+      howCalculatedHeadline: "The headline figure comes straight from the retained scenario in Decide — never recomputed here.",
+      howCalculatedConfidence: "The confidence bar counts, across every indicator on this page, how many are verified, estimated, or still unknown.",
+      howCalculatedBenefit: "The estimated benefit comes from the Deliver module (realized vs. expected benefits) when it exists, otherwise it stays blank rather than invented.",
+      howCalculatedModules: "Per-module progress comes from the status already recorded in the Control Tower, never recomputed here either.",
     },
     ecosystemJoin: {
       title: "Join the ecosystem",

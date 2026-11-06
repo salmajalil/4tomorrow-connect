@@ -175,6 +175,16 @@ export async function POST(request: Request) {
         .select("id")
         .single();
       if (orgError) {
+        // Logged, not swallowed: without this, the generic message below is
+        // the only thing anyone (including whoever reads the Vercel function
+        // logs) ever sees — impossible to tell an RLS denial from a missing
+        // table from a constraint violation.
+        console.error("[decide/diagnostic] organizations insert failed", {
+          code: orgError.code,
+          message: orgError.message,
+          details: orgError.details,
+          hint: orgError.hint,
+        });
         throw new Error(
           language === "en" ? "Couldn't save the diagnostic. Try again." : "Impossible d'enregistrer le diagnostic. Réessaie."
         );
@@ -205,6 +215,12 @@ export async function POST(request: Request) {
       .single();
 
     if (transformationError) {
+      console.error("[decide/diagnostic] transformations insert failed", {
+        code: transformationError.code,
+        message: transformationError.message,
+        details: transformationError.details,
+        hint: transformationError.hint,
+      });
       throw new Error(
         language === "en" ? "Couldn't save the diagnostic. Try again." : "Impossible d'enregistrer le diagnostic. Réessaie."
       );

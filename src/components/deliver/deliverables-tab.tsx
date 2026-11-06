@@ -26,6 +26,41 @@ const KIND_ICONS: Record<DeliverableKind, IconName> = {
   toolkit: "toolbox",
 };
 
+// The AI writes `summary` as a free-form multi-paragraph essay (unlike
+// `keyPoints`, which is already a short list) — shown in full by default it
+// was exactly the kind of "pavé" (wall of text) the gabarit asks to avoid.
+// Same line-clamp + toggle pattern already used by scenario-card.tsx.
+function ExecutiveReportContent({
+  content,
+  d,
+}: {
+  content: DeliverableExecutiveReportContent;
+  d: Dictionary["deliver"]["deliverables"];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="flex flex-col gap-3">
+      <div>
+        <p className={`text-sm leading-relaxed text-ink ${expanded ? "" : "line-clamp-3"}`}>{content.summary}</p>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 text-xs font-medium text-accent-strong underline-offset-4 hover:underline"
+        >
+          {expanded ? d.readLess : d.readMore}
+        </button>
+      </div>
+      <ul className="flex flex-col gap-1.5">
+        {content.keyPoints.map((k, i) => (
+          <li key={i} className="rounded-lg border border-border bg-surface-2 p-2.5 text-sm text-ink">
+            {k}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 // The "Transformation Roadmap" deliverable's detail view IS the co-
 // constructed execution Gantt (see execution-gantt.tsx's comment on why
 // this isn't a 4th tab). Every other kind gets a straightforward content
@@ -116,18 +151,7 @@ function DeliverableContentView({
 
   if (kind === "executive_report") {
     const content = deliverable.content as DeliverableExecutiveReportContent;
-    return (
-      <div className="flex flex-col gap-3">
-        <p className="text-sm text-ink">{content.summary}</p>
-        <ul className="flex flex-col gap-1.5">
-          {content.keyPoints.map((k, i) => (
-            <li key={i} className="rounded-lg border border-border bg-surface-2 p-2.5 text-sm text-ink">
-              {k}
-            </li>
-          ))}
-        </ul>
-      </div>
-    );
+    return <ExecutiveReportContent content={content} d={d} />;
   }
 
   const content = deliverable.content as DeliverableToolkitContent;

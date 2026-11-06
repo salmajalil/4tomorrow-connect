@@ -712,6 +712,8 @@ const fr = {
         likelihood: "Probabilité",
         impact: "Impact",
         mitigation: "Mitigation :",
+        readMore: "Lire la suite",
+        readLess: "Réduire",
       },
       gantt: {
         noRoadmap: "Aucune feuille de route pour l'instant. Génère-la d'abord dans Décider.",
@@ -1677,6 +1679,8 @@ const en: Dictionary = {
         likelihood: "Likelihood",
         impact: "Impact",
         mitigation: "Mitigation:",
+        readMore: "Read more",
+        readLess: "Show less",
       },
       gantt: {
         noRoadmap: "No roadmap available — generate one in Decide first.",

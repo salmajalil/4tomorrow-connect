@@ -664,6 +664,9 @@ export type Database = {
       process_flows: Table<ProcessFlow, Partial<ProcessFlow> & Pick<ProcessFlow, "transformation_id">>;
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      // 0025_claim_pending_invitations.sql — renvoie le nombre d'invitations acceptées.
+      claim_pending_invitations: { Args: Record<string, never>; Returns: number };
+    };
   };
 };

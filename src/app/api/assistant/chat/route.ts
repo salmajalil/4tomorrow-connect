@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
+import { createClient } from "@/lib/supabase/server";
 import { getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
 import { buildAssistantSystemPrompt, type ChatMessage } from "@/lib/assistant";
 import { getLanguage } from "@/lib/i18n/language";
@@ -23,6 +24,18 @@ const requestSchema = z.object({
 
 export async function POST(request: Request) {
   const language = await getLanguage();
+  // Never reachable anonymously: every call costs a real model call (and
+  // possibly web_search), so it is gated on a session like every other AI
+  // route (same pattern as src/app/api/decide/roadmap/route.ts).
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: language === "en" ? "Log in first." : "Connecte-toi d'abord." }, { status: 401 });
+  }
+
   let body: z.infer<typeof requestSchema>;
   try {
     body = requestSchema.parse(await request.json());

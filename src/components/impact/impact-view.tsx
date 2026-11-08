@@ -312,6 +312,22 @@ export function ImpactView({ project, t, language }: { project: ProjectImpact; t
           )}
         </section>
       )}
+
+      {/* Gabarit: every tool screen ends with a collapsed "how is this
+          calculated" — this page had none before. Short on purpose: it
+          names the source of each figure, it doesn't re-explain the figure
+          itself. */}
+      <details className="mt-10 border border-border bg-surface p-6 text-sm">
+        <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-[0.2em] text-muted">
+          {im.howCalculatedTitle}
+        </summary>
+        <ul className="mt-4 flex flex-col gap-2 text-muted">
+          <li>{im.howCalculatedHeadline}</li>
+          <li>{im.howCalculatedConfidence}</li>
+          <li>{im.howCalculatedBenefit}</li>
+          <li>{im.howCalculatedModules}</li>
+        </ul>
+      </details>
     </div>
   );
 }

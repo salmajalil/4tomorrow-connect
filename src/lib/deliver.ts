@@ -55,6 +55,198 @@ ${RESULT_START}
 ${RESULT_END}
 The block must be the last thing in your response, with valid JSON (no trailing commas, no comments) inside it.`;
 
+// Per-kind guided questionnaire shown before generation (Deliver's one-click
+// blind generation replaced by "a few real-world inputs first" — the AI
+// still never calculates anything, these are narrative grounding facts it's
+// told to prefer over guessing). Every field is optional and the fast
+// "Boost All" path still works with none of them filled — this only makes
+// output sharper when the client actually answers, never a hard gate.
+export type DeliverableInputFieldDef = {
+  key: string;
+  // Invariant, English — goes into the AI prompt regardless of UI language.
+  promptLabel: string;
+  label: { fr: string; en: string };
+  placeholder: { fr: string; en: string };
+  multiline?: boolean;
+};
+
+const INPUT_FIELDS: Record<DeliverableKind, DeliverableInputFieldDef[]> = {
+  roadmap: [
+    {
+      key: "startDate",
+      promptLabel: "Actual execution start date",
+      label: { fr: "Date de démarrage réelle", en: "Actual start date" },
+      placeholder: { fr: "Ex : 15 janvier 2026", en: "E.g.: January 15, 2026" },
+    },
+    {
+      key: "teamAvailable",
+      promptLabel: "Team/resources actually available to execute",
+      label: { fr: "Équipe/ressources réellement disponibles", en: "Team/resources actually available" },
+      placeholder: {
+        fr: "Ex : 2 chefs de projet, 1 intégrateur externe à partir de mars",
+        en: "E.g.: 2 project leads, 1 external integrator from March",
+      },
+      multiline: true,
+    },
+    {
+      key: "constraints",
+      promptLabel: "Known scheduling constraints or blackout periods",
+      label: { fr: "Contraintes de planning connues", en: "Known scheduling constraints" },
+      placeholder: {
+        fr: "Ex : arrêt usine en août, budget bloqué jusqu'au T2",
+        en: "E.g.: plant shutdown in August, budget locked until Q2",
+      },
+      multiline: true,
+    },
+  ],
+  action_plan: [
+    {
+      key: "immediateCapacity",
+      promptLabel: "Who can act immediately, right now",
+      label: { fr: "Qui peut agir dès maintenant", en: "Who can act immediately" },
+      placeholder: { fr: "Ex : l'équipe qualité, dispo à 50%", en: "E.g.: the quality team, 50% available" },
+    },
+    {
+      key: "blockers",
+      promptLabel: "Blockers already known today",
+      label: { fr: "Blocages déjà identifiés", en: "Blockers already known" },
+      placeholder: { fr: "Ex : validation juridique en attente", en: "E.g.: legal sign-off pending" },
+      multiline: true,
+    },
+    {
+      key: "horizon",
+      promptLabel: "Time horizon this action plan must cover",
+      label: { fr: "Horizon de temps visé", en: "Time horizon" },
+      placeholder: { fr: "Ex : 30 jours, 90 jours", en: "E.g.: 30 days, 90 days" },
+    },
+  ],
+  kpi_dashboard: [
+    {
+      key: "currentBaseline",
+      promptLabel: "Real current measured values for the indicators — use these instead of guessing",
+      label: { fr: "Valeurs actuelles réellement mesurées", en: "Real current measured values" },
+      placeholder: {
+        fr: "Ex : taux de service actuel 92%, délai moyen 6j",
+        en: "E.g.: current service rate 92%, average lead time 6d",
+      },
+      multiline: true,
+    },
+    {
+      key: "reportingFrequency",
+      promptLabel: "How often these KPIs will actually be tracked",
+      label: { fr: "Fréquence de suivi prévue", en: "Tracking frequency" },
+      placeholder: { fr: "Ex : hebdomadaire, comité mensuel", en: "E.g.: weekly, monthly steering committee" },
+    },
+    {
+      key: "dataSource",
+      promptLabel: "Where this data actually comes from",
+      label: { fr: "Source des données", en: "Data source" },
+      placeholder: {
+        fr: "Ex : ERP, tableur partagé, reporting terrain",
+        en: "E.g.: ERP, shared spreadsheet, field reporting",
+      },
+    },
+  ],
+  risk_map: [
+    {
+      key: "knownRisks",
+      promptLabel: "Risks the team has already identified or experienced",
+      label: { fr: "Risques déjà identifiés en interne", en: "Risks already identified internally" },
+      placeholder: {
+        fr: "Ex : turnover sur l'équipe technique, dépendance à un seul fournisseur",
+        en: "E.g.: turnover on the technical team, single-supplier dependency",
+      },
+      multiline: true,
+    },
+    {
+      key: "riskAppetite",
+      promptLabel: "Organization's actual risk tolerance for this project",
+      label: { fr: "Appétence au risque de l'organisation", en: "Organization's risk appetite" },
+      placeholder: { fr: "Ex : faible — zéro tolérance sur la sécurité", en: "E.g.: low — zero tolerance on safety" },
+    },
+    {
+      key: "pastIncidents",
+      promptLabel: "Past incidents or failed projects worth learning from",
+      label: { fr: "Incidents ou échecs passés à prendre en compte", en: "Past incidents to account for" },
+      placeholder: {
+        fr: "Ex : un déploiement similaire a échoué en 2023 faute de formation",
+        en: "E.g.: a similar rollout failed in 2023 due to lack of training",
+      },
+      multiline: true,
+    },
+  ],
+  executive_report: [
+    {
+      key: "audience",
+      promptLabel: "The actual audience of this report",
+      label: { fr: "Destinataire réel de ce rapport", en: "Actual audience of this report" },
+      placeholder: { fr: "Ex : comité de direction, conseil d'administration", en: "E.g.: executive committee, board of directors" },
+    },
+    {
+      key: "decisionNeeded",
+      promptLabel: "The specific decision this report must support",
+      label: { fr: "Décision attendue à l'issue du rapport", en: "Decision this report must support" },
+      placeholder: { fr: "Ex : valider le budget d'exécution", en: "E.g.: approve the execution budget" },
+    },
+    {
+      key: "deadline",
+      promptLabel: "Deadline this report is tied to",
+      label: { fr: "Échéance liée à ce rapport", en: "Deadline tied to this report" },
+      placeholder: { fr: "Ex : comité du 20 décembre", en: "E.g.: Dec 20 steering committee" },
+    },
+  ],
+  toolkit: [
+    {
+      key: "existingTools",
+      promptLabel: "Tools the organization already uses today — avoid redundant recommendations",
+      label: { fr: "Outils déjà utilisés aujourd'hui", en: "Tools already in use today" },
+      placeholder: { fr: "Ex : Excel, ERP SAP, Trello", en: "E.g.: Excel, SAP ERP, Trello" },
+      multiline: true,
+    },
+    {
+      key: "budget",
+      promptLabel: "Realistic budget available for new tools",
+      label: { fr: "Budget réaliste pour de nouveaux outils", en: "Realistic budget for new tools" },
+      placeholder: { fr: "Ex : limité, privilégier le gratuit/open-source", en: "E.g.: limited, prefer free/open-source" },
+    },
+    {
+      key: "techConstraints",
+      promptLabel: "Technical constraints any new tool must respect",
+      label: { fr: "Contraintes techniques à respecter", en: "Technical constraints to respect" },
+      placeholder: {
+        fr: "Ex : doit s'intégrer à l'ERP existant, données hébergées en France",
+        en: "E.g.: must integrate with the existing ERP, data hosted in France",
+      },
+      multiline: true,
+    },
+  ],
+};
+
+export function getDeliverableInputFields(
+  kind: DeliverableKind,
+  language: Language
+): { key: string; label: string; placeholder: string; multiline?: boolean }[] {
+  return INPUT_FIELDS[kind].map((f) => ({
+    key: f.key,
+    label: f.label[language],
+    placeholder: f.placeholder[language],
+    multiline: f.multiline,
+  }));
+}
+
+// Only known keys for this kind are read — anything else the client sends
+// is ignored rather than rejected, same permissive-but-bounded approach as
+// the rest of Deliver's free-text fields. Each value capped defensively.
+function buildInputsBlock(kind: DeliverableKind, inputs: Record<string, string>): string {
+  const filled = INPUT_FIELDS[kind]
+    .map((f) => ({ label: f.promptLabel, value: (inputs[f.key] ?? "").trim().slice(0, 600) }))
+    .filter((f) => f.value.length > 0);
+  if (filled.length === 0) return "";
+  return `\n\nReal-world inputs provided by the client for this specific deliverable (ground the output in these first, they are more reliable than anything inferred) :\n${filled
+    .map((f) => `- ${f.label}: ${f.value}`)
+    .join("\n")}`;
+}
+
 export interface DeliverGenerationContext {
   domains: Domain[];
   organization: string;
@@ -205,7 +397,11 @@ Schema:
 { "title": string, "content": ${KIND_SCHEMA_BLOCK[kind]} }`;
 }
 
-export function buildDeliverableUserPrompt(context: DeliverGenerationContext): string {
+export function buildDeliverableUserPrompt(
+  context: DeliverGenerationContext,
+  kind?: DeliverableKind,
+  inputs?: Record<string, string>
+): string {
   return `Domaines détectés : ${context.domains.map((d) => DOMAIN_LABELS[d]).join(", ")}
 Organisation : ${context.organization || "(non précisé)"}
 Industrie : ${context.industry || "(non précisé)"}
@@ -220,7 +416,9 @@ Indicateurs de la trajectoire : ${JSON.stringify(context.indicators)}
 
 Gaps identifiés : ${context.gaps.map((g) => `${g.name} — ${g.reason}`).join("; ") || "(aucun)"}
 Priorités : ${context.priorities.map((p) => `${p.name} — ${p.reason}`).join("; ") || "(aucune)"}
-${context.sourceDocText ? `\nDocument(s) projet fourni(s) (contexte supplémentaire) :\n${context.sourceDocText}` : ""}`;
+${context.sourceDocText ? `\nDocument(s) projet fourni(s) (contexte supplémentaire) :\n${context.sourceDocText}` : ""}${
+    kind && inputs ? buildInputsBlock(kind, inputs) : ""
+  }`;
 }
 
 export function parseDeliverableOutput(kind: DeliverableKind, rawText: string): { title: string; content: DeliverableContent } {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeRiskSeverity, rankRisksBySeverity } from "./risk-scoring";
+import { computeRiskSeverity, rankRisksBySeverity, riskZone } from "./risk-scoring";
 
 describe("computeRiskSeverity", () => {
   it("multiplies probability by impact when both are set", () => {
@@ -59,5 +59,22 @@ describe("rankRisksBySeverity", () => {
     const risks = [{ name: "X", probability: 2, impact: 4 }];
     const [result] = rankRisksBySeverity(risks);
     expect(result.severity).toBe(8);
+  });
+});
+
+describe("riskZone", () => {
+  it("returns null for a non-evaluated risk", () => {
+    expect(riskZone(null)).toBeNull();
+  });
+
+  it("classifies the four ISO 31000-style tiers by severity", () => {
+    expect(riskZone(1)).toBe("faible");
+    expect(riskZone(4)).toBe("faible");
+    expect(riskZone(5)).toBe("modéré");
+    expect(riskZone(9)).toBe("modéré");
+    expect(riskZone(10)).toBe("élevé");
+    expect(riskZone(14)).toBe("élevé");
+    expect(riskZone(15)).toBe("critique");
+    expect(riskZone(25)).toBe("critique");
   });
 });

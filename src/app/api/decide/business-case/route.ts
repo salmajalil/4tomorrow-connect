@@ -85,5 +85,49 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ businessCase: data, result });
+  // D05 → L06 : le bénéfice net annuel calculé ci-dessus (jamais une autre
+  // valeur) alimente le bénéfice attendu de Livrer, source='business_case'
+  // (voir 0016_actions_and_benefits.sql). Uniquement pour la trajectoire
+  // réellement retenue : un business case sur un scénario écarté ne doit
+  // pas écraser le bénéfice attendu du projet. Best-effort : le business
+  // case lui-même est déjà enregistré.
+  let benefitLinked = false;
+  const { data: tx } = await supabase
+    .from("transformations")
+    .select("selected_trajectory_id")
+    .eq("id", body.transformationId)
+    .maybeSingle();
+  if (tx?.selected_trajectory_id === body.trajectoryId) {
+    const { error: benefitError } = await supabase.from("benefit_expectations").upsert(
+      {
+        transformation_id: body.transformationId,
+        expected_annual: result.netAnnual,
+        source: "business_case",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "transformation_id" }
+    );
+    benefitLinked = !benefitError;
+  }
+
+  return NextResponse.json({ businessCase: data, result, benefitLinked });
+}
+
+// Relecture au montage (même principe que GET /api/decide/flow pour D02) :
+// le dernier business case enregistré pour cette trajectoire, ou null.
+// RLS limite la lecture aux projets accessibles à l'appelant.
+export async function GET(request: Request) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ businessCase: null }, { status: 401 });
+
+  const trajectoryId = new URL(request.url).searchParams.get("trajectoryId");
+  if (!trajectoryId || !z.string().uuid().safeParse(trajectoryId).success) {
+    return NextResponse.json({ businessCase: null });
+  }
+
+  const { data } = await supabase.from("business_cases").select("*").eq("trajectory_id", trajectoryId).maybeSingle();
+  return NextResponse.json({ businessCase: data ?? null });
 }

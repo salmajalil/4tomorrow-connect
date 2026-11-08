@@ -3,6 +3,7 @@ import {
   computeExpiresAt,
   evaluateConsumption,
   isTokenStillUsable,
+  validationHistoryStatus,
   VALIDATION_TOKEN_TTL_MS,
   type ValidationTokenRecord,
   type CurrentDecisionState,
@@ -82,5 +83,36 @@ describe("isTokenStillUsable", () => {
     expect(isTokenStillUsable(token, current, issuedAt).ok).toBe(true);
     const used = { ...token, usedAt: "2026-01-01T01:00:00Z" };
     expect(isTokenStillUsable(used, current, issuedAt).ok).toBe(false);
+  });
+});
+
+describe("refusal codes", () => {
+  it("exposes a stable code alongside the French reason", () => {
+    expect(evaluateConsumption(token, current, issuedAt, false).code).toBe("not_confirmed");
+    expect(evaluateConsumption({ ...token, usedAt: "2026-01-01T01:00:00Z" }, current, issuedAt, true).code).toBe("used");
+    expect(evaluateConsumption(token, { ...current, trajectoryId: "traj-2" }, issuedAt, true).code).toBe("decision_changed");
+    expect(evaluateConsumption(token, current, issuedAt, true).code).toBeNull();
+  });
+});
+
+describe("validationHistoryStatus", () => {
+  const pendingRow = { ...token, outcome: null };
+
+  it("shows the CEO's outcome once answered", () => {
+    expect(validationHistoryStatus({ ...pendingRow, outcome: "rejected" }, current, issuedAt)).toBe("rejected");
+  });
+
+  it("is pending while the token is still usable", () => {
+    expect(validationHistoryStatus(pendingRow, current, issuedAt)).toBe("pending");
+  });
+
+  it("is expired after 72h without an answer — never pending forever", () => {
+    const later = new Date(Date.parse(token.expiresAt) + 1000);
+    expect(validationHistoryStatus(pendingRow, current, later)).toBe("expired");
+  });
+
+  it("is outdated when the decision changed since the link was sent", () => {
+    const edited: CurrentDecisionState = { ...current, decisionUpdatedAt: "2026-01-01T00:30:00Z" };
+    expect(validationHistoryStatus(pendingRow, edited, issuedAt)).toBe("outdated");
   });
 });

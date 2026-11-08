@@ -1,4 +1,7 @@
+"use client";
+
 import { canShowRadar } from "@/lib/decide-scenario-calc";
+import { useLanguage } from "@/components/language-provider";
 
 const SIZE = 380;
 const CENTER = SIZE / 2;
@@ -42,6 +45,7 @@ export function RadarChart({
   axes: string[];
   series: { label: string; values: number[]; veto?: boolean }[];
 }) {
+  const { t } = useLanguage();
   // D04 — "vue radar en option (≤ 6 critères)" : au-delà, le radar devient
   // illisible (axes trop serrés) ; le comparateur en barres reste la seule vue.
   if (!canShowRadar(axes.length)) return null;
@@ -53,7 +57,7 @@ export function RadarChart({
       <svg
         viewBox={`0 0 ${SIZE} ${SIZE}`}
         role="img"
-        aria-label="Comparaison des scénarios en radar"
+        aria-label={t.decide.scenarios.radarAriaLabel}
         className="mx-auto block w-full max-w-sm"
       >
         {rings.map((ring) => {

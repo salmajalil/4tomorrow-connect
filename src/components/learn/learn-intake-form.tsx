@@ -16,6 +16,7 @@ import {
   CRITICALITY_MAX,
   DEFAULT_TRAINING_SUGGESTIONS,
   computeSkillGaps,
+  validateSkillInputs,
   rankSkillGaps,
   topGapPerDomain,
   suggestTrainingForGap,
@@ -83,7 +84,7 @@ function SkillGapCard({
           <p className="text-xs text-muted">{DOMAIN_LABELS[r.domain]}</p>
         </div>
         <span
-          className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
             toConfirm ? "bg-surface-2 text-muted" : "bg-success/15 text-success"
           }`}
         >
@@ -98,7 +99,7 @@ function SkillGapCard({
           return <span key={i} className={`h-2 flex-1 rounded-full ${filled}`} />;
         })}
       </div>
-      <div className="flex items-center justify-between text-[11px] text-muted">
+      <div className="flex items-center justify-between text-xs text-muted">
         <span>
           {skillsT.demonstrated} {r.demonstrated}/{SKILL_LEVEL_MAX}
         </span>
@@ -197,16 +198,24 @@ export function LearnIntakeForm({
     };
   }, []);
 
-  const validSkillInputs: SkillAssessmentInput[] = skillRows
-    .filter((r) => r.role.trim().length > 0)
-    .map((r) => ({
-      role: r.role,
-      domain: r.domain,
-      required: r.required,
-      demonstrated: r.demonstrated,
-      criticality: r.criticality,
-      selfAssessed: r.selfAssessed,
-    }));
+  // F01 — chaque ligne passe par validateSkillInputs (la même règle que le
+  // serveur, src/app/api/learn/generate/route.ts) : une ligne invalide (rôle
+  // vide, niveau hors bornes) est signalée sur la ligne elle-même et bloque
+  // la génération, au lieu d'être ignorée en silence.
+  const toSkillInput = (r: SkillRow): SkillAssessmentInput => ({
+    role: r.role,
+    domain: r.domain,
+    required: r.required,
+    demonstrated: r.demonstrated,
+    criticality: r.criticality,
+    selfAssessed: r.selfAssessed,
+  });
+  const skillRowErrors = new Map<string, string[]>();
+  for (const r of skillRows) {
+    const errors = validateSkillInputs([toSkillInput(r)]);
+    if (errors.length > 0) skillRowErrors.set(r.id, errors);
+  }
+  const validSkillInputs: SkillAssessmentInput[] = skillRows.filter((r) => !skillRowErrors.has(r.id)).map(toSkillInput);
   const skillResults = computeSkillGaps(validSkillInputs);
   const rankedSkillResults = rankSkillGaps(skillResults);
   const topGaps = topGapPerDomain(skillResults);
@@ -253,6 +262,7 @@ export function LearnIntakeForm({
   const canSubmit =
     state.topic.trim().length > 0 &&
     !submitting &&
+    skillRowErrors.size === 0 &&
     (state.mode !== "diagnostic" || !!state.transformationId) &&
     (state.mode !== "document" || (!!state.sourceDocText && !uploading));
 
@@ -418,7 +428,8 @@ export function LearnIntakeForm({
                     value={row.role}
                     onChange={(e) => updateSkillRow(row.id, { role: e.target.value })}
                     placeholder={skillsT.rolePlaceholder}
-                    className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+                    aria-invalid={row.role.trim() === "" || undefined}
+                    className={`rounded-lg border ${row.role.trim() === "" ? "border-danger/60" : "border-border"} bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none`}
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-xs">
@@ -496,8 +507,24 @@ export function LearnIntakeForm({
                 />
                 {skillsT.selfAssessed}
               </label>
+              {skillRowErrors.has(row.id) && (
+                <ul role="alert" className="flex flex-col gap-1 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-xs text-danger">
+                  {/* Rôle vide : message traduit. Les autres erreurs (niveaux hors
+                      bornes, impossibles via les curseurs) gardent le texte de
+                      validateSkillInputs. */}
+                  {row.role.trim() === ""
+                    ? <li>{skillsT.roleMissing}</li>
+                    : (skillRowErrors.get(row.id) ?? []).map((e) => <li key={e}>{e}</li>)}
+                </ul>
+              )}
             </div>
           ))}
+
+          {skillRowErrors.size > 0 && (
+            <p role="status" className="text-sm font-medium text-danger">
+              {skillsT.rowsInvalid.replace("{n}", String(skillRowErrors.size))}
+            </p>
+          )}
 
           <button
             type="button"
@@ -519,7 +546,7 @@ export function LearnIntakeForm({
                     .replace("{domain}", DOMAIN_LABELS[rankedSkillResults[0].domain])
                 : skillsT.noGaps}
             </p>
-            <p className="text-[11px] text-muted">{skillsT.topGapsTitle}</p>
+            <p className="text-xs text-muted">{skillsT.topGapsTitle}</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {rankedSkillResults.map((r, i) => {
                 // The top (highest-priority) gap in r's domain gets the suggested

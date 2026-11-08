@@ -32,7 +32,7 @@ function moduleHref(module: ModuleName, transformationId: string): string | null
 function LivePulse({ lastSync, t }: { lastSync: Date | null; t: Dictionary }) {
   const language = useLanguage().language;
   return (
-    <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-live">
+    <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-live">
       <span className="relative flex h-2 w-2">
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-live opacity-60" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-live" />
@@ -47,7 +47,7 @@ function LivePulse({ lastSync, t }: { lastSync: Date | null; t: Dictionary }) {
 function StatTile({ label, value, tone }: { label: string; value: number | string; tone?: "danger" | "live" | "accent" }) {
   return (
     <div className="flex flex-col gap-1 border border-border bg-surface p-4">
-      <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-muted">{label}</span>
+      <span className="font-mono text-xs uppercase tracking-[0.16em] text-muted">{label}</span>
       <span
         className={`font-display text-4xl leading-none tabular-nums ${
           tone === "danger" ? "text-danger" : tone === "live" ? "text-live" : tone === "accent" ? "text-accent-strong" : "text-ink"
@@ -115,7 +115,7 @@ function ModulePath({
                 background: st === "done" ? color : st === "in_progress" ? `color-mix(in srgb, ${color} 45%, transparent)` : "var(--border)",
               }}
             />
-            <span className={`flex items-center gap-1 text-[10.5px] ${st === "not_started" ? "text-muted" : "text-body"}`}>
+            <span className={`flex items-center gap-1 text-xs ${st === "not_started" ? "text-muted" : "text-body"}`}>
               <Icon name={m} className="h-3 w-3 shrink-0" style={{ color: st === "not_started" ? undefined : color }} />
               <span className="truncate">{moduleLabels[m]}</span>
             </span>
@@ -256,7 +256,7 @@ function TeamPanel({
 
       <form onSubmit={submitInvite} className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
         <div className="flex min-w-[180px] flex-1 flex-col gap-1">
-          <label className="text-[11px] text-muted">{ct.teamInvite}</label>
+          <label className="text-xs text-muted">{ct.teamInvite}</label>
           <input
             type="email"
             required
@@ -267,7 +267,7 @@ function TeamPanel({
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-[11px] text-muted">{ct.teamInviteRoleLabel}</label>
+          <label className="text-xs text-muted">{ct.teamInviteRoleLabel}</label>
           <select
             value={role}
             onChange={(e) => setRole(e.target.value as TransformationMemberRole)}
@@ -282,7 +282,7 @@ function TeamPanel({
         </div>
         {role === "expert" && (
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] text-muted">{ct.teamInviteDomainLabel}</label>
+            <label className="text-xs text-muted">{ct.teamInviteDomainLabel}</label>
             <select
               value={domain}
               onChange={(e) => setDomain(e.target.value as ModuleName)}
@@ -305,7 +305,7 @@ function TeamPanel({
         </button>
       </form>
       {error && <p className="text-xs text-danger">{error}</p>}
-      <p className="text-[11px] text-muted">{ct.teamInviteNotice}</p>
+      <p className="text-xs text-muted">{ct.teamInviteNotice}</p>
     </div>
   );
 }
@@ -356,12 +356,12 @@ function RiskRow({ risk, ct }: { risk: RiskRowData; ct: Dictionary["controlTower
           <span className="font-medium text-ink">{risk.name}</span>
           {risk.reason && <span className="text-muted"> — {risk.reason}</span>}
         </span>
-        <span className={`shrink-0 font-mono text-[10px] uppercase tracking-wide ${status === "évalué" ? "text-danger" : "text-muted"}`}>
+        <span className={`shrink-0 font-mono text-xs uppercase tracking-wide ${status === "évalué" ? "text-danger" : "text-muted"}`}>
           {severity !== null ? `${ct.severityLabel} ${severity}/25` : ct.severityNotEvaluated}
         </span>
       </div>
       <div className="mt-2 flex flex-wrap items-end gap-2">
-        <label className="flex flex-col gap-0.5 text-[10px] text-muted">
+        <label className="flex flex-col gap-0.5 text-xs text-muted">
           {ct.probabilityLabel}
           <select
             value={probability ?? ""}
@@ -376,7 +376,7 @@ function RiskRow({ risk, ct }: { risk: RiskRowData; ct: Dictionary["controlTower
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-0.5 text-[10px] text-muted">
+        <label className="flex flex-col gap-0.5 text-xs text-muted">
           {ct.impactLabel}
           <select
             value={impact ?? ""}
@@ -391,11 +391,11 @@ function RiskRow({ risk, ct }: { risk: RiskRowData; ct: Dictionary["controlTower
             ))}
           </select>
         </label>
-        <label className="flex min-w-[8rem] flex-1 flex-col gap-0.5 text-[10px] text-muted">
+        <label className="flex min-w-[8rem] flex-1 flex-col gap-0.5 text-xs text-muted">
           {ct.ownerLabel}
           <input value={owner} onChange={(e) => setOwner(e.target.value)} className="border border-border bg-surface px-1.5 py-1 text-ink" />
         </label>
-        <label className="flex min-w-[10rem] flex-[2] flex-col gap-0.5 text-[10px] text-muted">
+        <label className="flex min-w-[10rem] flex-[2] flex-col gap-0.5 text-xs text-muted">
           {ct.treatmentLabel}
           <input value={treatment} onChange={(e) => setTreatment(e.target.value)} className="border border-border bg-surface px-1.5 py-1 text-ink" />
         </label>
@@ -403,7 +403,7 @@ function RiskRow({ risk, ct }: { risk: RiskRowData; ct: Dictionary["controlTower
           type="button"
           onClick={() => void save()}
           disabled={saving}
-          className="shrink-0 bg-accent px-2.5 py-1.5 text-[10px] font-medium text-accent-ink disabled:opacity-50"
+          className="shrink-0 bg-accent px-2.5 py-1.5 text-xs font-medium text-accent-ink disabled:opacity-50"
         >
           {ct.saveLabel}
         </button>
@@ -463,7 +463,7 @@ function ActionsPanel({
             <button
               type="button"
               onClick={() => void createClient().from("actions").update({ status: ACTION_STATUS_CYCLE[a.status] }).eq("id", a.id)}
-              className="border border-border px-2 py-1 font-mono text-[10px] uppercase tracking-wide text-ink hover:border-accent"
+              className="border border-border px-2 py-1 font-mono text-xs uppercase tracking-wide text-ink hover:border-accent"
             >
               {STATUS_LABELS[a.status]}
             </button>
@@ -554,7 +554,7 @@ function ProjectCard({
           <div className="flex items-center gap-2">
             <h3 className="truncate font-display text-xl leading-tight text-ink">{shortName(project, t)}</h3>
             {project.archived && (
-              <span className="shrink-0 border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+              <span className="shrink-0 border border-border px-1.5 py-0.5 font-mono text-xs uppercase tracking-[0.12em] text-muted">
                 {ct.archivedBadge}
               </span>
             )}
@@ -874,7 +874,7 @@ export function ControlTowerView({
 
       {active.length > 0 && (
         <section className="mt-8 border border-border bg-surface p-5">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-accent-strong">{ct.todayTitle}</h2>
+          <h2 className="font-mono text-xs uppercase tracking-[0.18em] text-accent-strong">{ct.todayTitle}</h2>
           {actions.length === 0 ? (
             <p className="mt-3 text-sm text-muted">{ct.todayEmpty}</p>
           ) : (

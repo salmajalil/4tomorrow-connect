@@ -43,13 +43,13 @@ function FitGauge({ value, label }: { value: number; label: string }) {
   const v = Math.max(0, Math.min(10, Math.round(value)));
   return (
     <span className="flex items-center gap-1.5">
-      <span className="text-[10.5px] text-muted">{label}</span>
+      <span className="text-xs text-muted">{label}</span>
       <span className="flex gap-[2px]" aria-hidden>
         {Array.from({ length: 5 }, (_, i) => (
           <span key={i} className={`h-2.5 w-1.5 ${i < Math.round(v / 2) ? "bg-accent" : "bg-border"}`} />
         ))}
       </span>
-      <span className="font-mono text-[10.5px] tabular-nums text-muted">{v}/10</span>
+      <span className="font-mono text-xs tabular-nums text-muted">{v}/10</span>
     </span>
   );
 }
@@ -188,7 +188,7 @@ function MatchCard({
     <article className={`flex flex-col gap-3 border bg-surface p-4 transition ${shortlisted ? "border-accent" : "border-border"}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+          <p className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.14em] text-muted">
             {brick && <Icon name={brick.icon} className="h-3 w-3" />}
             {brickLabel}
           </p>
@@ -210,12 +210,12 @@ function MatchCard({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         {typeof match.fit === "number" && match.fit > 0 && <FitGauge value={match.fit} label={r.fit} />}
         {match.source === "registry" ? (
-          <span className="border border-success/40 px-1.5 py-0.5 text-[10.5px] font-medium text-success">{r.registrySource}</span>
+          <span className="border border-success/40 px-1.5 py-0.5 text-xs font-medium text-success">{r.registrySource}</span>
         ) : (
-          <span className="border border-border px-1.5 py-0.5 text-[10.5px] font-medium text-muted">{r.webSource}</span>
+          <span className="border border-border px-1.5 py-0.5 text-xs font-medium text-muted">{r.webSource}</span>
         )}
         {match.gapAddressed && (
-          <span className="border border-border bg-surface-2 px-1.5 py-0.5 text-[10.5px] text-body">{match.gapAddressed}</span>
+          <span className="border border-border bg-surface-2 px-1.5 py-0.5 text-xs text-body">{match.gapAddressed}</span>
         )}
       </div>
 

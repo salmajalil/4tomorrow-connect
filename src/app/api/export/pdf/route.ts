@@ -4,6 +4,7 @@ import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import type { ReactElement } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getLanguage } from "@/lib/i18n/language";
+import type { Language } from "@/types/database";
 import {
   DecideReportDocument,
   ConnectReportDocument,
@@ -30,12 +31,15 @@ type Kind = z.infer<typeof requestSchema>["kind"];
 // this is a formatting boundary, not a security one.
 type PayloadKind = Exclude<Kind, "project-ceo" | "project-detailed">;
 
+// Chaque builder reçoit aussi la langue active (cookie, getLanguage) : les
+// libellés du PDF suivent la langue de l'interface, comme les rapports
+// projet (project-reports.tsx).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const BUILDERS: Record<PayloadKind, (payload: any) => ReactElement<DocumentProps>> = {
-  decide: (p) => DecideReportDocument(p),
-  connect: (p) => ConnectReportDocument(p),
-  learn: (p) => LearnReportDocument(p),
-  "control-tower": (p) => ControlTowerReportDocument(p),
+const BUILDERS: Record<PayloadKind, (payload: any, language: Language) => ReactElement<DocumentProps>> = {
+  decide: (p, language) => DecideReportDocument({ ...p, language }),
+  connect: (p, language) => ConnectReportDocument({ ...p, language }),
+  learn: (p, language) => LearnReportDocument({ ...p, language }),
+  "control-tower": (p, language) => ControlTowerReportDocument({ ...p, language }),
 };
 
 const FILENAMES: Record<Kind, string> = {
@@ -91,7 +95,7 @@ export async function POST(request: Request) {
           ? CeoReportDocument({ project, language })
           : DetailedReportDocument({ project, language });
     } else {
-      document = BUILDERS[body.kind](body.payload);
+      document = BUILDERS[body.kind](body.payload, language);
     }
     buffer = await renderToBuffer(document);
   } catch {

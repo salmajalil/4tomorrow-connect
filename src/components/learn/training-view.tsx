@@ -93,20 +93,20 @@ export function TrainingView({ training }: { training: Training }) {
         {!isWorkshop && (
           <div className="grid grid-cols-2 gap-3 sm:max-w-md">
             <button type="button" onClick={() => setTab("cartes")} className="border border-border bg-surface p-3 text-left hover:border-accent">
-              <span className="block font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{tr.progressCards}</span>
+              <span className="block font-mono text-xs uppercase tracking-[0.14em] text-muted">{tr.progressCards}</span>
               <span className="mt-1 block font-display text-3xl leading-none text-ink tabular-nums">
                 {mastered}
                 <span className="text-lg text-muted">/{training.flashcards.length}</span>
               </span>
             </button>
             <button type="button" onClick={() => setTab("quiz")} className="border border-border bg-surface p-3 text-left hover:border-accent">
-              <span className="block font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{tr.progressQuiz}</span>
+              <span className="block font-mono text-xs uppercase tracking-[0.14em] text-muted">{tr.progressQuiz}</span>
               <span className="mt-1 block font-display text-3xl leading-none text-ink tabular-nums">
                 {quizScore}
                 <span className="text-lg text-muted">/{totalQuestions}</span>
               </span>
               {quizAnswered > 0 && quizAnswered < totalQuestions && (
-                <span className="mt-1 block font-mono text-[10px] text-muted">
+                <span className="mt-1 block font-mono text-xs text-muted">
                   {quizAnswered}/{totalQuestions}
                 </span>
               )}
@@ -312,7 +312,7 @@ export function TrainingView({ training }: { training: Training }) {
         <div className="flex flex-col gap-4">
           <FormatTile icon="film" title={tr.videoScript} subtitle={tr.videoScriptSubtitle} />
           <p className="flex items-start gap-2 border border-dashed border-border-strong px-4 py-3 text-xs text-muted">
-            <span className="shrink-0 border border-accent/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-accent-strong">
+            <span className="shrink-0 border border-accent/40 px-1.5 py-0.5 font-mono text-xs uppercase tracking-[0.12em] text-accent-strong">
               {tr.optionBadge}
             </span>
             {tr.videoOptionHint}
@@ -342,20 +342,20 @@ export function TrainingView({ training }: { training: Training }) {
           <p className="text-xs text-muted">{tr.qualiopiIntro}</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="rounded-lg border border-border bg-surface p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{tr.targetAudience}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">{tr.targetAudience}</p>
               <p className="mt-1 text-sm text-ink">{training.audience || t.common.notSpecified}</p>
             </div>
             <div className="rounded-lg border border-border bg-surface p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{tr.duration}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">{tr.duration}</p>
               <p className="mt-1 text-sm text-ink">{training.duration_minutes ?? "—"} min</p>
             </div>
             <div className="rounded-lg border border-border bg-surface p-3 sm:col-span-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{tr.prerequisites}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">{tr.prerequisites}</p>
               <p className="mt-1 text-sm text-ink">{training.prerequisites}</p>
             </div>
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{tr.pedagogicalObjectives}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">{tr.pedagogicalObjectives}</p>
             <ul className="mt-2 flex flex-col gap-1.5">
               {training.objectives.map((o, i) => (
                 <li key={i} className="rounded-lg border border-border bg-surface p-2.5 text-sm text-ink">

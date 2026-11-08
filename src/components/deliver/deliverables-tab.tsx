@@ -74,7 +74,7 @@ function DeliverableKpiDashboardContentView({ content, d }: { content: Deliverab
             <div className="flex items-baseline justify-between gap-2">
               <p className="font-semibold text-ink">{k.name}</p>
               <span
-                className={`text-[10px] font-semibold uppercase ${
+                className={`text-xs font-semibold uppercase ${
                   k.source === "trajectory" ? "text-success" : "text-accent-strong"
                 }`}
               >
@@ -127,13 +127,13 @@ function DeliverableRiskMapContentView({ content, d }: { content: DeliverableRis
         <div className="grid min-w-[420px] grid-cols-[auto_1fr_1fr_1fr] gap-1.5 text-xs">
           <div />
           {levels.map((impact) => (
-            <div key={impact} className="text-center font-mono text-[10px] uppercase tracking-wide text-muted">
+            <div key={impact} className="text-center font-mono text-xs uppercase tracking-wide text-muted">
               {severityLabel[impact]}
             </div>
           ))}
           {levels.map((likelihood) => (
             <Fragment key={likelihood}>
-              <div className="flex items-center justify-end pr-1 font-mono text-[10px] uppercase tracking-wide text-muted">
+              <div className="flex items-center justify-end pr-1 font-mono text-xs uppercase tracking-wide text-muted">
                 {severityLabel[likelihood]}
               </div>
               {levels.map((impact) => {
@@ -149,7 +149,7 @@ function DeliverableRiskMapContentView({ content, d }: { content: DeliverableRis
                       <span
                         key={r.i}
                         title={r.name}
-                        className="flex h-5 w-5 items-center justify-center rounded-full bg-ink text-[10px] font-semibold text-surface"
+                        className="flex h-5 w-5 items-center justify-center rounded-full bg-ink text-xs font-semibold text-surface"
                       >
                         {r.i + 1}
                       </span>
@@ -160,7 +160,7 @@ function DeliverableRiskMapContentView({ content, d }: { content: DeliverableRis
             </Fragment>
           ))}
         </div>
-        <p className="mt-1.5 flex justify-between px-1 text-[10px] font-mono uppercase tracking-wide text-muted">
+        <p className="mt-1.5 flex justify-between px-1 text-xs font-mono uppercase tracking-wide text-muted">
           <span>↑ {d.likelihood}</span>
           <span>{d.impact} →</span>
         </p>
@@ -170,7 +170,7 @@ function DeliverableRiskMapContentView({ content, d }: { content: DeliverableRis
           <div key={i} className={`rounded-lg border p-3 text-sm ${TONE_CLASSES[riskCellTone(r.likelihood, r.impact)]}`}>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <p className="font-semibold text-ink">
-                <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-ink text-[10px] font-semibold text-surface">
+                <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-ink text-xs font-semibold text-surface">
                   {i + 1}
                 </span>
                 {r.name}

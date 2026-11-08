@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/service";
 import { evaluateConsumption, isTokenStillUsable, type ValidationTokenRecord, type CurrentDecisionState } from "@/lib/validation-token";
 import { getLanguage } from "@/lib/i18n/language";
+import { getDictionary } from "@/lib/i18n/dictionary";
 
 // L09 — route publique (pas de session requise) derrière un jeton opaque à
 // usage unique. Toujours filtrée par `token` exact, jamais par un id
@@ -39,10 +40,13 @@ async function loadState(supabase: ReturnType<typeof createServiceClient>, token
 
 export async function GET(_request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
+  // Route publique sans session : la langue vient du cookie (getLanguage),
+  // comme src/app/connect/page.tsx.
+  const v = getDictionary(await getLanguage()).impact.ceoValidation;
   const supabase = createServiceClient();
   const state = await loadState(supabase, token);
   if (!state) {
-    return NextResponse.json({ ok: false, reason: "Lien de validation introuvable." }, { status: 404 });
+    return NextResponse.json({ ok: false, reason: v.linkNotFound }, { status: 404 });
   }
 
   const usable = isTokenStillUsable(state.record, state.current, new Date());
@@ -55,7 +59,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
 
   return NextResponse.json({
     ok: usable.ok,
-    reason: usable.reason,
+    reason: usable.code ? v.reasons[usable.code] : null,
     alreadyDecided: state.tokenRow.outcome !== null,
     outcome: state.tokenRow.outcome,
     decision: trajectory
@@ -102,7 +106,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
   const now = new Date();
   const result = evaluateConsumption(state.record, state.current, now, body.confirmed);
   if (!result.ok) {
-    return NextResponse.json({ error: result.reason }, { status: 409 });
+    return NextResponse.json(
+      { error: result.code ? getDictionary(language).impact.ceoValidation.reasons[result.code] : result.reason },
+      { status: 409 }
+    );
   }
 
   const { error } = await supabase

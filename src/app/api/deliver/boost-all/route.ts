@@ -25,6 +25,10 @@ export const maxDuration = 120;
 const requestSchema = z.object({
   transformationId: z.string().uuid(),
   sourceDocText: z.string().trim().default(""),
+  // Per-kind guided questionnaire answers, keyed by DeliverableKind — {} for
+  // any kind the client didn't answer (the whole "Boost All" one-click path
+  // keeps working with this entirely omitted).
+  inputs: z.record(z.string(), z.record(z.string(), z.string())).default({}),
 });
 
 export async function POST(request: Request) {
@@ -74,7 +78,6 @@ export async function POST(request: Request) {
   }
 
   const anthropic = getAnthropicClient();
-  const userPrompt = buildDeliverableUserPrompt({ ...mission.context, sourceDocText: body.sourceDocText || undefined });
 
   // The slow part (up to 6 parallel AI calls, then the save) — wrapped so
   // the connection stays visibly alive throughout instead of one long
@@ -83,6 +86,12 @@ export async function POST(request: Request) {
   return streamJsonResponse(async () => {
     const settled = await Promise.allSettled(
       missingKinds.map(async (kind) => {
+        const kindInputs = body.inputs[kind] ?? {};
+        const userPrompt = buildDeliverableUserPrompt(
+          { ...mission.context, sourceDocText: body.sourceDocText || undefined },
+          kind,
+          kindInputs
+        );
         const createCall = () =>
           anthropic.messages.create({
             model: MATCHING_MODEL,
@@ -108,14 +117,20 @@ export async function POST(request: Request) {
           .map((block) => block.text)
           .join("\n");
         const result = parseDeliverableOutput(kind, rawText);
-        return { kind, title: result.title, content: result.content };
+        return { kind, title: result.title, content: result.content, inputs: kindInputs };
       })
     );
 
     const succeeded = settled
       .filter(
-        (r): r is PromiseFulfilledResult<{ kind: DeliverableKind; title: string; content: DeliverableContent }> =>
-          r.status === "fulfilled"
+        (
+          r
+        ): r is PromiseFulfilledResult<{
+          kind: DeliverableKind;
+          title: string;
+          content: DeliverableContent;
+          inputs: Record<string, string>;
+        }> => r.status === "fulfilled"
       )
       .map((r) => r.value);
 
@@ -147,6 +162,7 @@ export async function POST(request: Request) {
             kind: s.kind,
             title: s.title,
             content: s.content,
+            inputs: s.inputs,
           })),
           { onConflict: "transformation_id,trajectory_id,kind" }
         )

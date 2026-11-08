@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ModelOutput, MatchOutput } from "@/lib/matching";
 import { EcosystemDiagram } from "@/components/connect/ecosystem-diagram";
 import { Eyebrow } from "@/components/eyebrow";
@@ -13,15 +13,14 @@ import { SupplierAssessmentPanel } from "@/components/connect/supplier-assessmen
 // Shortlist kept in this browser: a light, per-viewer convenience until the
 // shortlist gets its own column in the database.
 function useShortlist(storageKey: string) {
-  const [list, setList] = useState<string[]>([]);
-  useEffect(() => {
+  const [list, setList] = useState<string[]>(() => {
     try {
       const raw = window.localStorage.getItem(storageKey);
-      if (raw) setList(JSON.parse(raw) as string[]);
+      return raw ? (JSON.parse(raw) as string[]) : [];
     } catch {
-      /* storage unavailable: start empty */
+      return [];
     }
-  }, [storageKey]);
+  });
   function toggle(name: string) {
     setList((prev) => {
       const next = prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name];

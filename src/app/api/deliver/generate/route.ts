@@ -21,6 +21,9 @@ const requestSchema = z.object({
   transformationId: z.string().uuid(),
   kind: z.enum(DELIVERABLE_KINDS),
   sourceDocText: z.string().trim().default(""),
+  // Guided questionnaire answers for this kind — optional, {} when the
+  // client skips straight to generation (unchanged fast path).
+  inputs: z.record(z.string(), z.string()).default({}),
 });
 
 export async function POST(request: Request) {
@@ -71,7 +74,14 @@ export async function POST(request: Request) {
         max_tokens: 4000,
         system: buildDeliverableSystemPrompt(body.kind, language),
         messages: [
-          { role: "user", content: buildDeliverableUserPrompt({ ...mission.context, sourceDocText: body.sourceDocText || undefined }) },
+          {
+            role: "user",
+            content: buildDeliverableUserPrompt(
+              { ...mission.context, sourceDocText: body.sourceDocText || undefined },
+              body.kind,
+              body.inputs
+            ),
+          },
         ],
       });
     } catch (err) {
@@ -99,6 +109,7 @@ export async function POST(request: Request) {
           kind: body.kind,
           title: result.title,
           content: result.content,
+          inputs: body.inputs,
         },
         { onConflict: "transformation_id,trajectory_id,kind" }
       )

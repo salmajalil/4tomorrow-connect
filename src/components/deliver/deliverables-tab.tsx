@@ -2,7 +2,7 @@
 
 import { Icon, type IconName } from "@/components/icons";
 import { useState } from "react";
-import { DELIVERABLE_KINDS, DELIVERABLE_LABELS, type DeliverableKind } from "@/lib/deliver";
+import { DELIVERABLE_KINDS, DELIVERABLE_LABELS, getDeliverableInputFields, type DeliverableKind } from "@/lib/deliver";
 import { ExecutionGantt } from "@/components/deliver/execution-gantt";
 import { parseJsonResponse } from "@/lib/parse-json-response";
 import { useLanguage } from "@/components/language-provider";
@@ -168,6 +168,84 @@ function DeliverableContentView({
   );
 }
 
+// The guided questionnaire shown inline on a card before its first
+// generation — replaces the old one-click blind "Générer". Every field is
+// optional; "Générer sans répondre" keeps the original one-click behavior
+// available for anyone who wants to skip straight past it.
+function DeliverableInputsForm({
+  kind,
+  language,
+  values,
+  onChange,
+  onSubmit,
+  onSkip,
+  onCancel,
+  hasDocuments,
+  submitting,
+  d,
+}: {
+  kind: DeliverableKind;
+  language: "fr" | "en";
+  values: Record<string, string>;
+  onChange: (key: string, value: string) => void;
+  onSubmit: () => void;
+  onSkip: () => void;
+  onCancel: () => void;
+  hasDocuments: boolean;
+  submitting: boolean;
+  d: Dictionary["deliver"]["deliverables"];
+}) {
+  const fields = getDeliverableInputFields(kind, language);
+  return (
+    <div className="mt-4 border-t border-border pt-4">
+      <p className="font-semibold text-ink">{d.inputsTitle}</p>
+      <p className="mt-1 text-xs text-muted">{d.inputsSubtitle}</p>
+      {hasDocuments && <p className="mt-2 text-xs text-accent-strong">{d.inputsDocHint}</p>}
+      <div className="mt-3 flex flex-col gap-3">
+        {fields.map((f) => (
+          <div key={f.key}>
+            <label className="text-xs font-medium text-muted">
+              {f.label} <span className="text-muted/70">({d.inputsOptional})</span>
+            </label>
+            {f.multiline ? (
+              <textarea
+                value={values[f.key] ?? ""}
+                onChange={(e) => onChange(f.key, e.target.value)}
+                placeholder={f.placeholder}
+                rows={2}
+                className="mt-1 w-full resize-none rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+              />
+            ) : (
+              <input
+                value={values[f.key] ?? ""}
+                onChange={(e) => onChange(f.key, e.target.value)}
+                placeholder={f.placeholder}
+                className="mt-1 w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+              />
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={submitting}
+          className="rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-accent-ink hover:bg-accent-strong disabled:opacity-50"
+        >
+          {submitting ? "..." : d.inputsSubmit}
+        </button>
+        <button type="button" onClick={onSkip} disabled={submitting} className="text-xs font-semibold text-accent underline underline-offset-2">
+          {d.inputsSkip}
+        </button>
+        <button type="button" onClick={onCancel} disabled={submitting} className="text-xs text-muted underline underline-offset-2">
+          {d.inputsCancel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function DeliverablesTab({
   transformationId,
   deliverables,
@@ -181,11 +259,13 @@ export function DeliverablesTab({
   roadmapPhases: RoadmapPhaseEntry[];
   sourceDocText: string;
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const d = t.deliver.deliverables;
   const [generatingKind, setGeneratingKind] = useState<DeliverableKind | null>(null);
   const [boosting, setBoosting] = useState(false);
   const [openKind, setOpenKind] = useState<DeliverableKind | null>(null);
+  const [formOpenKind, setFormOpenKind] = useState<DeliverableKind | null>(null);
+  const [draftInputs, setDraftInputs] = useState<Partial<Record<DeliverableKind, Record<string, string>>>>({});
   const [error, setError] = useState("");
 
   const readyCount = DELIVERABLE_KINDS.filter((k) => deliverables[k]).length;
@@ -194,7 +274,7 @@ export function DeliverablesTab({
   // generation can see the connection dropped by mobile Safari mid-flight
   // even when the server finishes cleanly; only that network-level failure
   // (TypeError), never a real server error, gets an automatic retry.
-  async function generateOne(kind: DeliverableKind) {
+  async function generateOne(kind: DeliverableKind, inputs: Record<string, string> = {}) {
     setGeneratingKind(kind);
     setError("");
     const maxAttempts = 3;
@@ -203,11 +283,12 @@ export function DeliverablesTab({
         const res = await fetch("/api/deliver/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ transformationId, kind, sourceDocText }),
+          body: JSON.stringify({ transformationId, kind, sourceDocText, inputs }),
         });
         const { data } = await parseJsonResponse(res);
         if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
         onDeliverablesChange({ ...deliverables, [kind]: data.deliverable as Deliverable });
+        setFormOpenKind(null);
         setOpenKind(kind);
         setGeneratingKind(null);
         return;
@@ -278,6 +359,8 @@ export function DeliverablesTab({
         {DELIVERABLE_KINDS.map((kind) => {
           const deliverable = deliverables[kind];
           const isOpen = openKind === kind;
+          const isFormOpen = formOpenKind === kind;
+          const filledInputs = deliverable ? Object.entries(deliverable.inputs ?? {}).filter(([, v]) => v.trim()) : [];
           return (
             <div key={kind} className="rounded-xl border border-border bg-surface p-4">
               <div className="flex items-center gap-3">
@@ -299,7 +382,7 @@ export function DeliverablesTab({
                 ) : (
                   <button
                     type="button"
-                    onClick={() => generateOne(kind)}
+                    onClick={() => setFormOpenKind(isFormOpen ? null : kind)}
                     disabled={generatingKind === kind}
                     className="shrink-0 rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-accent-ink hover:bg-accent-strong disabled:opacity-50"
                   >
@@ -307,9 +390,40 @@ export function DeliverablesTab({
                   </button>
                 )}
               </div>
+              {isFormOpen && !deliverable && (
+                <DeliverableInputsForm
+                  kind={kind}
+                  language={language}
+                  values={draftInputs[kind] ?? {}}
+                  onChange={(key, value) =>
+                    setDraftInputs((prev) => ({ ...prev, [kind]: { ...prev[kind], [key]: value } }))
+                  }
+                  onSubmit={() => generateOne(kind, draftInputs[kind] ?? {})}
+                  onSkip={() => generateOne(kind, {})}
+                  onCancel={() => setFormOpenKind(null)}
+                  hasDocuments={sourceDocText.trim().length > 0}
+                  submitting={generatingKind === kind}
+                  d={d}
+                />
+              )}
               {isOpen && deliverable && (
                 <div className="mt-4 border-t border-border pt-4">
                   <p className="mb-3 font-display text-lg text-ink">{deliverable.title}</p>
+                  {filledInputs.length > 0 && (
+                    <details className="mb-3 rounded-lg border border-border bg-surface-2 px-3 py-2">
+                      <summary className="cursor-pointer text-xs font-semibold text-accent-strong">{d.basedOnInputs}</summary>
+                      <ul className="mt-2 flex flex-col gap-1">
+                        {filledInputs.map(([key, value]) => {
+                          const field = getDeliverableInputFields(kind, language).find((f) => f.key === key);
+                          return (
+                            <li key={key} className="text-xs text-muted">
+                              <span className="font-medium text-ink">{field?.label ?? key} :</span> {value}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </details>
+                  )}
                   <DeliverableContentView
                     kind={kind}
                     deliverable={deliverable}

@@ -476,6 +476,11 @@ export type Deliverable = {
   kind: DeliverableKind;
   title: string;
   content: DeliverableContent;
+  // Per-kind guided questionnaire answers used to generate this deliverable
+  // (0020_deliverable_inputs.sql) — empty object when the client skipped it
+  // (e.g. the "Boost All" fast path). Shown back on the view as "basé sur
+  // tes réponses" transparency, same spirit as "Comment c'est calculé".
+  inputs: Record<string, string>;
   created_at: string;
 };
 

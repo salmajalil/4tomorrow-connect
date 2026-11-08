@@ -148,3 +148,46 @@ export function equalWeights(axes: string[]): Record<string, number> {
   });
   return weights;
 }
+
+/**
+ * Curseur de pondération (matrice D04) : fixe le poids d'un critère et
+ * redistribue le reste (100 − nouveau poids) sur les autres critères au
+ * prorata de leurs poids actuels — la même règle que l'analyse de
+ * sensibilité ci-dessus, mais en entiers (la colonne
+ * decision_criteria_weights.weight est un integer). Arrondi par plus fort
+ * reste : la somme fait toujours exactement 100. Si tous les autres poids
+ * sont à 0, le reste est réparti également entre eux. Un critère inconnu ne
+ * change rien.
+ */
+export function rebalanceWeights(
+  weights: Record<string, number>,
+  axis: string,
+  value: number
+): Record<string, number> {
+  if (!(axis in weights)) return { ...weights };
+  const axes = Object.keys(weights);
+  const others = axes.filter((a) => a !== axis);
+  if (others.length === 0) return { [axis]: 100 };
+
+  const next = Math.min(100, Math.max(0, Math.round(Number.isFinite(value) ? value : 0)));
+  const remaining = 100 - next;
+  const otherSum = others.reduce((total, a) => total + Math.max(0, weights[a] ?? 0), 0);
+  const shares = others.map((a) => ({
+    axis: a,
+    exact: otherSum > 0 ? (remaining * Math.max(0, weights[a] ?? 0)) / otherSum : remaining / others.length,
+  }));
+
+  const result: Record<string, number> = { [axis]: next };
+  for (const s of shares) result[s.axis] = Math.floor(s.exact);
+  let leftover = remaining - shares.reduce((total, s) => total + result[s.axis], 0);
+  // Plus fort reste d'abord ; à égalité, ordre des critères (déterministe).
+  const byRemainder = [...shares].sort((a, b) => (b.exact - Math.floor(b.exact)) - (a.exact - Math.floor(a.exact)));
+  for (const s of byRemainder) {
+    if (leftover <= 0) break;
+    result[s.axis] += 1;
+    leftover -= 1;
+  }
+
+  // Conserve l'ordre d'origine des clés (l'affichage suit cet ordre).
+  return Object.fromEntries(axes.map((a) => [a, result[a]]));
+}

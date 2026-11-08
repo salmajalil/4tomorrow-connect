@@ -7,6 +7,7 @@ import {
   computeSensitivity,
   equalWeights,
   canShowRadar,
+  rebalanceWeights,
   type ScenarioScoreInput,
 } from "./decide-scenario-calc";
 
@@ -154,5 +155,54 @@ describe("canShowRadar", () => {
   it("rejects above 6 axes (too cramped to read)", () => {
     expect(canShowRadar(7)).toBe(false);
     expect(canShowRadar(12)).toBe(false);
+  });
+});
+
+describe("rebalanceWeights", () => {
+  const sum = (w: Record<string, number>) => Object.values(w).reduce((a, b) => a + b, 0);
+
+  it("sets the moved weight and spreads the rest proportionally", () => {
+    expect(rebalanceWeights({ cost: 40, risk: 40, roi: 20 }, "cost", 60)).toEqual({ cost: 60, risk: 27, roi: 13 });
+  });
+
+  it("always returns integers summing to exactly 100", () => {
+    const w = rebalanceWeights({ a: 34, b: 33, c: 33 }, "a", 51);
+    expect(sum(w)).toBe(100);
+    expect(Object.values(w).every(Number.isInteger)).toBe(true);
+    expect(validateWeights(w)).toEqual([]);
+  });
+
+  it("keeps the other criteria's relative weights", () => {
+    const w = rebalanceWeights({ a: 20, b: 60, c: 20 }, "a", 60);
+    expect(w).toEqual({ a: 60, b: 30, c: 10 });
+  });
+
+  it("splits evenly when every other weight is 0", () => {
+    expect(rebalanceWeights({ a: 100, b: 0, c: 0 }, "a", 40)).toEqual({ a: 40, b: 30, c: 30 });
+  });
+
+  it("clamps and rounds the moved value", () => {
+    expect(rebalanceWeights({ a: 50, b: 50 }, "a", 130)).toEqual({ a: 100, b: 0 });
+    expect(rebalanceWeights({ a: 50, b: 50 }, "a", -5)).toEqual({ a: 0, b: 100 });
+    expect(rebalanceWeights({ a: 50, b: 50 }, "a", 33.6)).toEqual({ a: 34, b: 66 });
+  });
+
+  it("puts 100 on a single criterion", () => {
+    expect(rebalanceWeights({ a: 100 }, "a", 20)).toEqual({ a: 100 });
+  });
+
+  it("ignores an unknown criterion and keeps key order", () => {
+    expect(rebalanceWeights({ a: 50, b: 50 }, "z", 10)).toEqual({ a: 50, b: 50 });
+    expect(Object.keys(rebalanceWeights({ x: 10, y: 30, z: 60 }, "z", 20))).toEqual(["x", "y", "z"]);
+  });
+
+  it("feeds straight into rankScenarios: moving a weight can change the winner", () => {
+    const scenarios: ScenarioScoreInput[] = [
+      { trajectoryId: "A", scores: { cost: 9, risk: 2 }, veto: false },
+      { trajectoryId: "B", scores: { cost: 3, risk: 8 }, veto: false },
+    ];
+    expect(rankScenarios(scenarios, { cost: 50, risk: 50 })[0].trajectoryId).toBe("A");
+    const moved = rebalanceWeights({ cost: 50, risk: 50 }, "risk", 80);
+    expect(rankScenarios(scenarios, moved)[0].trajectoryId).toBe("B");
   });
 });

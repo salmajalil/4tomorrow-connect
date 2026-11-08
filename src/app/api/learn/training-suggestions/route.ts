@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { MAX_FREE_TEXT_LENGTH } from "@/lib/input-limits";
 import { createClient } from "@/lib/supabase/server";
 import { DOMAINS } from "@/lib/learn-skills-calc";
 import { getLanguage } from "@/lib/i18n/language";
@@ -43,7 +44,7 @@ export async function GET() {
 
 const putSchema = z.object({
   domain: z.enum(DOMAINS),
-  suggestion: z.string().trim().min(1),
+  suggestion: z.string().trim().min(1).max(MAX_FREE_TEXT_LENGTH),
 });
 
 export async function PUT(request: Request) {

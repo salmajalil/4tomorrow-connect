@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ScenarioOutput } from "@/lib/decide";
+import { isHttpUrl } from "@/lib/url-safety";
 import type { IndicatorFeedback, TrajectoryIndicators } from "@/types/database";
 import { ValidationQueue } from "@/components/decide/validation-queue";
 import { RoadmapView } from "@/components/decide/roadmap-view";
@@ -336,7 +337,8 @@ export function ScenarioCard({
                     {scenario.regulations.map((r, i) => (
                       <li key={i}>
                         <span className="font-medium text-ink">{r.name}</span> — {r.description}
-                        {r.sourceUrl && (
+                        {/* Scenarios persisted before URL sanitization may still carry a non-http(s) value. */}
+                        {isHttpUrl(r.sourceUrl) && (
                           <>
                             {" "}
                             <a
@@ -376,9 +378,9 @@ export function ScenarioCard({
                       <SourceBadge source={s.source} t={t} />
                     </div>
                     <p className="mt-1 text-xs text-muted">{s.reason}</p>
-                    {(s.website || s.contactEmail) && (
+                    {(isHttpUrl(s.website) || s.contactEmail) && (
                       <div className="mt-1 flex flex-wrap gap-3 text-xs">
-                        {s.website && (
+                        {isHttpUrl(s.website) && (
                           <a
                             href={s.website}
                             target="_blank"

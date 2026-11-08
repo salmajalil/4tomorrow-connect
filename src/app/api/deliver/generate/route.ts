@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { MAX_DOC_LENGTH } from "@/lib/input-limits";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
+import { enforceAiQuota, getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
 import {
   buildDeliverableSystemPrompt,
   buildDeliverableUserPrompt,
@@ -20,7 +21,7 @@ export const maxDuration = 60;
 const requestSchema = z.object({
   transformationId: z.string().uuid(),
   kind: z.enum(DELIVERABLE_KINDS),
-  sourceDocText: z.string().trim().default(""),
+  sourceDocText: z.string().trim().max(MAX_DOC_LENGTH).default(""),
   // Guided questionnaire answers for this kind — optional, {} when the
   // client skips straight to generation (unchanged fast path).
   inputs: z.record(z.string(), z.string()).default({}),
@@ -39,6 +40,10 @@ export async function POST(request: Request) {
       { status: 401 }
     );
   }
+
+  // Daily AI quota per user and route (see assertAiQuota, src/lib/anthropic.ts).
+  const quotaResponse = await enforceAiQuota(supabase, user.id, "deliver/generate", language);
+  if (quotaResponse) return quotaResponse;
 
   let body: z.infer<typeof requestSchema>;
   try {

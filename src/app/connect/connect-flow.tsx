@@ -118,11 +118,14 @@ export function ConnectFlow({
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="font-display text-2xl text-ink">{t.connect.results.title}</h1>
           <div className="flex items-center gap-4">
-            <ExportPdfButton
-              kind="connect"
-              payload={{ result, projectLabel: state.industry || t.connect.results.yourProject }}
-              filename="4tomorrow-connect.pdf"
-            />
+            {/* The PDF is rebuilt server-side from the saved project — nothing to export until it is persisted. */}
+            {activeTransformationId && (
+              <ExportPdfButton
+                kind="connect"
+                payload={{ transformationId: activeTransformationId }}
+                filename="4tomorrow-connect.pdf"
+              />
+            )}
             <button
               type="button"
               onClick={() => {

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { MAX_DOC_LENGTH, MAX_FREE_TEXT_LENGTH } from "@/lib/input-limits";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
+import { enforceAiQuota, getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
 import {
   buildLearnCoreSystemPrompt,
   buildLearnInteractiveSystemPrompt,
@@ -98,13 +99,13 @@ const skillAssessmentEntrySchema = z.object({
 
 const requestSchema = z.object({
   transformationId: z.string().uuid().nullable().optional(),
-  topic: z.string().trim().min(1, "Décris le sujet de la formation."),
-  audience: z.string().trim().default(""),
+  topic: z.string().trim().min(1, "Décris le sujet de la formation.").max(MAX_FREE_TEXT_LENGTH),
+  audience: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
   mode: z.enum(["rapide", "document", "diagnostic", "workshop"]),
-  sourceDocText: z.string().trim().default(""),
-  sourceDocName: z.string().trim().default(""),
-  organization: z.string().trim().default(""),
-  industry: z.string().trim().default(""),
+  sourceDocText: z.string().trim().max(MAX_DOC_LENGTH).default(""),
+  sourceDocName: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
+  organization: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
+  industry: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
   skillAssessments: z.array(skillAssessmentEntrySchema).default([]),
 });
 
@@ -121,6 +122,10 @@ export async function POST(request: Request) {
       { status: 401 }
     );
   }
+
+  // Daily AI quota per user and route (see assertAiQuota, src/lib/anthropic.ts).
+  const quotaResponse = await enforceAiQuota(supabase, user.id, "learn/generate", language);
+  if (quotaResponse) return quotaResponse;
 
   let body: z.infer<typeof requestSchema>;
   try {

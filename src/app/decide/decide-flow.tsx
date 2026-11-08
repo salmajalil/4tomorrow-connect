@@ -389,7 +389,7 @@ export function DecideFlow({
           </div>
           <ExportPdfButton
             kind="decide"
-            payload={{ diagnostic, scenarios }}
+            payload={{ transformationId: diagnostic.transformationId }}
             filename={`4tomorrow-decide-${diagnostic.transformationId}.pdf`}
           />
         </div>

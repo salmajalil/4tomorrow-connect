@@ -107,6 +107,20 @@ export type EcosystemMember = {
   website: string | null;
   description: string | null;
   contact: string | null;
+  // Moderation gate (0024_ecosystem_members_moderation.sql): only 'approved'
+  // rows are ever injected into a model prompt.
+  status: EcosystemMemberStatus;
+  created_at: string;
+};
+
+export type EcosystemMemberStatus = "pending" | "approved" | "rejected";
+
+// Per-user, per-route AI call log backing the daily quota
+// (0023_ai_usage.sql, assertAiQuota in src/lib/anthropic.ts).
+export type AiUsage = {
+  id: string;
+  user_id: string;
+  route: string;
   created_at: string;
 };
 
@@ -584,6 +598,7 @@ export type Database = {
         Partial<CapabilityAssessment> &
           Pick<CapabilityAssessment, "transformation_id" | "domain" | "observed" | "target" | "importance" | "gap" | "priority" | "status">
       >;
+      ai_usage: Table<AiUsage, Partial<AiUsage> & Pick<AiUsage, "user_id" | "route">>;
       ecosystem_members: Table<EcosystemMember, Partial<EcosystemMember> & Pick<EcosystemMember, "name" | "type">>;
       matches: Table<Match, Partial<Match> & Pick<Match, "transformation_id" | "category" | "name" | "source">>;
       meeting_requests: Table<

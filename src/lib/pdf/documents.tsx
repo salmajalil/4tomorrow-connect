@@ -6,6 +6,7 @@ import type { ScenarioWithId } from "@/components/decide/scenario-card";
 import type { ModelOutput, MatchOutput } from "@/lib/matching";
 import type { Training } from "@/types/database";
 import type { ControlTowerProject } from "@/lib/control-tower";
+import { isHttpUrl } from "@/lib/url-safety";
 import type { ModuleName, ModuleStatusValue } from "@/types/database";
 
 function domainBadges(domains: string[]): string[] {
@@ -198,11 +199,15 @@ export function ConnectReportDocument({ result, projectLabel }: { result: ModelO
               <Text style={pdfStyles.h3}>{m.name}</Text>
               <Paragraph>{m.reason}</Paragraph>
               <Text style={pdfStyles.muted}>Gap adressé : {m.gapAddressed}</Text>
-              {m.website && (
-                <PdfLink src={m.website} style={{ ...pdfStyles.muted, color: PDF_COLORS.gold }}>
-                  {m.website}
-                </PdfLink>
-              )}
+              {/* Clickable only for an explicit http(s) URL — never javascript:, file:, etc. */}
+              {m.website &&
+                (isHttpUrl(m.website) ? (
+                  <PdfLink src={m.website} style={{ ...pdfStyles.muted, color: PDF_COLORS.gold }}>
+                    {m.website}
+                  </PdfLink>
+                ) : (
+                  <Text style={pdfStyles.muted}>{m.website}</Text>
+                ))}
             </Card>
           ))}
         </View>

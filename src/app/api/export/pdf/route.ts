@@ -12,11 +12,16 @@ import {
 } from "@/lib/pdf/documents";
 import { CeoReportDocument, DetailedReportDocument } from "@/lib/pdf/project-reports";
 import { fetchProjectImpact } from "@/lib/project-impact";
+import { loadConnectExport, loadDecideExport, loadLearnExport } from "@/lib/pdf/export-data";
 
-// Formats data the client already legitimately fetched and is displaying
-// (its own diagnostic/scenarios, matching results, training, or control
-// tower projects) into a downloadable PDF — no new Supabase reads here, so
-// the only access check that matters is "is this a signed-in user at all".
+// "decide", "connect", "learn", "project-ceo" and "project-detailed" never
+// render client-supplied content: the client sends an id, the data is
+// re-read server-side through the user's own Supabase client (RLS), and any
+// other field in the payload is ignored. Rendering a posted object would let
+// anyone produce a 4 Tomorrow-branded PDF with arbitrary content.
+//
+// "control-tower" still formats the client payload (out of scope of this
+// fix — see buildControlTower below).
 const requestSchema = z.object({
   kind: z.enum(["decide", "connect", "learn", "control-tower", "project-ceo", "project-detailed"]),
   payload: z.record(z.string(), z.unknown()),
@@ -24,19 +29,11 @@ const requestSchema = z.object({
 
 type Kind = z.infer<typeof requestSchema>["kind"];
 
-// Payload shape is enforced by each React-PDF component's own prop types
-// at the call site below via this one cast — the client only ever sends
-// back an object it already received from one of our own API routes, so
-// this is a formatting boundary, not a security one.
-type PayloadKind = Exclude<Kind, "project-ceo" | "project-detailed">;
-
+// Only remaining client-payload kind. Its shape is enforced by the
+// React-PDF component's own prop types via this one cast.
+// TODO(security): re-read control tower projects server-side too.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const BUILDERS: Record<PayloadKind, (payload: any) => ReactElement<DocumentProps>> = {
-  decide: (p) => DecideReportDocument(p),
-  connect: (p) => ConnectReportDocument(p),
-  learn: (p) => LearnReportDocument(p),
-  "control-tower": (p) => ControlTowerReportDocument(p),
-};
+const buildControlTower = (payload: any): ReactElement<DocumentProps> => ControlTowerReportDocument(payload);
 
 const FILENAMES: Record<Kind, string> = {
   decide: "4tomorrow-decide.pdf",
@@ -51,6 +48,9 @@ const FILENAMES: Record<Kind, string> = {
 // data is re-read through the signed-in user's own Supabase client, so RLS
 // guarantees nobody can render someone else's project.
 const projectPayloadSchema = z.object({ transformationId: z.string().uuid() });
+const learnPayloadSchema = z.object({ trainingId: z.string().uuid() });
+
+class ExportNotFoundError extends Error {}
 
 export async function POST(request: Request) {
   const language = await getLanguage();
@@ -90,11 +90,36 @@ export async function POST(request: Request) {
         body.kind === "project-ceo"
           ? CeoReportDocument({ project, language })
           : DetailedReportDocument({ project, language });
+    } else if (body.kind === "decide") {
+      const { transformationId } = projectPayloadSchema.parse(body.payload);
+      const data = await loadDecideExport(supabase, transformationId);
+      if (!data) throw new ExportNotFoundError();
+      document = DecideReportDocument(data);
+    } else if (body.kind === "connect") {
+      const { transformationId } = projectPayloadSchema.parse(body.payload);
+      const data = await loadConnectExport(
+        supabase,
+        transformationId,
+        language === "en" ? "Your project" : "Ton projet"
+      );
+      if (!data) throw new ExportNotFoundError();
+      document = ConnectReportDocument(data);
+    } else if (body.kind === "learn") {
+      const { trainingId } = learnPayloadSchema.parse(body.payload);
+      const data = await loadLearnExport(supabase, trainingId);
+      if (!data) throw new ExportNotFoundError();
+      document = LearnReportDocument(data);
     } else {
-      document = BUILDERS[body.kind](body.payload);
+      document = buildControlTower(body.payload);
     }
     buffer = await renderToBuffer(document);
-  } catch {
+  } catch (err) {
+    if (err instanceof ExportNotFoundError) {
+      return NextResponse.json(
+        { error: language === "en" ? "Nothing to export for this project." : "Rien à exporter pour ce projet." },
+        { status: 404 }
+      );
+    }
     return NextResponse.json(
       {
         error:

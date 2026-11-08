@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { MAX_FREE_TEXT_LENGTH } from "@/lib/input-limits";
 import { createServiceClient } from "@/lib/supabase/service";
 import { evaluateConsumption, isTokenStillUsable, type ValidationTokenRecord, type CurrentDecisionState } from "@/lib/validation-token";
 import { getLanguage } from "@/lib/i18n/language";
@@ -74,7 +75,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
 const postSchema = z.object({
   confirmed: z.boolean(),
   outcome: z.enum(["validated", "needs_more_info", "rejected"]),
-  note: z.string().trim().default(""),
+  note: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ token: string }> }) {

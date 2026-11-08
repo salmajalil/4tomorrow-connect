@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { MAX_FREE_TEXT_LENGTH } from "@/lib/input-limits";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
+import { enforceAiQuota, getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
 import { buildSystemPrompt, buildUserPrompt, parseModelOutput, MatchingParseError } from "@/lib/matching";
 import type { EcosystemMember } from "@/types/database";
 import { setModuleStatus } from "@/lib/module-status";
@@ -13,12 +14,12 @@ import { getLanguage } from "@/lib/i18n/language";
 export const maxDuration = 180;
 
 const requestSchema = z.object({
-  industry: z.string().trim().min(1, "Choisis ou saisis une industrie."),
-  partnerTypes: z.array(z.string().trim().min(1)).default([]),
-  location: z.string().trim().default(""),
-  budget: z.string().trim().default(""),
-  co2Target: z.string().trim().default(""),
-  description: z.string().trim().default(""),
+  industry: z.string().trim().min(1, "Choisis ou saisis une industrie.").max(MAX_FREE_TEXT_LENGTH),
+  partnerTypes: z.array(z.string().trim().min(1).max(MAX_FREE_TEXT_LENGTH)).max(50).default([]),
+  location: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
+  budget: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
+  co2Target: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
+  description: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
   // Set when the user arrived from another module (e.g. Decide) via
   // "?transformationId=" — reuse and update that same project instead of
   // creating a duplicate one, same pattern as Learn's linked projects.
@@ -39,6 +40,10 @@ export async function POST(request: Request) {
     );
   }
 
+  // Daily AI quota per user and route (see assertAiQuota, src/lib/anthropic.ts).
+  const quotaResponse = await enforceAiQuota(supabase, user.id, "match", language);
+  if (quotaResponse) return quotaResponse;
+
   let body: z.infer<typeof requestSchema>;
   try {
     const json = await request.json();
@@ -54,6 +59,8 @@ export async function POST(request: Request) {
   const { data: registry, error: registryError } = await supabase
     .from("ecosystem_members")
     .select("*")
+    // Moderation gate: only manually approved entries reach the prompt.
+    .eq("status", "approved")
     .order("created_at", { ascending: false })
     .limit(200);
 

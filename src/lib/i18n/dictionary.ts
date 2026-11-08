@@ -1009,7 +1009,7 @@ const fr = {
     ecosystemJoin: {
       title: "Rejoindre l'écosystème",
       subtitle:
-        "Ajoute une technologie, une startup, un expert, un partenaire ou un programme de financement au répertoire partagé — sans validation manuelle, visible immédiatement dans les prochains matchings.",
+        "Ajoute une technologie, une startup, un expert, un partenaire ou un programme de financement au répertoire partagé. Chaque contribution est relue avant d'apparaître dans les matchings.",
       thankYou: "Merci pour ta contribution !",
       thankYouDetail: "L'entrée est déjà visible dans le répertoire et sera prise en compte dans les prochains matchings.",
       addAnother: "Ajouter une autre entrée",
@@ -2032,7 +2032,7 @@ const en: Dictionary = {
     ecosystemJoin: {
       title: "Join the ecosystem",
       subtitle:
-        "Add a technology, startup, expert, partner or funding program to the shared directory — no manual review, immediately visible in future matchings.",
+        "Add a technology, startup, expert, partner or funding program to the shared directory. Each contribution is reviewed before it appears in matchings.",
       thankYou: "Thanks for your contribution!",
       thankYouDetail: "The entry is already visible in the directory and will be factored into future matchings.",
       addAnother: "Add another entry",

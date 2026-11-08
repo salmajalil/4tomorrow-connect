@@ -4,13 +4,16 @@ import { useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/components/language-provider";
+import { safeNextPath } from "@/lib/safe-redirect";
 
 type Mode = "password" | "magic-link";
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/connect";
+  // `next` comes from the URL: only a same-site path is ever reused for
+  // emailRedirectTo or router.push (open redirect otherwise).
+  const next = safeNextPath(searchParams.get("next"));
   const { t } = useLanguage();
 
   const [mode, setMode] = useState<Mode>("password");
@@ -43,6 +46,10 @@ export default function LoginPage() {
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
+        // Password sign-in never goes through /auth/callback, so pending
+        // team invitations are claimed here too (best-effort, never blocks
+        // the sign-in itself).
+        await supabase.rpc("claim_pending_invitations");
         router.push(next);
         router.refresh();
       }

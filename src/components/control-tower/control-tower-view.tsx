@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { fetchControlTowerProjects, MODULE_ORDER, type ControlTowerProject } from "@/lib/control-tower";
+import {
+  fetchControlTowerProjects,
+  fetchPendingInvitationCount,
+  MODULE_ORDER,
+  type ControlTowerProject,
+} from "@/lib/control-tower";
 import { Eyebrow } from "@/components/eyebrow";
 import { ExportPdfButton } from "@/components/export-pdf-button";
 import { DOMAIN_LABELS, type Domain } from "@/lib/decide";
@@ -705,12 +710,25 @@ function ProjectCard({
 
 type TodayAction = { key: string; tone: "accent" | "danger" | "live"; icon: IconName; label: string; project: string; href: string };
 
-// At most three things to do now, across all active projects: figures to
-// confirm first (they unlock reliable reports), then open risks, then the
-// next module on the path.
+// At most three things to do now, across all active projects: CEO answers
+// received first (someone is waiting on the consultant's follow-up), then
+// figures to confirm (they unlock reliable reports), then open risks, then
+// the next module on the path. Pending invitations are shown separately,
+// above this list, so they are never cut by the three-item limit.
 function todayActions(projects: ControlTowerProject[], t: Dictionary): TodayAction[] {
   const ct = t.controlTower;
   const out: TodayAction[] = [];
+  for (const p of projects) {
+    for (const r of p.ceoResponses)
+      out.push({
+        key: `c-${r.id}`,
+        tone: r.outcome === "validated" ? "live" : r.outcome === "rejected" ? "danger" : "accent",
+        icon: r.outcome === "validated" ? "check" : r.outcome === "rejected" ? "alert" : "question",
+        label: ct.actionCeoResponse[r.outcome],
+        project: r.outcomeNote ? `${shortName(p, t)} — ${r.outcomeNote}` : shortName(p, t),
+        href: `/decide?transformationId=${p.transformationId}`,
+      });
+  }
   for (const p of projects) {
     if (p.pendingValidationCount > 0)
       out.push({
@@ -751,24 +769,47 @@ function todayActions(projects: ControlTowerProject[], t: Dictionary): TodayActi
 
 export function ControlTowerView({
   userId,
+  userEmail,
   initialProjects,
+  initialPendingInvitations,
 }: {
   userId: string;
+  userEmail: string | null;
   initialProjects: ControlTowerProject[];
+  initialPendingInvitations: number;
 }) {
   const { t } = useLanguage();
   const ct = t.controlTower;
   const [projects, setProjects] = useState(initialProjects);
+  const [pendingInvitations, setPendingInvitations] = useState(initialPendingInvitations);
+  const [accepting, setAccepting] = useState(false);
+  const [acceptError, setAcceptError] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "hot" | "done" | "archived">("all");
 
   const refresh = useCallback(async () => {
     const supabase = createClient();
-    const next = await fetchControlTowerProjects(supabase, userId, t.common.untitledProject);
+    const [next, pending] = await Promise.all([
+      fetchControlTowerProjects(supabase, userId, t.common.untitledProject),
+      fetchPendingInvitationCount(supabase, userEmail),
+    ]);
     setProjects(next);
+    setPendingInvitations(pending);
     setLastSync(new Date());
-  }, [userId, t.common.untitledProject]);
+  }, [userId, userEmail, t.common.untitledProject]);
+
+  // Accepting = claim_pending_invitations() (0025), the only way an invitee
+  // can attach their account to an invitation; then a full re-fetch so the
+  // newly joined projects appear.
+  async function acceptInvitations() {
+    setAccepting(true);
+    setAcceptError(null);
+    const { error } = await createClient().rpc("claim_pending_invitations");
+    if (error) setAcceptError(ct.actionAcceptFailed);
+    await refresh();
+    setAccepting(false);
+  }
 
   // All these tables are already in the supabase_realtime publication
   // (migration 0002) and RLS-scoped, so subscribing without a per-row
@@ -872,11 +913,32 @@ export function ControlTowerView({
         <StatTile label={ct.achievements} value={totalWin} />
       </div>
 
-      {active.length > 0 && (
+      {(active.length > 0 || pendingInvitations > 0) && (
         <section className="mt-8 border border-border bg-surface p-5">
           <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-accent-strong">{ct.todayTitle}</h2>
+          {pendingInvitations > 0 && (
+            <div className="mt-3 flex items-center gap-4 border-b border-border pb-3">
+              <Icon name="chat" className="h-5 w-5 shrink-0 text-accent-strong" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-ink">
+                  {pendingInvitations} {ct.actionInvitations}
+                </span>
+                <span className="block truncate text-xs text-muted">{acceptError ?? ct.actionInvitationsHint}</span>
+              </span>
+              <button
+                type="button"
+                onClick={acceptInvitations}
+                disabled={accepting}
+                className="shrink-0 bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:bg-accent-strong disabled:opacity-50"
+              >
+                {accepting ? ct.actionAccepting : ct.actionAcceptInvitations}
+              </button>
+            </div>
+          )}
           {actions.length === 0 ? (
-            <p className="mt-3 text-sm text-muted">{ct.todayEmpty}</p>
+            pendingInvitations > 0 ? null : (
+              <p className="mt-3 text-sm text-muted">{ct.todayEmpty}</p>
+            )
           ) : (
             <ol className="mt-3 flex flex-col divide-y divide-border">
               {actions.map((a, i) => (

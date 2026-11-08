@@ -32,29 +32,44 @@ export function SupplierAssessmentPanel({
   const [criteria, setCriteria] = useState<SupplierCriterion[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<SupplierAssessmentResult | null>(null);
+  // Gabarit « à revoir » : vrai dès qu'un critère/prérequis change après un
+  // enregistrement. L'ancien verdict enregistré est alors retiré (setSaved
+  // (null)) au profit de l'aperçu live, signalé comme non enregistré.
+  const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!matchId || !transformationId) return null;
 
   const preview = computeSupplierAssessment(prerequisites, criteria);
 
+  function markChanged() {
+    setSaved(null);
+    setDirty(true);
+  }
+
   function addPrerequisite() {
+    markChanged();
     setPrerequisites((prev) => [...prev, { label: "", met: false }]);
   }
   function updatePrerequisite(i: number, patch: Partial<SupplierPrerequisite>) {
+    markChanged();
     setPrerequisites((prev) => prev.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
   }
   function removePrerequisite(i: number) {
+    markChanged();
     setPrerequisites((prev) => prev.filter((_, idx) => idx !== i));
   }
 
   function addCriterion() {
+    markChanged();
     setCriteria((prev) => [...prev, { label: "", score: null, proofStatus: "manquant", proofDate: null }]);
   }
   function updateCriterion(i: number, patch: Partial<SupplierCriterion>) {
+    markChanged();
     setCriteria((prev) => prev.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
   }
   function removeCriterion(i: number) {
+    markChanged();
     setCriteria((prev) => prev.filter((_, idx) => idx !== i));
   }
 
@@ -70,6 +85,7 @@ export function SupplierAssessmentPanel({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || a.saveError);
       setSaved(data.result as SupplierAssessmentResult);
+      setDirty(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : a.saveError);
     } finally {
@@ -103,6 +119,11 @@ export function SupplierAssessmentPanel({
             {shown.score !== null && (
               <span className="border border-border px-1.5 py-0.5 text-muted">
                 {a.score} {shown.score}/5
+              </span>
+            )}
+            {dirty && !saved && (
+              <span role="status" className="border border-danger/50 px-1.5 py-0.5 font-medium text-danger">
+                {a.unsaved}
               </span>
             )}
             {shown.recommended && <span className="border border-accent bg-accent/10 px-1.5 py-0.5 font-medium text-accent-strong">{a.recommended}</span>}

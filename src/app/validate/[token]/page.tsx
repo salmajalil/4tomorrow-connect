@@ -2,6 +2,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { evaluateConsumption, type ValidationTokenRecord, type CurrentDecisionState } from "@/lib/validation-token";
 import { fetchProjectImpact } from "@/lib/project-impact";
 import { ValidationActions } from "@/components/validate/validation-actions";
+import { getLanguage } from "@/lib/i18n/language";
+import { getDictionary } from "@/lib/i18n/dictionary";
 
 // L09 — page mobile pour le CEO, atteinte uniquement par lien (jamais dans
 // la nav — voir src/app/auth/reset-password/page.tsx pour le même principe
@@ -10,6 +12,10 @@ import { ValidationActions } from "@/components/validate/validation-actions";
 // role (src/lib/supabase/service.ts), jamais exposé au client.
 export default async function ValidatePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
+  // Pas de session ici (lien seul) : la langue vient du cookie, comme
+  // src/app/connect/page.tsx.
+  const language = await getLanguage();
+  const v = getDictionary(language).impact.ceoValidation;
   const supabase = createServiceClient();
 
   const { data: tokenRow } = await supabase
@@ -19,7 +25,7 @@ export default async function ValidatePage({ params }: { params: Promise<{ token
     .maybeSingle();
 
   if (!tokenRow) {
-    return <StatusPage title="Lien introuvable" message="Ce lien de validation n'existe pas." />;
+    return <StatusPage title={v.notFoundTitle} message={v.notFoundMessage} />;
   }
 
   const { data: tx } = await supabase
@@ -29,7 +35,7 @@ export default async function ValidatePage({ params }: { params: Promise<{ token
     .maybeSingle();
 
   if (!tx) {
-    return <StatusPage title="Projet introuvable" message="Le projet associé à ce lien n'existe plus." />;
+    return <StatusPage title={v.projectNotFoundTitle} message={v.projectNotFoundMessage} />;
   }
 
   const record: ValidationTokenRecord = {
@@ -47,21 +53,21 @@ export default async function ValidatePage({ params }: { params: Promise<{ token
 
   if (tokenRow.used_at !== null) {
     const labels: Record<string, string> = {
-      validated: "Cette décision a déjà été validée.",
-      needs_more_info: "Un complément a déjà été demandé sur cette décision.",
-      rejected: "Cette décision a déjà été refusée.",
+      validated: v.alreadyValidated,
+      needs_more_info: v.alreadyNeedsMoreInfo,
+      rejected: v.alreadyRejected,
     };
     return (
       <StatusPage
-        title="Déjà traité"
-        message={labels[tokenRow.outcome ?? ""] ?? "Ce lien a déjà été utilisé."}
+        title={v.alreadyHandledTitle}
+        message={labels[tokenRow.outcome ?? ""] ?? v.alreadyUsed}
       />
     );
   }
 
   const usable = evaluateConsumption(record, current, new Date(), true);
   if (!usable.ok) {
-    return <StatusPage title="Lien invalide" message={usable.reason ?? "Ce lien n'est plus valide."} />;
+    return <StatusPage title={v.invalidTitle} message={usable.code ? v.reasons[usable.code] : v.invalidMessage} />;
   }
 
   const project = await fetchProjectImpact(supabase, tx.id);
@@ -70,8 +76,8 @@ export default async function ValidatePage({ params }: { params: Promise<{ token
   return (
     <div className="mx-auto flex min-h-[calc(100vh-64px)] w-full max-w-md flex-col gap-6 px-4 py-10">
       <div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">Validation · 4 Tomorrow</p>
-        <h1 className="mt-2 font-display text-3xl text-ink">{project?.trajectory?.name ?? "Décision à valider"}</h1>
+        <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted">{v.pageTag}</p>
+        <h1 className="mt-2 font-display text-3xl text-ink">{project?.trajectory?.name ?? v.decisionFallback}</h1>
         {project?.trajectory?.stance && <p className="mt-1 text-sm text-muted">{project.trajectory.stance}</p>}
       </div>
 
@@ -83,7 +89,7 @@ export default async function ValidatePage({ params }: { params: Promise<{ token
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {keyFigures.map((indicator) => (
             <div key={indicator.label} className="rounded-lg border border-border bg-surface p-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{indicator.label}</p>
+              <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted">{indicator.label}</p>
               <p className="mt-1 font-display text-2xl text-ink tabular-nums">{String(indicator.value ?? "—")}</p>
             </div>
           ))}
@@ -96,14 +102,16 @@ export default async function ValidatePage({ params }: { params: Promise<{ token
         rel="noreferrer"
         className="text-sm font-medium text-accent underline underline-offset-2"
       >
-        Voir les preuves détaillées →
+        {v.seeEvidence}
       </a>
 
       <ValidationActions token={token} />
 
       <p className="text-center text-xs text-muted">
-        Ce lien est à usage unique et expire le{" "}
-        {new Date(tokenRow.expires_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}.
+        {v.expiresOn.replace(
+          "{date}",
+          new Date(tokenRow.expires_at).toLocaleString(language === "en" ? "en-US" : "fr-FR", { dateStyle: "medium", timeStyle: "short" })
+        )}
       </p>
     </div>
   );

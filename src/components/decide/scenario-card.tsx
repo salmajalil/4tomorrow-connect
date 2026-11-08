@@ -21,7 +21,7 @@ function SourceBadge({ source, t }: { source: "registry" | "web_search"; t: Dict
   if (source !== "registry") return null;
   return (
     <span
-      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+      className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${
         source === "registry" ? "bg-success/15 text-success" : "bg-accent/15 text-accent-strong"
       }`}
     >
@@ -127,7 +127,7 @@ export function ScenarioCard({
         selected || recommended ? "border-accent bg-surface" : "border-border bg-surface"
       } ${recommended && !compact ? "shadow-[0_0_0_1px_var(--accent)]" : ""}`}
     >
-      <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em]">
+      <div className="flex flex-wrap items-center gap-2 font-mono text-xs uppercase tracking-[0.16em]">
         <span className="text-muted">
           {SLOT_LABELS[index] ?? index + 1} · {stanceShort}
         </span>
@@ -164,14 +164,14 @@ export function ScenarioCard({
 
       {!compact && keyFigures.length > 0 && (
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">{scenarios.keyFigures}</p>
+          <p className="font-mono text-xs uppercase tracking-[0.16em] text-muted">{scenarios.keyFigures}</p>
           <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
             {keyFigures.map(([key, entry]) => (
               <div key={key} className="flex min-w-0 flex-col gap-2 border border-border bg-surface-2 p-3">
                 <span className="text-xs leading-snug text-muted">{key}</span>
                 <span className="font-display text-2xl leading-none text-ink">{String(entry.value)}</span>
                 <span
-                  className={`self-start px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.12em] ${
+                  className={`self-start px-1.5 py-0.5 font-mono text-xs uppercase tracking-[0.12em] ${
                     entry.confidence === "verified"
                       ? "bg-success text-bg"
                       : entry.confidence === "estimate"
@@ -207,7 +207,7 @@ export function ScenarioCard({
       {!compact && (scenario.risksSpecific.length > 0 || scenario.opportunitiesSpecific.length > 0) && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-success">{scenarios.gains}</p>
+            <p className="font-mono text-xs uppercase tracking-[0.16em] text-success">{scenarios.gains}</p>
             <ul className="mt-2 flex flex-col gap-2">
               {scenario.opportunitiesSpecific.map((o, i) => (
                 <li key={`opp-${i}`} title={o.reason} className="flex gap-2 text-sm text-body">
@@ -218,7 +218,7 @@ export function ScenarioCard({
             </ul>
           </div>
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-danger">{scenarios.watch}</p>
+            <p className="font-mono text-xs uppercase tracking-[0.16em] text-danger">{scenarios.watch}</p>
             <ul className="mt-2 flex flex-col gap-2">
               {scenario.risksSpecific.map((r, i) => (
                 <li key={`risk-${i}`} title={r.reason} className="flex gap-2 text-sm text-body">
@@ -413,6 +413,7 @@ export function ScenarioCard({
         <button
           type="button"
           onClick={onSelect}
+          aria-pressed={selected}
           className={`self-start rounded-lg px-5 py-2 text-sm font-semibold transition ${
             selected
               ? "bg-accent text-accent-ink"
@@ -425,6 +426,7 @@ export function ScenarioCard({
           <button
             type="button"
             onClick={onToggleVeto}
+            aria-pressed={!!scenario.veto}
             className={`text-xs font-medium underline-offset-4 hover:underline ${
               scenario.veto ? "text-danger" : "text-muted"
             }`}

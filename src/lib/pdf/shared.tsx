@@ -85,14 +85,20 @@ export function ReportShell({
   moduleTag,
   title,
   subtitle,
+  language = "fr",
   children,
 }: {
   moduleTag: string;
   title: string;
   subtitle?: string;
+  language?: "fr" | "en";
   children: ReactNode;
 }) {
-  const generatedAt = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  const generatedAt = new Date().toLocaleDateString(language === "en" ? "en-US" : "fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
   return (
     <Document>
       <Page size="A4" style={pdfStyles.page} wrap>
@@ -101,7 +107,9 @@ export function ReportShell({
             <Text style={pdfStyles.brand}>4 TOMORROW</Text>
             <Text style={pdfStyles.moduleTag}>{moduleTag}</Text>
           </View>
-          <Text style={pdfStyles.generatedAt}>Généré le {generatedAt}</Text>
+          <Text style={pdfStyles.generatedAt}>
+            {language === "en" ? "Generated on" : "Généré le"} {generatedAt}
+          </Text>
         </View>
 
         <Text style={pdfStyles.title}>{title}</Text>

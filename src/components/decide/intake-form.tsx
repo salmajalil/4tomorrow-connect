@@ -6,7 +6,7 @@ import { extractFileText } from "@/lib/extract-file-text";
 import { useLanguage } from "@/components/language-provider";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import { DOMAINS, DOMAIN_LABELS, type Domain } from "@/lib/decide";
-import { CAPABILITY_LEVEL_MAX, CAPABILITY_LEVEL_MIN } from "@/lib/decide-diagnostic-calc";
+import { CAPABILITY_LEVEL_MAX, CAPABILITY_LEVEL_MIN, capabilityAssessmentProgress } from "@/lib/decide-diagnostic-calc";
 
 export type RiskTolerance = "low" | "medium" | "high";
 export type ProjectScope = "local" | "national" | "global";
@@ -18,16 +18,33 @@ export interface CapabilityFormEntry {
   target: number;
   importance: number;
   proofNote: string;
+  // Gabarit D01 — false tant que l'utilisateur n'a ni bougé un curseur ni
+  // confirmé explicitement les niveaux. Une capacité non évaluée n'est
+  // jamais envoyée : elle reste « non définie », distincte d'une capacité
+  // évaluée sans écart (observé = cible).
+  assessed: boolean;
 }
 
 export type CapabilityFormState = Record<Domain, CapabilityFormEntry>;
 
-// observed === target by default (gap 0): an untouched capability must
-// never produce a fabricated gap/priority — only what the user actually
-// adjusts counts as a real assessment.
+// Valeurs de départ des curseurs uniquement (affichage) — tant que
+// `assessed` est false, elles ne sont pas envoyées et ne produisent aucun
+// écart ni aucune priorité.
 function defaultCapabilities(): CapabilityFormState {
-  const entry: CapabilityFormEntry = { observed: 3, target: 3, importance: 3, proofNote: "" };
+  const entry: CapabilityFormEntry = { observed: 3, target: 3, importance: 3, proofNote: "", assessed: false };
   return DOMAINS.reduce((acc, d) => ({ ...acc, [d]: { ...entry } }), {} as CapabilityFormState);
+}
+
+// Seules les capacités explicitement évaluées partent au serveur (qui
+// accepte un enregistrement partiel, voir capabilitiesSchema dans
+// src/app/api/decide/diagnostic/route.ts).
+function assessedCapabilities(capabilities: Partial<CapabilityFormState>): Partial<CapabilityFormState> {
+  const out: Partial<CapabilityFormState> = {};
+  for (const d of DOMAINS) {
+    const entry = capabilities[d];
+    if (entry?.assessed) out[d] = entry;
+  }
+  return out;
 }
 
 export interface IntakeState {
@@ -47,10 +64,10 @@ export interface IntakeState {
   horizonYears: number;
   organizationSize: OrganizationSize;
   enrichWithWebSearch: boolean;
-  // D01 — the structured, chiffrée capability assessment. Optional-feeling
-  // in the UI (sensible defaults, nothing required) but always sent: the
+  // D01 — the structured, chiffrée capability assessment. Optional: only
+  // the capabilities the user explicitly assessed are submitted; the
   // diagnostic's gaps/priorities are computed from this, never from the AI.
-  capabilities: CapabilityFormState;
+  capabilities: Partial<CapabilityFormState>;
 }
 
 // Folded into the free-text "constraints" sent to the diagnostic/scenario
@@ -150,6 +167,7 @@ export function IntakeForm({
   }
 
   const canSubmit = (state.challenges.trim() || state.objectives.trim() || state.uploadedDocText.trim()) && !submitting;
+  const capabilityProgress = capabilityAssessmentProgress(DOMAINS.map((d) => state.capabilities[d]?.assessed === true));
 
   return (
     <form
@@ -160,6 +178,7 @@ export function IntakeForm({
         onSubmit({
           ...state,
           constraints: state.constraints.trim() ? `${structured}\n\n${state.constraints}` : structured,
+          capabilities: assessedCapabilities(state.capabilities),
         });
       }}
       className="flex flex-col gap-8"
@@ -422,24 +441,68 @@ export function IntakeForm({
         <div>
           <span className="text-xs font-semibold uppercase tracking-wide text-muted">{intake.capabilitiesTitle}</span>
           <p className="mt-1 text-xs text-muted">{intake.capabilitiesHint}</p>
+          <p className="mt-2 text-sm font-medium text-ink">
+            {intake.capabilitiesProgress
+              .replace("{n}", String(capabilityProgress.assessed))
+              .replace("{total}", String(capabilityProgress.total))}
+          </p>
+          {capabilityProgress.state === "vide" && <p className="mt-1 text-xs text-muted">{intake.capabilitiesNone}</p>}
+          {capabilityProgress.state === "incomplet" && (
+            <p className="mt-1 text-xs text-accent-strong">{intake.capabilitiesIncomplete}</p>
+          )}
         </div>
 
         <div className="flex flex-col gap-4">
           {DOMAINS.map((domain) => {
-            const entry = state.capabilities[domain];
+            const entry = state.capabilities[domain] ?? defaultCapabilities()[domain];
+            // Toute saisie sur une capacité la marque comme évaluée.
             const update = (patch: Partial<CapabilityFormEntry>) =>
               setState((s) => ({
                 ...s,
-                capabilities: { ...s.capabilities, [domain]: { ...s.capabilities[domain], ...patch } },
+                capabilities: { ...s.capabilities, [domain]: { ...entry, ...s.capabilities[domain], assessed: true, ...patch } },
               }));
             return (
-              <div key={domain} className="flex flex-col gap-3 rounded-lg border border-border bg-surface-2/40 p-3">
-                <p className="text-sm font-semibold text-ink">{DOMAIN_LABELS[domain]}</p>
+              <div
+                key={domain}
+                className={`flex flex-col gap-3 rounded-lg border p-3 ${
+                  entry.assessed ? "border-border bg-surface-2/40" : "border-dashed border-border bg-surface"
+                }`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-ink">{DOMAIN_LABELS[domain]}</p>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${
+                        entry.assessed ? "bg-success/15 text-success" : "bg-accent/15 text-accent-strong"
+                      }`}
+                    >
+                      {entry.assessed ? intake.capabilityAssessed : intake.capabilityNotAssessed}
+                    </span>
+                    {entry.assessed ? (
+                      <button
+                        type="button"
+                        onClick={() => update({ ...defaultCapabilities()[domain] })}
+                        className="text-xs text-muted underline underline-offset-2 hover:text-danger"
+                      >
+                        {intake.capabilityReset}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => update({})}
+                        className="text-xs font-medium text-accent-strong underline underline-offset-2"
+                      >
+                        {intake.capabilityMarkAssessed}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {!entry.assessed && <p className="text-xs text-muted">{intake.capabilityNotAssessedHint}</p>}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <label className="flex flex-col gap-1 text-xs">
                     <span className="flex items-center justify-between font-medium text-muted">
                       <span>{intake.capabilityObserved}</span>
-                      <span className="text-accent">{entry.observed}</span>
+                      <span className="text-accent">{entry.assessed ? entry.observed : "—"}</span>
                     </span>
                     <input
                       type="range"
@@ -453,7 +516,7 @@ export function IntakeForm({
                   <label className="flex flex-col gap-1 text-xs">
                     <span className="flex items-center justify-between font-medium text-muted">
                       <span>{intake.capabilityTarget}</span>
-                      <span className="text-accent">{entry.target}</span>
+                      <span className="text-accent">{entry.assessed ? entry.target : "—"}</span>
                     </span>
                     <input
                       type="range"
@@ -467,7 +530,7 @@ export function IntakeForm({
                   <label className="flex flex-col gap-1 text-xs">
                     <span className="flex items-center justify-between font-medium text-muted">
                       <span>{intake.capabilityImportance}</span>
-                      <span className="text-accent">{entry.importance}</span>
+                      <span className="text-accent">{entry.assessed ? entry.importance : "—"}</span>
                     </span>
                     <input
                       type="range"

@@ -106,5 +106,19 @@ export async function GET(request: Request) {
     .eq("transformation_id", transformationId)
     .order("created_at", { ascending: false });
 
-  return NextResponse.json({ history: data ?? [] });
+  // État actuel de la décision — permet à l'écran de distinguer un jeton
+  // encore « en attente » d'un jeton périmé (décision modifiée depuis
+  // l'envoi), via isTokenStillUsable (src/lib/validation-token.ts).
+  const { data: tx } = await supabase
+    .from("transformations")
+    .select("id, selected_trajectory_id, decision_updated_at")
+    .eq("id", transformationId)
+    .maybeSingle();
+
+  return NextResponse.json({
+    history: data ?? [],
+    current: tx
+      ? { transformationId: tx.id, trajectoryId: tx.selected_trajectory_id, decisionUpdatedAt: tx.decision_updated_at }
+      : null,
+  });
 }

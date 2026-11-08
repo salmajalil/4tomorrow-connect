@@ -7,7 +7,75 @@ import type { ModelOutput, MatchOutput } from "@/lib/matching";
 import type { Training } from "@/types/database";
 import type { ControlTowerProject } from "@/lib/control-tower";
 import { isHttpUrl } from "@/lib/url-safety";
-import type { ModuleName, ModuleStatusValue } from "@/types/database";
+import type { Language, ModuleName, ModuleStatusValue } from "@/types/database";
+import { getDictionary } from "@/lib/i18n/dictionary";
+
+// Libellés propres aux exports PDF qui n'existent pas déjà dans le
+// dictionnaire principal (src/lib/i18n/dictionary.ts) — tout ce qui y
+// existe déjà (titres de diagnostic, catégories Connecter, onglets Learn,
+// statuts Tour de contrôle...) est lu de là, jamais dupliqué ici.
+const PDF_LABELS = {
+  fr: {
+    decideTitle: "Diagnostic & scénarios stratégiques",
+    gapsIdentified: "Gaps identifiés",
+    scenario: "Scénario",
+    maturity: "Maturité :",
+    benefit: "Bénéfice :",
+    scenarioRisksOpportunities: "Risques & opportunités du scénario",
+    risk: "Risque :",
+    opportunity: "Opportunité :",
+    connectTitle: "Rapport de matching écosystème",
+    workshopTag: "LEARN · ATELIER",
+    contextAndOutcome: "Contexte & résultat attendu",
+    objectives: "Objectifs",
+    audienceAndPrerequisites: "Public & prérequis",
+    notSpecified: "Non précisé",
+    none: "Aucun",
+    executiveSummary: "Résumé exécutif",
+    correctAnswer: "(bonne réponse)",
+    visual: "Visuel :",
+    methodAndEvaluation: "Méthode & évaluation",
+    methodAi: "Génération IA",
+    fromDocument: " à partir du document « {name} »",
+    evaluation: ". Évaluation des acquis : quiz de {n} question(s) ci-dessus.",
+    controlTowerTag: "TOUR DE CONTRÔLE",
+    controlTowerTitle: "Vue d'ensemble — tous les projets",
+    projectCount: "{n} projet(s)",
+    completed: "% complété",
+    moduleStatus: "Statut des modules",
+    validatedKeyMetrics: "Indicateurs clés validés",
+  },
+  en: {
+    decideTitle: "Diagnostic & strategic scenarios",
+    gapsIdentified: "Identified gaps",
+    scenario: "Scenario",
+    maturity: "Maturity:",
+    benefit: "Benefit:",
+    scenarioRisksOpportunities: "Scenario risks & opportunities",
+    risk: "Risk:",
+    opportunity: "Opportunity:",
+    connectTitle: "Ecosystem matching report",
+    workshopTag: "LEARN · WORKSHOP",
+    contextAndOutcome: "Context & expected outcome",
+    objectives: "Objectives",
+    audienceAndPrerequisites: "Audience & prerequisites",
+    notSpecified: "Not specified",
+    none: "None",
+    executiveSummary: "Executive summary",
+    correctAnswer: "(correct answer)",
+    visual: "Visual:",
+    methodAndEvaluation: "Method & assessment",
+    methodAi: "AI generation",
+    fromDocument: " from the document \"{name}\"",
+    evaluation: ". Learning assessment: {n}-question quiz above.",
+    controlTowerTag: "CONTROL TOWER",
+    controlTowerTitle: "Overview — all projects",
+    projectCount: "{n} project(s)",
+    completed: "% complete",
+    moduleStatus: "Module status",
+    validatedKeyMetrics: "Validated key indicators",
+  },
+} satisfies Record<Language, Record<string, string>>;
 
 function domainBadges(domains: string[]): string[] {
   return domains.map((d) => DOMAIN_LABELS[d as Domain] ?? d);
@@ -19,17 +87,22 @@ function domainBadges(domains: string[]): string[] {
 export function DecideReportDocument({
   diagnostic,
   scenarios,
+  language,
 }: {
   diagnostic: DiagnosticResult;
   scenarios: ScenarioWithId[];
+  language: Language;
 }) {
+  const L = PDF_LABELS[language];
+  const t = getDictionary(language).decide;
   return (
     <ReportShell
       moduleTag="DECIDE"
-      title="Diagnostic & scénarios stratégiques"
+      title={L.decideTitle}
       subtitle={domainBadges(diagnostic.domains).join(" · ")}
+      language={language}
     >
-      <SectionTitle>Lecture de la situation</SectionTitle>
+      <SectionTitle>{t.diagnostic.title}</SectionTitle>
       {diagnostic.maturityHighlights.map((h, i) => (
         <NumberedItem key={i} index={i}>
           {h}
@@ -37,7 +110,7 @@ export function DecideReportDocument({
       ))}
       <Paragraph>{diagnostic.maturityReading}</Paragraph>
 
-      <SectionTitle>Gaps identifiés</SectionTitle>
+      <SectionTitle>{L.gapsIdentified}</SectionTitle>
       {diagnostic.gaps.map((g, i) => (
         <Card key={i}>
           <Text style={pdfStyles.h3}>{g.name}</Text>
@@ -45,7 +118,7 @@ export function DecideReportDocument({
         </Card>
       ))}
 
-      <SectionTitle>Causes racines</SectionTitle>
+      <SectionTitle>{t.diagnostic.rootCauses}</SectionTitle>
       {diagnostic.rootCauses.map((c, i) => (
         <Card key={i}>
           <Text style={pdfStyles.h3}>{c.name}</Text>
@@ -53,7 +126,7 @@ export function DecideReportDocument({
         </Card>
       ))}
 
-      <SectionTitle>Priorités</SectionTitle>
+      <SectionTitle>{t.diagnostic.priorities}</SectionTitle>
       {diagnostic.priorities.map((p, i) => (
         <Card key={i}>
           <Text style={pdfStyles.h3}>
@@ -63,7 +136,7 @@ export function DecideReportDocument({
         </Card>
       ))}
 
-      <SectionTitle>Risques</SectionTitle>
+      <SectionTitle>{t.diagnostic.risks}</SectionTitle>
       {diagnostic.risks.map((r, i) => (
         <Card key={i}>
           <Text style={pdfStyles.h3}>{r.name}</Text>
@@ -71,21 +144,21 @@ export function DecideReportDocument({
         </Card>
       ))}
 
-      <SectionTitle>Critères de décision retenus</SectionTitle>
+      <SectionTitle>{t.diagnostic.decisionCriteria}</SectionTitle>
       <BadgeList items={diagnostic.decisionCriteria} />
 
-      <SectionTitle>Recommandation de démarrage</SectionTitle>
+      <SectionTitle>{t.diagnostic.startingRecommendation}</SectionTitle>
       <Paragraph>{diagnostic.startingRecommendation}</Paragraph>
 
       {scenarios.map((s, i) => (
         <View key={s.trajectoryId} break={i > 0}>
           <SectionTitle>
-            Scénario {i + 1} — {s.name}
+            {L.scenario} {i + 1} — {s.name}
           </SectionTitle>
           <Text style={pdfStyles.muted}>{s.stance}</Text>
           <Paragraph>{s.description}</Paragraph>
 
-          <Text style={pdfStyles.h3}>Briefing exécutif</Text>
+          <Text style={pdfStyles.h3}>{t.scenarios.executiveBriefing}</Text>
           {s.briefingHighlights.map((h, i) => (
             <NumberedItem key={i} index={i}>
               {h}
@@ -95,16 +168,18 @@ export function DecideReportDocument({
 
           {s.techStack.length > 0 && (
             <>
-              <Text style={pdfStyles.h3}>Stack / solutions</Text>
-              {s.techStack.map((t, ti) => (
+              <Text style={pdfStyles.h3}>{t.scenarios.stackSolutions}</Text>
+              {s.techStack.map((tech, ti) => (
                 <Card key={ti}>
-                  <Text style={pdfStyles.h3}>{t.name}</Text>
+                  <Text style={pdfStyles.h3}>{tech.name}</Text>
                   <Text style={pdfStyles.muted}>
-                    Maturité : {t.maturity}
-                    {t.maturityScale ? ` (${t.maturityScale})` : ""}
+                    {L.maturity} {tech.maturity}
+                    {tech.maturityScale ? ` (${tech.maturityScale})` : ""}
                   </Text>
-                  <Paragraph>{t.detail}</Paragraph>
-                  <Text style={pdfStyles.muted}>Bénéfice : {t.benefit}</Text>
+                  <Paragraph>{tech.detail}</Paragraph>
+                  <Text style={pdfStyles.muted}>
+                    {L.benefit} {tech.benefit}
+                  </Text>
                 </Card>
               ))}
             </>
@@ -112,7 +187,7 @@ export function DecideReportDocument({
 
           {s.suppliers.length > 0 && (
             <>
-              <Text style={pdfStyles.h3}>Fournisseurs & partenaires</Text>
+              <Text style={pdfStyles.h3}>{t.scenarios.tabSuppliers}</Text>
               {s.suppliers.map((sup, si) => (
                 <Card key={si}>
                   <Text style={pdfStyles.h3}>{sup.name}</Text>
@@ -125,7 +200,7 @@ export function DecideReportDocument({
 
           {s.regulations.length > 0 && (
             <>
-              <Text style={pdfStyles.h3}>Régulations / standards</Text>
+              <Text style={pdfStyles.h3}>{t.scenarios.applicableRegulations}</Text>
               {s.regulations.map((r, ri) => (
                 <Paragraph key={ri}>
                   {r.name} — {r.description}
@@ -134,15 +209,15 @@ export function DecideReportDocument({
             </>
           )}
 
-          <Text style={pdfStyles.h3}>Risques & opportunités du scénario</Text>
+          <Text style={pdfStyles.h3}>{L.scenarioRisksOpportunities}</Text>
           {s.risksSpecific.map((r, ri) => (
             <Text key={ri} style={{ ...pdfStyles.p, color: PDF_COLORS.danger }}>
-              Risque : {r.name} — {r.reason}
+              {L.risk} {r.name} — {r.reason}
             </Text>
           ))}
           {s.opportunitiesSpecific.map((o, oi) => (
             <Text key={oi} style={{ ...pdfStyles.p, color: PDF_COLORS.success }}>
-              Opportunité : {o.name} — {o.reason}
+              {L.opportunity} {o.name} — {o.reason}
             </Text>
           ))}
         </View>
@@ -154,26 +229,40 @@ export function DecideReportDocument({
 // ---------------------------------------------------------------------
 // Connect
 // ---------------------------------------------------------------------
-const CATEGORY_LABELS: Record<MatchOutput["category"], string> = {
-  technology: "Technologies",
-  startup: "Startups",
-  expert: "Experts & consultants",
-  partner: "Partenaires",
-  funding: "Financement & subventions",
-  supplier: "Fournisseurs",
-  support: "Accompagnement",
-};
+function categoryLabels(language: Language): Record<MatchOutput["category"], string> {
+  const r = getDictionary(language).connect.results;
+  return {
+    technology: r.categoryTechnology,
+    startup: r.categoryStartup,
+    expert: r.categoryExpert,
+    partner: r.categoryPartner,
+    funding: r.categoryFunding,
+    supplier: r.categorySupplier,
+    support: r.categorySupport,
+  };
+}
 const CATEGORY_ORDER: MatchOutput["category"][] = ["partner", "technology", "startup", "supplier", "funding", "support", "expert"];
 
-export function ConnectReportDocument({ result, projectLabel }: { result: ModelOutput; projectLabel: string }) {
+export function ConnectReportDocument({
+  result,
+  projectLabel,
+  language,
+}: {
+  result: ModelOutput;
+  projectLabel: string;
+  language: Language;
+}) {
+  const L = PDF_LABELS[language];
+  const tr = getDictionary(language).connect.results;
+  const CATEGORY_LABELS = categoryLabels(language);
   const byCategory = CATEGORY_ORDER.map((category) => ({
     category,
     matches: result.matches.filter((m) => m.category === category),
   })).filter((g) => g.matches.length > 0);
 
   return (
-    <ReportShell moduleTag="CONNECT" title="Rapport de matching écosystème" subtitle={projectLabel}>
-      <SectionTitle>Gaps identifiés</SectionTitle>
+    <ReportShell moduleTag="CONNECT" title={L.connectTitle} subtitle={projectLabel} language={language}>
+      <SectionTitle>{L.gapsIdentified}</SectionTitle>
       {result.gaps.map((g, i) => (
         <Card key={i}>
           <Text style={pdfStyles.h3}>{g.name}</Text>
@@ -181,10 +270,10 @@ export function ConnectReportDocument({ result, projectLabel }: { result: ModelO
         </Card>
       ))}
 
-      <SectionTitle>Strategic brief</SectionTitle>
+      <SectionTitle>{tr.strategicBrief}</SectionTitle>
       <Paragraph>{result.strategicBrief}</Paragraph>
 
-      <SectionTitle>Bonnes idées</SectionTitle>
+      <SectionTitle>{tr.goodIdeas}</SectionTitle>
       {result.goodIdeas.map((idea, i) => (
         <NumberedItem key={i} index={i}>
           {idea}
@@ -198,7 +287,9 @@ export function ConnectReportDocument({ result, projectLabel }: { result: ModelO
             <Card key={i}>
               <Text style={pdfStyles.h3}>{m.name}</Text>
               <Paragraph>{m.reason}</Paragraph>
-              <Text style={pdfStyles.muted}>Gap adressé : {m.gapAddressed}</Text>
+              <Text style={pdfStyles.muted}>
+                {tr.gapAddressed} {m.gapAddressed}
+              </Text>
               {/* Clickable only for an explicit http(s) URL — never javascript:, file:, etc. */}
               {m.website &&
                 (isHttpUrl(m.website) ? (
@@ -219,30 +310,34 @@ export function ConnectReportDocument({ result, projectLabel }: { result: ModelO
 // ---------------------------------------------------------------------
 // Learn
 // ---------------------------------------------------------------------
-export function LearnReportDocument({ training }: { training: Training }) {
+export function LearnReportDocument({ training, language }: { training: Training; language: Language }) {
+  const L = PDF_LABELS[language];
+  const tl = getDictionary(language).learn;
+  const tt = tl.training;
   const domains = domainBadges(training.domains);
   if (training.mode === "workshop") {
     return (
       <ReportShell
-        moduleTag="LEARN · ATELIER"
+        moduleTag={L.workshopTag}
         title={training.topic}
         subtitle={[...domains, training.duration_minutes ? `${training.duration_minutes} min` : null]
           .filter(Boolean)
           .join(" · ")}
+        language={language}
       >
-        <SectionTitle>Contexte & résultat attendu</SectionTitle>
-        <Text style={pdfStyles.h3}>Contexte</Text>
+        <SectionTitle>{L.contextAndOutcome}</SectionTitle>
+        <Text style={pdfStyles.h3}>{tt.workshopContext}</Text>
         <Paragraph>{training.workshop_intro?.context ?? ""}</Paragraph>
-        <Text style={pdfStyles.h3}>Résultat attendu</Text>
+        <Text style={pdfStyles.h3}>{tt.workshopExpectedOutcome}</Text>
         <Paragraph>{training.workshop_intro?.expectedOutcome ?? ""}</Paragraph>
-        <Text style={pdfStyles.h3}>Objectifs</Text>
+        <Text style={pdfStyles.h3}>{L.objectives}</Text>
         {training.objectives.map((o, i) => (
           <NumberedItem key={i} index={i}>
             {o}
           </NumberedItem>
         ))}
 
-        <SectionTitle>Support</SectionTitle>
+        <SectionTitle>{tt.tabSupport}</SectionTitle>
         {(training.workshop_support ?? []).map((section, i) => (
           <Card key={i}>
             <Text style={pdfStyles.h3}>{section.title}</Text>
@@ -251,27 +346,29 @@ export function LearnReportDocument({ training }: { training: Training }) {
         ))}
 
         <View break>
-          <SectionTitle>Déroulé</SectionTitle>
+          <SectionTitle>{tt.tabSteps}</SectionTitle>
           {(training.workshop_steps ?? [])
             .slice()
             .sort((a, b) => a.order - b.order)
             .map((step, i) => (
               <Card key={i}>
                 <Text style={pdfStyles.h3}>
-                  {step.order}. {step.title} ({step.durationMinutes} min)
+                  {step.order}. {step.title} ({step.durationMinutes} {tt.workshopStepDuration})
                 </Text>
                 <Paragraph>{step.description}</Paragraph>
                 {step.materials.length > 0 && (
-                  <Text style={pdfStyles.muted}>Matériel : {step.materials.join(", ")}</Text>
+                  <Text style={pdfStyles.muted}>
+                    {tt.workshopStepMaterials} {step.materials.join(", ")}
+                  </Text>
                 )}
               </Card>
             ))}
 
-          <SectionTitle>Public & prérequis</SectionTitle>
-          <Text style={pdfStyles.h3}>Participants</Text>
-          <Paragraph>{training.audience || "Non précisé"}</Paragraph>
-          <Text style={pdfStyles.h3}>Prérequis</Text>
-          <Paragraph>{training.prerequisites || "Aucun"}</Paragraph>
+          <SectionTitle>{L.audienceAndPrerequisites}</SectionTitle>
+          <Text style={pdfStyles.h3}>{tl.intake.audienceWorkshop}</Text>
+          <Paragraph>{training.audience || L.notSpecified}</Paragraph>
+          <Text style={pdfStyles.h3}>{tt.prerequisites}</Text>
+          <Paragraph>{training.prerequisites || L.none}</Paragraph>
         </View>
       </ReportShell>
     );
@@ -283,33 +380,38 @@ export function LearnReportDocument({ training }: { training: Training }) {
       subtitle={[...domains, training.duration_minutes ? `${training.duration_minutes} min` : null]
         .filter(Boolean)
         .join(" · ")}
+      language={language}
     >
-      <SectionTitle>Résumé exécutif</SectionTitle>
-      <Text style={pdfStyles.h3}>Défi adressé</Text>
+      <SectionTitle>{L.executiveSummary}</SectionTitle>
+      <Text style={pdfStyles.h3}>{tt.addressedChallenge}</Text>
       <Paragraph>{training.executive_summary.addressedChallenge}</Paragraph>
-      <Text style={pdfStyles.h3}>Résumé</Text>
+      <Text style={pdfStyles.h3}>{tt.summary}</Text>
       <Paragraph>{training.executive_summary.summary}</Paragraph>
-      <Text style={pdfStyles.h3}>Plan d&apos;action</Text>
+      <Text style={pdfStyles.h3}>{tt.actionPlan}</Text>
       {training.executive_summary.actionPlan.map((step, i) => (
         <NumberedItem key={i} index={i}>
           {step}
         </NumberedItem>
       ))}
 
-      <SectionTitle>Points clés</SectionTitle>
+      <SectionTitle>{tt.tabKeyPoints}</SectionTitle>
       {training.key_insights.map((insight, i) => (
         <Card key={i}>
           <Paragraph>{insight.text}</Paragraph>
-          {insight.source && <Text style={pdfStyles.muted}>Source : {insight.source}</Text>}
+          {insight.source && (
+            <Text style={pdfStyles.muted}>
+              {tt.source} {insight.source}
+            </Text>
+          )}
         </Card>
       ))}
 
-      <SectionTitle>Implications business</SectionTitle>
+      <SectionTitle>{tt.businessImplications}</SectionTitle>
       {training.business_implications.map((b, i) => (
         <Paragraph key={i}>• {b.text}</Paragraph>
       ))}
 
-      <SectionTitle>Cartes interactives (flashcards)</SectionTitle>
+      <SectionTitle>{tt.interactiveCards}</SectionTitle>
       {training.flashcards.map((f, i) => (
         <Card key={i}>
           <Text style={pdfStyles.h3}>
@@ -319,7 +421,7 @@ export function LearnReportDocument({ training }: { training: Training }) {
         </Card>
       ))}
 
-      <SectionTitle>Quiz de validation</SectionTitle>
+      <SectionTitle>{tt.validationQuiz}</SectionTitle>
       {training.comprehension_check.map((q, i) => {
         const letters = ["A", "B", "C", "D"];
         return (
@@ -335,7 +437,7 @@ export function LearnReportDocument({ training }: { training: Training }) {
                   style={isCorrect ? { ...pdfStyles.p, fontFamily: "Helvetica-Bold", color: PDF_COLORS.success } : pdfStyles.p}
                 >
                   {letters[oi] ?? oi + 1}. {o.text}
-                  {isCorrect ? "  (bonne réponse)" : ""}
+                  {isCorrect ? `  ${L.correctAnswer}` : ""}
                 </Text>
               );
             })}
@@ -345,36 +447,39 @@ export function LearnReportDocument({ training }: { training: Training }) {
       })}
 
       <View break>
-        <SectionTitle>Script vidéo — {training.video_script.title}</SectionTitle>
+        <SectionTitle>
+          {tt.videoScript} — {training.video_script.title}
+        </SectionTitle>
         {training.video_script.scenes.map((scene) => (
           <Card key={scene.sceneNumber}>
             <Text style={pdfStyles.h3}>
-              Scène {scene.sceneNumber} ({scene.durationSeconds}s)
+              {tt.scene} {scene.sceneNumber} ({scene.durationSeconds}s)
             </Text>
             <Paragraph>{scene.narration}</Paragraph>
-            <Text style={pdfStyles.muted}>Visuel : {scene.visualSuggestion}</Text>
+            <Text style={pdfStyles.muted}>
+              {L.visual} {scene.visualSuggestion}
+            </Text>
           </Card>
         ))}
 
-        <SectionTitle>Fiche Qualiopi</SectionTitle>
-        <Text style={pdfStyles.muted}>
-          Généré automatiquement — sert de preuve pour les critères Qualiopi C1 à C4 et C7.
-        </Text>
-        <Text style={pdfStyles.h3}>Public visé</Text>
-        <Paragraph>{training.audience || "Non précisé"}</Paragraph>
-        <Text style={pdfStyles.h3}>Prérequis</Text>
-        <Paragraph>{training.prerequisites || "Aucun"}</Paragraph>
-        <Text style={pdfStyles.h3}>Objectifs pédagogiques</Text>
+        <SectionTitle>{tt.tabQualiopi}</SectionTitle>
+        <Text style={pdfStyles.muted}>{tt.qualiopiIntro}</Text>
+        <Text style={pdfStyles.h3}>{tt.targetAudience}</Text>
+        <Paragraph>{training.audience || L.notSpecified}</Paragraph>
+        <Text style={pdfStyles.h3}>{tt.prerequisites}</Text>
+        <Paragraph>{training.prerequisites || L.none}</Paragraph>
+        <Text style={pdfStyles.h3}>{tt.pedagogicalObjectives}</Text>
         {training.objectives.map((o, i) => (
           <Text key={i} style={pdfStyles.p}>
             • {o}
           </Text>
         ))}
-        <Text style={pdfStyles.h3}>Méthode & évaluation</Text>
+        <Text style={pdfStyles.h3}>{L.methodAndEvaluation}</Text>
         <Paragraph>
-          Génération IA{training.source_doc_name ? ` à partir du document « ${training.source_doc_name} »` : ""}
-          {training.mode === "diagnostic" ? ", à partir d'un diagnostic Decide existant" : ""}. Évaluation des acquis
-          : quiz de {training.comprehension_check.length} question(s) ci-dessus.
+          {L.methodAi}
+          {training.source_doc_name ? L.fromDocument.replace("{name}", training.source_doc_name) : ""}
+          {training.mode === "diagnostic" ? tt.fromDiagnostic : ""}
+          {L.evaluation.replace("{n}", String(training.comprehension_check.length))}
         </Paragraph>
       </View>
     </ReportShell>
@@ -391,38 +496,46 @@ const MODULE_LABELS: Record<ModuleName, string> = {
   deliver: "Deliver",
 };
 
-function statusLabel(status: ModuleStatusValue): string {
-  if (status === "done") return "Terminé";
-  if (status === "in_progress") return "En cours";
-  return "Non démarré";
+function statusLabel(status: ModuleStatusValue, language: Language): string {
+  const ct = getDictionary(language).controlTower;
+  if (status === "done") return ct.statusDone;
+  if (status === "in_progress") return ct.statusInProgress;
+  return ct.statusNotStarted;
 }
 
-export function ControlTowerReportDocument({ projects }: { projects: ControlTowerProject[] }) {
+export function ControlTowerReportDocument({ projects, language }: { projects: ControlTowerProject[]; language: Language }) {
+  const L = PDF_LABELS[language];
+  const dict = getDictionary(language);
+  const ct = dict.controlTower;
   return (
     <ReportShell
-      moduleTag="TOUR DE CONTRÔLE"
-      title="Vue d'ensemble — tous les projets"
-      subtitle={`${projects.length} projet${projects.length > 1 ? "s" : ""}`}
+      moduleTag={L.controlTowerTag}
+      title={L.controlTowerTitle}
+      subtitle={L.projectCount.replace("{n}", String(projects.length))}
+      language={language}
     >
       {projects.map((p, i) => (
         <View key={p.transformationId} break={i > 0}>
           <SectionTitle>{p.title}</SectionTitle>
           <Text style={pdfStyles.muted}>
-            {p.organizationName} · {p.progressPercent}% complété · Cible :{" "}
-            {p.targetDate ? new Date(`${p.targetDate}T00:00:00Z`).toLocaleDateString("fr-FR") : "à définir"}
+            {p.organizationName} · {p.progressPercent}
+            {L.completed} · {ct.target}{" "}
+            {p.targetDate
+              ? new Date(`${p.targetDate}T00:00:00Z`).toLocaleDateString(language === "en" ? "en-US" : "fr-FR")
+              : ct.toBeDefined}
           </Text>
           <BadgeList items={domainBadges(p.domains)} />
 
-          <Text style={pdfStyles.h3}>Statut des modules</Text>
+          <Text style={pdfStyles.h3}>{L.moduleStatus}</Text>
           {(Object.keys(p.moduleStatus) as ModuleName[]).map((m) => (
             <Text key={m} style={pdfStyles.p}>
-              {MODULE_LABELS[m]} — {statusLabel(p.moduleStatus[m])}
+              {MODULE_LABELS[m]} — {statusLabel(p.moduleStatus[m], language)}
             </Text>
           ))}
 
           {p.keyMetrics.length > 0 && (
             <>
-              <Text style={pdfStyles.h3}>Indicateurs clés validés</Text>
+              <Text style={pdfStyles.h3}>{L.validatedKeyMetrics}</Text>
               {p.keyMetrics.map((m, mi) => (
                 <Text key={mi} style={pdfStyles.p}>
                   {m.key} : {String(m.value)}
@@ -433,7 +546,7 @@ export function ControlTowerReportDocument({ projects }: { projects: ControlTowe
 
           {p.risks.length > 0 && (
             <>
-              <Text style={pdfStyles.h3}>Points chauds</Text>
+              <Text style={pdfStyles.h3}>{ct.hotPoints}</Text>
               {p.risks.map((r) => (
                 <Text key={r.id} style={{ ...pdfStyles.p, color: PDF_COLORS.danger }}>
                   {r.name}
@@ -445,7 +558,7 @@ export function ControlTowerReportDocument({ projects }: { projects: ControlTowe
 
           {p.opportunities.length > 0 && (
             <>
-              <Text style={pdfStyles.h3}>Opportunités</Text>
+              <Text style={pdfStyles.h3}>{dict.impact.opportunitiesTitle}</Text>
               {p.opportunities.map((o) => (
                 <Text key={o.id} style={{ ...pdfStyles.p, color: PDF_COLORS.success }}>
                   {o.name}

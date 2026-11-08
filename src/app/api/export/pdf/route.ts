@@ -4,6 +4,7 @@ import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import type { ReactElement } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getLanguage } from "@/lib/i18n/language";
+import type { Language } from "@/types/database";
 import {
   DecideReportDocument,
   ConnectReportDocument,
@@ -33,7 +34,8 @@ type Kind = z.infer<typeof requestSchema>["kind"];
 // React-PDF component's own prop types via this one cast.
 // TODO(security): re-read control tower projects server-side too.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const buildControlTower = (payload: any): ReactElement<DocumentProps> => ControlTowerReportDocument(payload);
+const buildControlTower = (payload: any, language: Language): ReactElement<DocumentProps> =>
+  ControlTowerReportDocument({ ...payload, language });
 
 const FILENAMES: Record<Kind, string> = {
   decide: "4tomorrow-decide.pdf",
@@ -94,7 +96,7 @@ export async function POST(request: Request) {
       const { transformationId } = projectPayloadSchema.parse(body.payload);
       const data = await loadDecideExport(supabase, transformationId);
       if (!data) throw new ExportNotFoundError();
-      document = DecideReportDocument(data);
+      document = DecideReportDocument({ ...data, language });
     } else if (body.kind === "connect") {
       const { transformationId } = projectPayloadSchema.parse(body.payload);
       const data = await loadConnectExport(
@@ -103,14 +105,14 @@ export async function POST(request: Request) {
         language === "en" ? "Your project" : "Ton projet"
       );
       if (!data) throw new ExportNotFoundError();
-      document = ConnectReportDocument(data);
+      document = ConnectReportDocument({ ...data, language });
     } else if (body.kind === "learn") {
       const { trainingId } = learnPayloadSchema.parse(body.payload);
       const data = await loadLearnExport(supabase, trainingId);
       if (!data) throw new ExportNotFoundError();
-      document = LearnReportDocument(data);
+      document = LearnReportDocument({ ...data, language });
     } else {
-      document = buildControlTower(body.payload);
+      document = buildControlTower(body.payload, language);
     }
     buffer = await renderToBuffer(document);
   } catch (err) {

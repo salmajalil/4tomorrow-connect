@@ -81,11 +81,13 @@ export function DeliverFlow({
         phase={missionPhase(readyCount)}
       />
 
-      <div className="mt-6 flex gap-1 overflow-x-auto border-b border-border pb-2">
+      <div role="tablist" className="mt-6 flex gap-1 overflow-x-auto border-b border-border pb-2">
         {TABS.map((tabDef) => (
           <button
             key={tabDef.id}
             type="button"
+            role="tab"
+            aria-selected={tab === tabDef.id}
             onClick={() => setTab(tabDef.id)}
             className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition ${
               tab === tabDef.id ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"

@@ -84,6 +84,9 @@ export function BenefitsTab({
 
   const itemsResult = computeItemsTotal(items.map((i) => ({ label: i.label, perimeter: i.perimeter, value: i.value })));
   const observedResult = computeObservedAnnual(observations.map((o) => ({ month: o.month, value: o.value })));
+  // L06 — gabarit « à revoir » : une valeur tapée mais pas encore
+  // enregistrée ne compte pas encore dans l'écart ci-dessous.
+  const expectedUnsaved = expectedInput !== String(expectation?.expected_annual ?? "");
   const comparison = compareBenefits(expectation?.expected_annual ?? null, observedResult?.observedAnnual ?? null);
 
   return (
@@ -103,6 +106,11 @@ export function BenefitsTab({
             )}
             <span className="text-[11px]">{expectation?.source === "business_case" ? b.expectedFromBusinessCase : b.expectedManualHint}</span>
           </label>
+          {expectedUnsaved && (
+            <span role="status" className="shrink-0 self-center border border-danger/50 px-2 py-0.5 text-xs font-medium text-danger">
+              {b.unsaved}
+            </span>
+          )}
           <button type="button" onClick={() => void saveExpected()} className="shrink-0 bg-accent px-3 py-2 text-xs font-medium text-accent-ink">
             {b.saveExpected}
           </button>
@@ -140,18 +148,21 @@ export function BenefitsTab({
             value={newItem.label}
             onChange={(e) => setNewItem((v) => ({ ...v, label: e.target.value }))}
             placeholder={b.labelPlaceholder}
+            aria-label={b.labelPlaceholder}
             className="min-w-[8rem] flex-[2] border border-border bg-surface px-2 py-1.5 text-xs text-ink"
           />
           <input
             value={newItem.perimeter}
             onChange={(e) => setNewItem((v) => ({ ...v, perimeter: e.target.value }))}
             placeholder={b.perimeterPlaceholder}
+            aria-label={b.perimeterPlaceholder}
             className="min-w-[8rem] flex-1 border border-border bg-surface px-2 py-1.5 text-xs text-ink"
           />
           <input
             value={newItem.value}
             onChange={(e) => setNewItem((v) => ({ ...v, value: e.target.value }))}
             placeholder={b.valuePlaceholder}
+            aria-label={b.valuePlaceholder}
             className="w-24 border border-border bg-surface px-2 py-1.5 text-xs text-ink"
           />
           <button type="button" onClick={() => void addItem()} className="shrink-0 bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink">
@@ -176,12 +187,14 @@ export function BenefitsTab({
             value={newObs.month}
             onChange={(e) => setNewObs((v) => ({ ...v, month: e.target.value }))}
             placeholder={b.monthPlaceholder}
+            aria-label={b.monthPlaceholder}
             className="w-28 border border-border bg-surface px-2 py-1.5 text-xs text-ink"
           />
           <input
             value={newObs.value}
             onChange={(e) => setNewObs((v) => ({ ...v, value: e.target.value }))}
             placeholder={b.valuePlaceholder}
+            aria-label={b.valuePlaceholder}
             className="w-24 border border-border bg-surface px-2 py-1.5 text-xs text-ink"
           />
           <button type="button" onClick={() => void addObservation()} className="shrink-0 bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink">

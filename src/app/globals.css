@@ -51,6 +51,25 @@
   --font-display: var(--font-instrument-serif);
 }
 
+/*
+ * Accessibilité — taille de texte minimale. `text-xs` est la plus petite
+ * taille utilisée dans l'app ; la règle du projet impose ≥ 14px partout,
+ * donc on la redéfinit à 0.875rem (14px) ici plutôt que de réécrire chaque
+ * occurrence une par une.
+ */
+@theme {
+  --text-xs: 0.875rem;
+  --text-xs--line-height: calc(1.25 / 0.875);
+}
+
+/* Focus clavier toujours visible (navigation au clavier uniquement :
+   :focus-visible ne s'affiche pas au clic souris). :where() garde une
+   spécificité nulle, donc un composant peut toujours la surcharger. */
+:where(button, a, [role="button"], [tabindex], input, select, textarea):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 body {
   background: var(--bg);
   color: var(--ink);

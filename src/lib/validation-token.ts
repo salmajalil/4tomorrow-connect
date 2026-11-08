@@ -28,9 +28,14 @@ export interface CurrentDecisionState {
   decisionUpdatedAt: string; // ISO timestamp actuel
 }
 
+export type ValidationRefusalCode = "not_confirmed" | "used" | "expired" | "other_project" | "decision_changed";
+
 export interface ConsumeResult {
   ok: boolean;
   reason: string | null;
+  // Code stable du motif de refus — permet aux écrans/routes de traduire le
+  // motif (fr/en) sans dépendre du texte français ci-dessus.
+  code: ValidationRefusalCode | null;
 }
 
 /** Calcule l'expiration d'un nouveau jeton émis à `issuedAt`. */
@@ -50,27 +55,48 @@ export function evaluateConsumption(
   explicitlyConfirmed: boolean
 ): ConsumeResult {
   if (!explicitlyConfirmed) {
-    return { ok: false, reason: "Confirmation explicite requise : ouvrir le lien ne valide rien." };
+    return { ok: false, reason: "Confirmation explicite requise : ouvrir le lien ne valide rien.", code: "not_confirmed" };
   }
   if (token.usedAt !== null) {
-    return { ok: false, reason: "Ce lien a déjà été utilisé." };
+    return { ok: false, reason: "Ce lien a déjà été utilisé.", code: "used" };
   }
   if (now.getTime() > Date.parse(token.expiresAt)) {
-    return { ok: false, reason: "Ce lien a expiré. Demandez-en un nouveau." };
+    return { ok: false, reason: "Ce lien a expiré. Demandez-en un nouveau.", code: "expired" };
   }
   if (token.transformationId !== current.transformationId) {
-    return { ok: false, reason: "Ce lien concerne un autre projet." };
+    return { ok: false, reason: "Ce lien concerne un autre projet.", code: "other_project" };
   }
   if (current.trajectoryId !== token.trajectoryId) {
-    return { ok: false, reason: "La décision a changé depuis l'envoi de ce lien. Un nouveau lien est nécessaire." };
+    return { ok: false, reason: "La décision a changé depuis l'envoi de ce lien. Un nouveau lien est nécessaire.", code: "decision_changed" };
   }
   if (current.decisionUpdatedAt !== token.decisionSnapshot) {
-    return { ok: false, reason: "La décision a changé depuis l'envoi de ce lien. Un nouveau lien est nécessaire." };
+    return { ok: false, reason: "La décision a changé depuis l'envoi de ce lien. Un nouveau lien est nécessaire.", code: "decision_changed" };
   }
-  return { ok: true, reason: null };
+  return { ok: true, reason: null, code: null };
 }
 
 /** True si un jeton (non consommé) est encore valide pour être affiché, sans le consommer. */
 export function isTokenStillUsable(token: ValidationTokenRecord, current: CurrentDecisionState, now: Date): ConsumeResult {
   return evaluateConsumption(token, current, now, true);
+}
+
+export type ValidationHistoryStatus = ValidationOutcome | "pending" | "expired" | "outdated";
+
+/**
+ * État à afficher pour une ligne d'historique côté porteur du projet : le
+ * résultat du CEO s'il a répondu, sinon « en attente » uniquement si le
+ * jeton est encore utilisable (isTokenStillUsable) — un jeton expiré ou
+ * dont la décision a changé depuis l'envoi n'est jamais montré « en attente ».
+ */
+export function validationHistoryStatus(
+  token: ValidationTokenRecord & { outcome: ValidationOutcome | null },
+  current: CurrentDecisionState | null,
+  now: Date
+): ValidationHistoryStatus {
+  if (token.outcome) return token.outcome;
+  if (now.getTime() > Date.parse(token.expiresAt)) return "expired";
+  if (!current) return "pending";
+  const usable = isTokenStillUsable(token, current, now);
+  if (usable.ok) return "pending";
+  return usable.code === "expired" ? "expired" : "outdated";
 }

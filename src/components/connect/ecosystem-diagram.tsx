@@ -88,7 +88,7 @@ export function EcosystemDiagram({
                 onSelect(lit ? null : n.key);
               }
             }}
-            className="cursor-pointer outline-none"
+            className="cursor-pointer focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
           >
             <circle
               cx={n.x}

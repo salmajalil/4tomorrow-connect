@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { IntakeForm, type IntakeState } from "@/components/decide/intake-form";
 import { DiagnosticView, type DiagnosticResult } from "@/components/decide/diagnostic-view";
+import { FlowView } from "@/components/decide/flow-view";
 import { ModuleCrossLinks } from "@/components/module-cross-links";
 import { ScenarioComparator } from "@/components/decide/scenario-comparator";
 import { RadarChart } from "@/components/decide/radar-chart";
@@ -304,6 +305,7 @@ export function DecideFlow({
           </div>
         </div>
         <DiagnosticView result={diagnostic} onGenerateScenarios={runScenarios} generating={false} />
+        <FlowView transformationId={diagnostic.transformationId} />
       </div>
     );
   }

@@ -536,6 +536,19 @@ export type BusinessCase = {
   created_at: string;
 };
 
+// D02 — cartographie dynamique. `steps`/`demand`/`levers` are the
+// user-entered or CSV-imported data; `result` is always the output of
+// src/lib/decide-flow-calc.ts's computeFlow for exactly that data — never a
+// value chosen by the AI.
+export type ProcessFlow = {
+  transformation_id: string;
+  demand: number;
+  steps: { id: string; name: string; process: number; wait: number; capacity: number }[];
+  levers: { waitCut: Record<string, number>; capAdd: Record<string, number> };
+  result: unknown | null;
+  updated_at: string;
+};
+
 export type ValidationOutcomeValue = "validated" | "needs_more_info" | "rejected";
 
 // L09 — CEO validation token. See src/lib/validation-token.ts for the
@@ -648,6 +661,7 @@ export type Database = {
         Partial<CeoValidationToken> &
           Pick<CeoValidationToken, "transformation_id" | "trajectory_id" | "decision_snapshot" | "token" | "expires_at">
       >;
+      process_flows: Table<ProcessFlow, Partial<ProcessFlow> & Pick<ProcessFlow, "transformation_id">>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

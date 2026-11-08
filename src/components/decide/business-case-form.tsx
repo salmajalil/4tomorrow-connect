@@ -114,11 +114,11 @@ export function BusinessCaseForm({ transformationId, trajectoryId }: { transform
       {enabled && (
         <div className="mt-4 flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Field label="Investissement (k€)" value={capex} onChange={setCapex} />
-            <Field label="Gains annuels (k€)" value={annualGains} onChange={setAnnualGains} />
-            <Field label="Coûts annuels (k€)" value={annualCosts} onChange={setAnnualCosts} />
-            <Field label="Horizon (années)" value={horizonYears} onChange={setHorizonYears} />
-            <Field label="Taux d'actualisation % (facultatif)" value={discountRatePercent} onChange={setDiscountRatePercent} />
+            <Field label="Investissement (k€)" value={capex} onChange={setCapex} placeholder="Ex : 150" />
+            <Field label="Gains annuels (k€)" value={annualGains} onChange={setAnnualGains} placeholder="Ex : 80" />
+            <Field label="Coûts annuels (k€)" value={annualCosts} onChange={setAnnualCosts} placeholder="Ex : 15" />
+            <Field label="Horizon (années)" value={horizonYears} onChange={setHorizonYears} placeholder="Ex : 3" />
+            <Field label="Taux d'actualisation % (facultatif)" value={discountRatePercent} onChange={setDiscountRatePercent} placeholder="Ex : 5" />
           </div>
 
           <button
@@ -167,7 +167,17 @@ export function BusinessCaseForm({ transformationId, trajectoryId }: { transform
   );
 }
 
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
   return (
     <label className="flex flex-col gap-1 text-xs text-muted">
       {label}
@@ -175,7 +185,8 @@ function Field({ label, value, onChange }: { label: string; value: string; onCha
         type="number"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-ink focus:border-accent focus:outline-none"
+        placeholder={placeholder}
+        className="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-muted/60 focus:border-accent focus:outline-none"
       />
     </label>
   );

@@ -35,10 +35,15 @@ function useShortlist(storageKey: string) {
   return { list, toggle };
 }
 
+// The label used to live only in a `title` tooltip — invisible on a touch
+// screen, so "9/10" next to a real company name read as an unlabeled,
+// unexplained rating of the firm itself instead of "how well this match
+// fits your need." Now always visible as text, never hover-only.
 function FitGauge({ value, label }: { value: number; label: string }) {
   const v = Math.max(0, Math.min(10, Math.round(value)));
   return (
-    <span className="flex items-center gap-1.5" title={`${label} ${v}/10`}>
+    <span className="flex items-center gap-1.5">
+      <span className="text-[10.5px] text-muted">{label}</span>
       <span className="flex gap-[2px]" aria-hidden>
         {Array.from({ length: 5 }, (_, i) => (
           <span key={i} className={`h-2.5 w-1.5 ${i < Math.round(v / 2) ? "bg-accent" : "bg-border"}`} />
@@ -204,8 +209,10 @@ function MatchCard({
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         {typeof match.fit === "number" && match.fit > 0 && <FitGauge value={match.fit} label={r.fit} />}
-        {match.source === "registry" && (
+        {match.source === "registry" ? (
           <span className="border border-success/40 px-1.5 py-0.5 text-[10.5px] font-medium text-success">{r.registrySource}</span>
+        ) : (
+          <span className="border border-border px-1.5 py-0.5 text-[10.5px] font-medium text-muted">{r.webSource}</span>
         )}
         {match.gapAddressed && (
           <span className="border border-border bg-surface-2 px-1.5 py-0.5 text-[10.5px] text-body">{match.gapAddressed}</span>

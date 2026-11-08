@@ -98,6 +98,9 @@ export function BenefitsTab({
               placeholder="0"
               className="border border-border bg-surface px-2 py-1.5 text-sm text-ink"
             />
+            {Number.isFinite(Number(expectedInput)) && expectedInput.trim() !== "" && (
+              <span className="font-mono text-[11px] text-muted">= {new Intl.NumberFormat("fr-FR").format(Number(expectedInput))}</span>
+            )}
             <span className="text-[11px]">{expectation?.source === "business_case" ? b.expectedFromBusinessCase : b.expectedManualHint}</span>
           </label>
           <button type="button" onClick={() => void saveExpected()} className="shrink-0 bg-accent px-3 py-2 text-xs font-medium text-accent-ink">

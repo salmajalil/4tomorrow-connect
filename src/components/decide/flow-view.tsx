@@ -349,6 +349,7 @@ export function FlowView({ transformationId }: { transformationId: string }) {
             onChange={(e) => setDemand(Number(e.target.value))}
             className="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-ink focus:border-accent focus:outline-none"
           />
+          {demand === 0 && <span className="text-xs text-muted">Ex : 120 pièces/jour demandées.</span>}
         </label>
 
         {validationErrors.length > 0 && (

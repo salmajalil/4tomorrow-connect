@@ -29,6 +29,11 @@ export function DecideReportDocument({
       subtitle={domainBadges(diagnostic.domains).join(" · ")}
     >
       <SectionTitle>Lecture de la situation</SectionTitle>
+      {diagnostic.maturityHighlights.map((h, i) => (
+        <NumberedItem key={i} index={i}>
+          {h}
+        </NumberedItem>
+      ))}
       <Paragraph>{diagnostic.maturityReading}</Paragraph>
 
       <SectionTitle>Gaps identifiés</SectionTitle>
@@ -80,6 +85,11 @@ export function DecideReportDocument({
           <Paragraph>{s.description}</Paragraph>
 
           <Text style={pdfStyles.h3}>Briefing exécutif</Text>
+          {s.briefingHighlights.map((h, i) => (
+            <NumberedItem key={i} index={i}>
+              {h}
+            </NumberedItem>
+          ))}
           <Paragraph>{s.executiveBriefing}</Paragraph>
 
           {s.techStack.length > 0 && (

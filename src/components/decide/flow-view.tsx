@@ -241,6 +241,49 @@ export function FlowView({ transformationId }: { transformationId: string }) {
         </div>
       )}
 
+      {/* Graphique — capacité par étape face à la demande, goulot en évidence */}
+      {result && (state === "resultat" || state === "a_revoir") && (
+        <div className={`mt-5 rounded-xl border border-border bg-surface p-4 ${state === "a_revoir" ? "opacity-60" : ""}`}>
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
+            Capacité par étape {result.current.demandCovered ? "— demande couverte" : `— goulot : ${result.current.bottleneck.name}`}
+          </p>
+          <div className="mt-3 flex flex-col gap-2.5">
+            {(() => {
+              const maxCap = Math.max(demand, ...result.simSteps.map((s) => s.capacity), 1) * 1.1;
+              return steps.map((s, i) => {
+                const sim = result.simSteps[i];
+                const isBottleneck = s.id === result.current.bottleneck.id;
+                return (
+                  <div key={s.id} className="grid grid-cols-1 gap-1 sm:grid-cols-[8rem_minmax(0,1fr)_auto] sm:items-center sm:gap-3">
+                    <span className={`truncate text-sm ${isBottleneck ? "font-semibold text-danger" : "text-body"}`}>{s.name || "(sans nom)"}</span>
+                    <div className="relative h-2.5 flex-1 overflow-hidden bg-surface-2">
+                      {sim.capacity > s.capacity && (
+                        <div className="absolute inset-y-0 left-0 h-full bg-accent/30" style={{ width: `${(sim.capacity / maxCap) * 100}%` }} />
+                      )}
+                      <div
+                        className="absolute inset-y-0 left-0 h-full"
+                        style={{ width: `${(s.capacity / maxCap) * 100}%`, background: isBottleneck ? "var(--danger)" : "var(--accent)" }}
+                        title={`Capacité : ${fmt(s.capacity)} p/j`}
+                      />
+                      <div className="absolute inset-y-0 w-px bg-ink" style={{ left: `${(demand / maxCap) * 100}%` }} title={`Demande : ${fmt(demand)} p/j`} />
+                    </div>
+                    <span className="text-right font-mono text-[11px] tabular-nums text-muted">
+                      {fmt(sim.capacity)}
+                      {sim.capacity > s.capacity && <span className="text-accent"> (+{fmt(sim.capacity - s.capacity)})</span>}
+                    </span>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted">
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5" style={{ background: "var(--danger)" }} /> Goulot actuel</span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 bg-accent/30" /> Capacité ajoutée (simulation)</span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-0.5 bg-ink" /> Demande ({fmt(demand)} p/j)</span>
+          </div>
+        </div>
+      )}
+
       {/* Données modifiables */}
       <div className="mt-6">
         <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">Étapes (traitement, attente en jours · capacité en pièces/jour)</p>

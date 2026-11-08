@@ -1,10 +1,11 @@
 "use client";
 
 import { Icon, type IconName } from "@/components/icons";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { DELIVERABLE_KINDS, DELIVERABLE_LABELS, getDeliverableInputFields, type DeliverableKind } from "@/lib/deliver";
 import { ExecutionGantt } from "@/components/deliver/execution-gantt";
 import { parseJsonResponse } from "@/lib/parse-json-response";
+import { leadingNumber, riskCellTone } from "@/lib/deliver-content-display";
 import { useLanguage } from "@/components/language-provider";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type {
@@ -61,6 +62,132 @@ function ExecutiveReportContent({
   );
 }
 
+function DeliverableKpiDashboardContentView({ content, d }: { content: DeliverableKpiDashboardContent; d: Dictionary["deliver"]["deliverables"] }) {
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {content.kpis.map((k, i) => {
+        const target = leadingNumber(k.target);
+        const current = k.current ? leadingNumber(k.current) : null;
+        const ratio = target !== null && target !== 0 && current !== null ? current / target : null;
+        return (
+          <div key={i} className="rounded-lg border border-border bg-surface-2 p-3 text-sm">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="font-semibold text-ink">{k.name}</p>
+              <span
+                className={`text-[10px] font-semibold uppercase ${
+                  k.source === "trajectory" ? "text-success" : "text-accent-strong"
+                }`}
+              >
+                {k.source === "trajectory" ? d.decideSource : d.estimateSource}
+              </span>
+            </div>
+            {ratio !== null ? (
+              <div className="mt-2">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-surface">
+                  <div
+                    className={`h-full rounded-full ${ratio >= 1 ? "bg-success" : "bg-accent"}`}
+                    style={{ width: `${Math.min(100, Math.max(0, ratio * 100))}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-muted">
+                  {d.current} {k.current} {k.unit} · {d.target} {k.target} {k.unit}
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="mt-1 text-ink">
+                  {d.target} {k.target} {k.unit}
+                </p>
+                {k.current && (
+                  <p className="text-xs text-muted">
+                    {d.current} {k.current} {k.unit}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const TONE_CLASSES: Record<"good" | "warn" | "crit", string> = {
+  good: "border-success/40 bg-success/10",
+  warn: "border-accent/40 bg-accent/10",
+  crit: "border-danger/40 bg-danger/10",
+};
+
+function DeliverableRiskMapContentView({ content, d }: { content: DeliverableRiskMapContent; d: Dictionary["deliver"]["deliverables"] }) {
+  const levels: ("high" | "medium" | "low")[] = ["high", "medium", "low"];
+  const severityLabel: Record<"low" | "medium" | "high", string> = { low: d.severityLow, medium: d.severityMedium, high: d.severityHigh };
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="overflow-x-auto">
+        <div className="grid min-w-[420px] grid-cols-[auto_1fr_1fr_1fr] gap-1.5 text-xs">
+          <div />
+          {levels.map((impact) => (
+            <div key={impact} className="text-center font-mono text-[10px] uppercase tracking-wide text-muted">
+              {severityLabel[impact]}
+            </div>
+          ))}
+          {levels.map((likelihood) => (
+            <Fragment key={likelihood}>
+              <div className="flex items-center justify-end pr-1 font-mono text-[10px] uppercase tracking-wide text-muted">
+                {severityLabel[likelihood]}
+              </div>
+              {levels.map((impact) => {
+                const cellRisks = content.risks
+                  .map((r, i) => ({ ...r, i }))
+                  .filter((r) => r.likelihood === likelihood && r.impact === impact);
+                return (
+                  <div
+                    key={`${likelihood}-${impact}`}
+                    className={`flex min-h-[3.25rem] flex-wrap items-center justify-center gap-1 rounded-lg border p-1.5 ${TONE_CLASSES[riskCellTone(likelihood, impact)]}`}
+                  >
+                    {cellRisks.map((r) => (
+                      <span
+                        key={r.i}
+                        title={r.name}
+                        className="flex h-5 w-5 items-center justify-center rounded-full bg-ink text-[10px] font-semibold text-surface"
+                      >
+                        {r.i + 1}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })}
+            </Fragment>
+          ))}
+        </div>
+        <p className="mt-1.5 flex justify-between px-1 text-[10px] font-mono uppercase tracking-wide text-muted">
+          <span>↑ {d.likelihood}</span>
+          <span>{d.impact} →</span>
+        </p>
+      </div>
+      <div className="flex flex-col gap-2">
+        {content.risks.map((r, i) => (
+          <div key={i} className={`rounded-lg border p-3 text-sm ${TONE_CLASSES[riskCellTone(r.likelihood, r.impact)]}`}>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="font-semibold text-ink">
+                <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-ink text-[10px] font-semibold text-surface">
+                  {i + 1}
+                </span>
+                {r.name}
+              </p>
+              <span className="text-xs text-muted">
+                {d.likelihood} {severityLabel[r.likelihood]} · {d.impact} {severityLabel[r.impact]}
+              </span>
+            </div>
+            <p className="mt-1 text-muted">{r.description}</p>
+            <p className="mt-1 text-xs text-ink">{d.mitigation} {r.mitigation}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // The "Transformation Roadmap" deliverable's detail view IS the co-
 // constructed execution Gantt (see execution-gantt.tsx's comment on why
 // this isn't a 4th tab). Every other kind gets a straightforward content
@@ -100,53 +227,11 @@ function DeliverableContentView({
   }
 
   if (kind === "kpi_dashboard") {
-    const content = deliverable.content as DeliverableKpiDashboardContent;
-    return (
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {content.kpis.map((k, i) => (
-          <div key={i} className="rounded-lg border border-border bg-surface-2 p-3 text-sm">
-            <div className="flex items-baseline justify-between gap-2">
-              <p className="font-semibold text-ink">{k.name}</p>
-              <span
-                className={`text-[10px] font-semibold uppercase ${
-                  k.source === "trajectory" ? "text-success" : "text-accent-strong"
-                }`}
-              >
-                {k.source === "trajectory" ? d.decideSource : d.estimateSource}
-              </span>
-            </div>
-            <p className="mt-1 text-ink">
-              {d.target} {k.target} {k.unit}
-            </p>
-            {k.current && (
-              <p className="text-xs text-muted">
-                {d.current} {k.current} {k.unit}
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
-    );
+    return <DeliverableKpiDashboardContentView content={deliverable.content as DeliverableKpiDashboardContent} d={d} />;
   }
 
   if (kind === "risk_map") {
-    const content = deliverable.content as DeliverableRiskMapContent;
-    return (
-      <div className="flex flex-col gap-2">
-        {content.risks.map((r, i) => (
-          <div key={i} className="rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="font-semibold text-ink">{r.name}</p>
-              <span className="text-xs text-muted">
-                {d.likelihood} {r.likelihood} · {d.impact} {r.impact}
-              </span>
-            </div>
-            <p className="mt-1 text-muted">{r.description}</p>
-            <p className="mt-1 text-xs text-ink">{d.mitigation} {r.mitigation}</p>
-          </div>
-        ))}
-      </div>
-    );
+    return <DeliverableRiskMapContentView content={deliverable.content as DeliverableRiskMapContent} d={d} />;
   }
 
   if (kind === "executive_report") {

@@ -511,6 +511,14 @@ export function LearnIntakeForm({
         {rankedSkillResults.length > 0 && (
           <div className="flex flex-col gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted">{skillsT.resultsTitle}</span>
+            <p className="font-display text-base text-ink">
+              {rankedSkillResults[0].gap > 0
+                ? skillsT.headline
+                    .replace("{n}", String(rankedSkillResults.filter((r) => r.gap > 0).length))
+                    .replace("{role}", rankedSkillResults[0].role)
+                    .replace("{domain}", DOMAIN_LABELS[rankedSkillResults[0].domain])
+                : skillsT.noGaps}
+            </p>
             <p className="text-[11px] text-muted">{skillsT.topGapsTitle}</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {rankedSkillResults.map((r, i) => {
@@ -558,6 +566,13 @@ export function LearnIntakeForm({
             ))}
           </div>
         </details>
+
+        {rankedSkillResults.length > 0 && (
+          <details className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs">
+            <summary className="cursor-pointer font-semibold text-accent-strong">{skillsT.howCalculatedTitle}</summary>
+            <p className="mt-2 text-muted">{skillsT.howCalculatedBody}</p>
+          </details>
+        )}
       </div>
 
       <button

@@ -91,22 +91,37 @@ export function SupplierAssessmentPanel({
       </button>
 
       {shown && (
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-[10.5px]">
-          <span
-            className={`border px-1.5 py-0.5 font-medium ${
-              shown.eligible ? "border-success/40 text-success" : "border-danger/40 text-danger"
-            }`}
-          >
-            {shown.eligible ? a.eligible : a.ineligible}
-          </span>
-          {shown.score !== null && (
-            <span className="border border-border px-1.5 py-0.5 text-muted">
-              {a.score} {shown.score}/5
+        <div className="mt-2 flex flex-col gap-1.5">
+          <div className="flex flex-wrap items-center gap-2 text-[10.5px]">
+            <span
+              className={`border px-1.5 py-0.5 font-medium ${
+                shown.eligible ? "border-success/40 text-success" : "border-danger/40 text-danger"
+              }`}
+            >
+              {shown.eligible ? a.eligible : a.ineligible}
             </span>
-          )}
-          {shown.recommended && <span className="border border-accent bg-accent/10 px-1.5 py-0.5 font-medium text-accent-strong">{a.recommended}</span>}
-          {!shown.recommended && shown.missingProofs.length > 0 && (
-            <span className="text-muted">{a.missingProofsCount.replace("{n}", String(shown.missingProofs.length))}</span>
+            {shown.score !== null && (
+              <span className="border border-border px-1.5 py-0.5 text-muted">
+                {a.score} {shown.score}/5
+              </span>
+            )}
+            {shown.recommended && <span className="border border-accent bg-accent/10 px-1.5 py-0.5 font-medium text-accent-strong">{a.recommended}</span>}
+            {!shown.recommended && shown.missingProofs.length > 0 && (
+              <span className="text-muted">{a.missingProofsCount.replace("{n}", String(shown.missingProofs.length))}</span>
+            )}
+          </div>
+          {shown.totalCriteria > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-20 overflow-hidden rounded-full bg-surface-2">
+                <div
+                  className="h-full rounded-full bg-accent"
+                  style={{ width: `${(shown.verifiedCount / shown.totalCriteria) * 100}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-muted">
+                {a.coverage} {shown.verifiedCount}/{shown.totalCriteria}
+              </span>
+            </div>
           )}
         </div>
       )}

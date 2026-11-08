@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
+import { enforceAiQuota, getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
 import {
   buildRoadmapSystemPrompt,
   buildRoadmapUserPrompt,
@@ -54,6 +54,10 @@ export async function POST(request: Request) {
       { status: 401 }
     );
   }
+
+  // Daily AI quota per user and route (see assertAiQuota, src/lib/anthropic.ts).
+  const quotaResponse = await enforceAiQuota(supabase, user.id, "decide/roadmap", language);
+  if (quotaResponse) return quotaResponse;
 
   let body: z.infer<typeof requestSchema>;
   try {

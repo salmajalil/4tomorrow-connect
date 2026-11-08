@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { MAX_DOC_LENGTH, MAX_FREE_TEXT_LENGTH } from "@/lib/input-limits";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
+import { enforceAiQuota, getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
 import {
   buildBrandThemeSystemPrompt,
   buildBrandThemeUserPrompt,
@@ -17,9 +18,9 @@ export const maxDuration = 60;
 
 const requestSchema = z
   .object({
-    siteUrl: z.string().trim().min(1).optional(),
-    docText: z.string().trim().min(1).optional(),
-    docName: z.string().trim().optional(),
+    siteUrl: z.string().trim().min(1).max(MAX_FREE_TEXT_LENGTH).optional(),
+    docText: z.string().trim().min(1).max(MAX_DOC_LENGTH).optional(),
+    docName: z.string().trim().max(MAX_FREE_TEXT_LENGTH).optional(),
   })
   .refine((v) => !!v.siteUrl || !!v.docText, { message: "siteUrl ou docText requis" });
 
@@ -36,6 +37,10 @@ export async function POST(request: Request) {
       { status: 401 }
     );
   }
+
+  // Daily AI quota per user and route (see assertAiQuota, src/lib/anthropic.ts).
+  const quotaResponse = await enforceAiQuota(supabase, user.id, "brand/analyze", language);
+  if (quotaResponse) return quotaResponse;
 
   let body: z.infer<typeof requestSchema>;
   try {

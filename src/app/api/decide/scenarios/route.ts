@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
+import { enforceAiQuota, getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
 import {
   buildScenarioSystemPrompt,
   buildScenariosUserPrompt,
@@ -15,6 +15,7 @@ import {
 import { setModuleStatus } from "@/lib/module-status";
 import { getLanguage } from "@/lib/i18n/language";
 import { streamJsonResponse } from "@/lib/streaming-json-response";
+import { sanitizeUrl } from "@/lib/url-safety";
 import type { EcosystemMember } from "@/types/database";
 
 // Headroom above MATCHING_TIMEOUT_MS (src/lib/anthropic.ts, 170s) — same
@@ -38,6 +39,10 @@ export async function POST(request: Request) {
       { status: 401 }
     );
   }
+
+  // Daily AI quota per user and route (see assertAiQuota, src/lib/anthropic.ts).
+  const quotaResponse = await enforceAiQuota(supabase, user.id, "decide/scenarios", language);
+  if (quotaResponse) return quotaResponse;
 
   let transformationId: string;
   try {
@@ -73,7 +78,13 @@ export async function POST(request: Request) {
       supabase.from("organizations").select("name, industry").eq("id", transformation.organization_id).maybeSingle(),
       supabase.from("gaps").select("name, reason").eq("transformation_id", transformationId),
       supabase.from("priorities").select("name, reason").eq("transformation_id", transformationId),
-      supabase.from("ecosystem_members").select("*").order("created_at", { ascending: false }).limit(200),
+      // Moderation gate: only manually approved entries reach the prompt.
+      supabase
+        .from("ecosystem_members")
+        .select("*")
+        .eq("status", "approved")
+        .order("created_at", { ascending: false })
+        .limit(200),
     ]);
 
     const domains = (transformation.domains as Domain[]) ?? [];
@@ -135,7 +146,7 @@ export async function POST(request: Request) {
           .filter((block): block is Anthropic.TextBlock => block.type === "text")
           .map((block) => block.text)
           .join("\n");
-        return parseScenarioOutput(rawText);
+        return sanitizeScenarioUrls(parseScenarioOutput(rawText));
       })
     );
 
@@ -254,4 +265,16 @@ export async function POST(request: Request) {
         : {}),
     };
   });
+}
+
+// Model-generated URLs become clickable hrefs in scenario-card.tsx — same
+// treatment as Connect (src/lib/matching.ts): only an absolute http(s) URL
+// survives, anything else (javascript:, data:, garbage) is dropped before it
+// is persisted or returned.
+function sanitizeScenarioUrls(scenario: ScenarioOutput): ScenarioOutput {
+  return {
+    ...scenario,
+    suppliers: scenario.suppliers.map((s) => ({ ...s, website: sanitizeUrl(s.website) ?? null })),
+    regulations: scenario.regulations.map((r) => ({ ...r, sourceUrl: sanitizeUrl(r.sourceUrl) ?? null })),
+  };
 }

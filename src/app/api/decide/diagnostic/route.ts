@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { MAX_DOC_LENGTH, MAX_FREE_TEXT_LENGTH } from "@/lib/input-limits";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
+import { enforceAiQuota, getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
 import {
   buildDiagnosticSystemPrompt,
   buildDiagnosticUserPrompt,
@@ -31,7 +32,7 @@ const capabilityEntrySchema = z.object({
   observed: z.number().int().min(CAPABILITY_LEVEL_MIN).max(CAPABILITY_LEVEL_MAX),
   target: z.number().int().min(CAPABILITY_LEVEL_MIN).max(CAPABILITY_LEVEL_MAX),
   importance: z.number().int().min(CAPABILITY_LEVEL_MIN).max(CAPABILITY_LEVEL_MAX),
-  proofNote: z.string().trim().default(""),
+  proofNote: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
 });
 
 // Keyed by domain, but kept as a plain string-keyed record (not z.enum)
@@ -42,13 +43,13 @@ const capabilityEntrySchema = z.object({
 const capabilitiesSchema = z.record(z.string(), capabilityEntrySchema).default({});
 
 const requestSchema = z.object({
-  organization: z.string().trim().default(""),
-  industry: z.string().trim().default(""),
-  challenges: z.string().trim().default(""),
-  objectives: z.string().trim().default(""),
-  constraints: z.string().trim().default(""),
-  regulations: z.string().trim().default(""),
-  uploadedDocText: z.string().trim().default(""),
+  organization: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
+  industry: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
+  challenges: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
+  objectives: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
+  constraints: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
+  regulations: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
+  uploadedDocText: z.string().trim().max(MAX_DOC_LENGTH).default(""),
   enrichWithWebSearch: z.boolean().default(false),
   capabilities: capabilitiesSchema,
 });
@@ -66,6 +67,10 @@ export async function POST(request: Request) {
       { status: 401 }
     );
   }
+
+  // Daily AI quota per user and route (see assertAiQuota, src/lib/anthropic.ts).
+  const quotaResponse = await enforceAiQuota(supabase, user.id, "decide/diagnostic", language);
+  if (quotaResponse) return quotaResponse;
 
   let body: z.infer<typeof requestSchema>;
   try {

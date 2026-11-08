@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { MAX_DOC_LENGTH } from "@/lib/input-limits";
 import { createClient } from "@/lib/supabase/server";
 import { setModuleStatus } from "@/lib/module-status";
 import { getLanguage } from "@/lib/i18n/language";
@@ -14,8 +15,8 @@ import { getLanguage } from "@/lib/i18n/language";
 // generation route feeds to the model as-is.
 export const maxDuration = 30;
 
-// Generous but bounded — a full spec document, not unlimited raw upload.
-const MAX_DOC_LENGTH = 20_000;
+// Generous but bounded — a full spec document, not unlimited raw upload
+// (MAX_DOC_LENGTH, shared in src/lib/input-limits.ts).
 
 const requestSchema = z.object({
   organization: z.string().trim().default(""),

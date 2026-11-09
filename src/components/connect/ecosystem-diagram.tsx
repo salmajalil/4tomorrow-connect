@@ -7,7 +7,7 @@ const CENTER = SIZE / 2;
 const ORBIT = 132;
 const CENTER_R = 50;
 
-// The project at the centre, the five ecosystem bricks around it. Every
+// The project at the centre, the three ecosystem bricks around it. Every
 // brick is a button: tapping one filters the players below, and the link
 // lights up — the ecosystem reads as connected, not as a list. Bricks with
 // nobody in them stay drawn (dashed) so the client sees what is missing.

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { EcosystemMember, Language } from "@/types/database";
 import { sanitizeUrl } from "@/lib/url-safety";
-import { MATCH_CATEGORIES } from "@/lib/ecosystem-bricks";
+import { CONNECT_MATCH_CATEGORIES } from "@/lib/ecosystem-bricks";
 
 function languageInstruction(language: Language): string {
   const languageName = language === "en" ? "English" : "French";
@@ -18,7 +18,9 @@ export interface MatchingInput {
 }
 
 const matchSchema = z.object({
-  category: z.enum(MATCH_CATEGORIES),
+  // "competitor_reference" = a player doing the same job as 4 Tomorrow, kept
+  // for internal market watch only (rule 4c of the system prompt).
+  category: z.enum(CONNECT_MATCH_CATEGORIES),
   name: z.string().min(1),
   reason: z.string().min(1),
   gapAddressed: z.string().min(1),
@@ -115,7 +117,8 @@ STRICT RULES:
 1. Every recommendation MUST explicitly name the gap it addresses (gapAddressed must match one of the "gaps" you output, by its "name").
 2. NEVER recommend something generic ("an AI platform", "a consulting firm"). Every match MUST be a real, specific, verifiable organization or named person.
 3. Only include a website or contactEmail when you are reasonably confident it is real (found via web_search or present in the directory above). If you cannot verify one, omit the field entirely — never invent a plausible-looking email or URL.
-4. category must be one of: "partner" (technical / integration partner), "technology" (technology provider), "startup", "supplier" (equipment, material or component supplier), "funding" (real, named grant program, subsidy scheme or investor — never a vague "funding is available"), "support" (support organisation: competitiveness cluster, regional agency, CCI, technical centre, accelerator, public support program), "expert" (named expert or specialised consultancy). Aim to cover the five ecosystem bricks — technical partners, suppliers, funding, support organisations, experts — whenever the project genuinely needs them.
+4. category must be one of: "partner" (generalist or multi-domain partner working across several poles of the project), "expert" (named expert or specialised consultancy in a field OTHER than strategic/industrial transformation consulting), "technology" (technology provider, including technical / integration partners for a specific technology), "startup", "supplier" (equipment, material or component supplier, supply chain), "funding" (real, named grant program, subsidy scheme or investor — never a vague "funding is available"), "support" (support organisation: competitiveness cluster, regional agency, CCI, technical centre, accelerator, public support program). These feed the three ecosystem bricks shown to the client — Strategy (partner, expert, funding, support: the cross-cutting view of the project's poles), Techno-Innovation (technology, startup) and Suppliers (supplier) — aim to cover all three whenever the project genuinely needs them.
+4c. COMPETITOR REFERENCES. This platform is operated by 4 Tomorrow, a strategic and industrial transformation consulting firm. When a real organization you identify does the same job as 4 Tomorrow — strategy or management consulting firms, transformation / operational-excellence / industry 4.0 consulting firms, or integrators selling end-to-end transformation programs rather than a specific technology — you MUST set its category to "competitor_reference", never "partner", "expert" or any other category. Such entries are kept for 4 Tomorrow's internal market watch only and are never shown as recommendations: do not count them toward the minimum number of matches, do not present them as the answer to a gap, and write their "reason" as a neutral, factual description of what they do (no recommendation wording). Their gapAddressed must still name the closest gap. When in doubt between "expert" and "competitor_reference" for a consultancy, choose "competitor_reference".
 4b. fit is an integer from 1 to 10: how directly this match closes its gap for THIS project (10 = obvious first call).
 5. source must be "registry" only when the match came from the KNOWN ECOSYSTEM DIRECTORY above (include its id as ecosystemMemberId); otherwise "web_search".
 6. strategicBrief is ONE synthesis paragraph (not a list) naming the specific opportunity and the recommended strategic angle for this exact project.
@@ -134,7 +137,7 @@ ${RESULT_START}
   "goodIdeas": [string, string, string],
   "matches": [
     {
-      "category": "partner" | "technology" | "startup" | "supplier" | "funding" | "support" | "expert",
+      "category": "partner" | "technology" | "startup" | "supplier" | "funding" | "support" | "expert" | "competitor_reference",
       "name": string,
       "reason": string,
       "gapAddressed": string,
@@ -148,7 +151,7 @@ ${RESULT_START}
 }
 ${RESULT_END}
 
-Produce at least 6 matches across at least 3 different categories when possible, and keep each "reason" to one or two short sentences. The ${RESULT_START}...${RESULT_END} block must be the last thing in your response, with valid JSON (no trailing commas, no comments) inside it.`;
+Produce at least 6 matches (competitor references excluded) across at least 3 different categories when possible, and keep each "reason" to one or two short sentences. The ${RESULT_START}...${RESULT_END} block must be the last thing in your response, with valid JSON (no trailing commas, no comments) inside it.`;
 }
 
 export function buildUserPrompt(input: MatchingInput): string {

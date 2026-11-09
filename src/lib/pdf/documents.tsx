@@ -239,8 +239,11 @@ function categoryLabels(language: Language): Record<MatchOutput["category"], str
     funding: r.categoryFunding,
     supplier: r.categorySupplier,
     support: r.categorySupport,
+    competitor_reference: r.categoryCompetitorReference,
   };
 }
+// "competitor_reference" is deliberately absent: players doing the same job
+// as 4 Tomorrow are internal market watch, never part of the client report.
 const CATEGORY_ORDER: MatchOutput["category"][] = ["partner", "technology", "startup", "supplier", "funding", "support", "expert"];
 
 export function ConnectReportDocument({

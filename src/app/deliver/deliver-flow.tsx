@@ -48,6 +48,7 @@ export function DeliverFlow({
   initialBenefitExpectation,
   initialBenefitItems,
   initialBenefitObservations,
+  indicatorNames,
 }: {
   transformationId: string;
   organizationId: string;
@@ -66,6 +67,7 @@ export function DeliverFlow({
   initialBenefitExpectation: BenefitExpectation | null;
   initialBenefitItems: BenefitItem[];
   initialBenefitObservations: BenefitObservation[];
+  indicatorNames: string[];
 }) {
   const { t } = useLanguage();
   const TABS = tabs(t.deliver.tabs);
@@ -160,6 +162,7 @@ export function DeliverFlow({
             onDeliverablesChange={setDeliverables}
             roadmapPhases={roadmapPhases}
             sourceDocText={sourceDocText}
+            indicatorNames={indicatorNames}
           />
         )}
 
@@ -179,6 +182,7 @@ export function DeliverFlow({
             initialExpectation={initialBenefitExpectation}
             initialItems={initialBenefitItems}
             initialObservations={initialBenefitObservations}
+            roadmapPhases={roadmapPhases}
           />
         )}
       </div>

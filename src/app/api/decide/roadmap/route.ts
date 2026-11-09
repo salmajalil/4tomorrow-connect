@@ -10,6 +10,8 @@ import {
   DecideParseError,
   type Domain,
 } from "@/lib/decide";
+import { buildInputsBlock } from "@/lib/deliver";
+import { computePhaseDates, fitDurationsToWindow, isIsoDate, weeksBetween } from "@/lib/deliver-gantt-calc";
 import { setModuleStatus } from "@/lib/module-status";
 import { getLanguage } from "@/lib/i18n/language";
 import { streamJsonResponse } from "@/lib/streaming-json-response";
@@ -39,6 +41,10 @@ const requestSchema = z.object({
   priorityCo2: z.number().min(0).max(100),
   priorityRisk: z.number().min(0).max(100),
   prioritySpeed: z.number().min(0).max(100),
+  // Guided questionnaire (optional, same fields as Livrer's roadmap
+  // deliverable — see INPUT_FIELDS.roadmap in src/lib/deliver.ts). {} keeps
+  // the original AI-from-diagnostic path exactly as it was.
+  guidedInputs: z.record(z.string(), z.string().max(2000)).default({}),
 });
 
 export async function POST(request: Request) {
@@ -86,6 +92,17 @@ export async function POST(request: Request) {
     .eq("id", trajectory.transformation_id)
     .maybeSingle();
 
+  // Target end date → whole weeks available, computed here (never by the
+  // model). Ignored when absent, invalid or not after the start date.
+  const targetEndDate = body.guidedInputs.targetEndDate?.trim() ?? "";
+  const availableWeeks = isIsoDate(targetEndDate) ? weeksBetween(body.startDate, targetEndDate) : null;
+  // The start date already has its own field on this screen; never let a
+  // stale questionnaire copy contradict it in the prompt.
+  const guidedInputsBlock = buildInputsBlock(
+    "roadmap",
+    Object.fromEntries(Object.entries(body.guidedInputs).filter(([key]) => key !== "startDate"))
+  );
+
   const anthropic = getAnthropicClient();
 
   // The slow part (the AI call, then the roadmap writes) — wrapped so the
@@ -119,6 +136,8 @@ export async function POST(request: Request) {
               priorityCo2OrEquivalent: body.priorityCo2,
               priorityRisk: body.priorityRisk,
               prioritySpeed: body.prioritySpeed,
+              guidedInputsBlock,
+              availableWeeks,
             }),
           },
         ],
@@ -152,26 +171,24 @@ export async function POST(request: Request) {
     }
 
     // Compute real calendar dates server-side (never trust the model's own
-    // date arithmetic) by accumulating each phase's duration sequentially
-    // from the chosen start date.
-    let cursor = new Date(`${body.startDate}T00:00:00Z`);
-    const phasesWithDates = result.phases.map((phase, index) => {
-      const start = new Date(cursor);
-      const end = new Date(cursor);
-      end.setUTCDate(end.getUTCDate() + phase.durationWeeks * 7);
-      cursor = new Date(end);
-      return {
-        transformation_id: trajectory.transformation_id,
-        trajectory_id: trajectory.id,
-        phase_name: phase.name,
-        start_date: start.toISOString().slice(0, 10),
-        end_date: end.toISOString().slice(0, 10),
-        deliverables: phase.deliverables,
-        actions: phase.actions,
-        kpis: phase.kpis,
-        order_index: index,
-      };
-    });
+    // date arithmetic) by chaining each phase's duration from the chosen
+    // start date. With a target end date, the durations are first scaled to
+    // fill exactly the available window (largest-remainder rounding, ≥ 1
+    // week per phase) — the model's proposal sets the proportions only.
+    const proposed = result.phases.map((p) => p.durationWeeks);
+    const durations = (availableWeeks !== null ? fitDurationsToWindow(proposed, availableWeeks) : null) ?? proposed;
+    const dates = computePhaseDates(body.startDate, durations);
+    const phasesWithDates = result.phases.map((phase, index) => ({
+      transformation_id: trajectory.transformation_id,
+      trajectory_id: trajectory.id,
+      phase_name: phase.name,
+      start_date: dates[index].start,
+      end_date: dates[index].end,
+      deliverables: phase.deliverables,
+      actions: phase.actions,
+      kpis: phase.kpis,
+      order_index: index,
+    }));
 
     // Support "Regenerate roadmap": clear this scenario's previous phases
     // first — must happen before the insert below, so stays sequential.

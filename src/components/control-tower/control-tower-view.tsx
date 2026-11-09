@@ -329,14 +329,16 @@ type RiskRowData = {
   impact: number | null;
   owner: string | null;
   treatment: string | null;
+  impacted_object: string | null;
 };
 
 // probability/impact/owner/treatment are set here by the user — never by
 // the AI, which only ever supplied name/reason (see risks table comment,
 // supabase/migrations/0012_actions_and_benefits.sql). Severity itself is
 // computed, never stored (src/lib/risk-scoring.ts).
-function RiskRow({ risk, ct }: { risk: RiskRowData; ct: Dictionary["controlTower"] }) {
+function RiskRow({ risk, ct, suggestionsId }: { risk: RiskRowData; ct: Dictionary["controlTower"]; suggestionsId: string }) {
   const [probability, setProbability] = useState(risk.probability);
+  const [impactedObject, setImpactedObject] = useState(risk.impacted_object ?? "");
   const [impact, setImpact] = useState(risk.impact);
   const [owner, setOwner] = useState(risk.owner ?? "");
   const [treatment, setTreatment] = useState(risk.treatment ?? "");
@@ -347,7 +349,13 @@ function RiskRow({ risk, ct }: { risk: RiskRowData; ct: Dictionary["controlTower
     setSaving(true);
     await createClient()
       .from("risks")
-      .update({ probability, impact, owner: owner.trim() || null, treatment: treatment.trim() || null })
+      .update({
+        probability,
+        impact,
+        owner: owner.trim() || null,
+        treatment: treatment.trim() || null,
+        impacted_object: impactedObject.trim() || null,
+      })
       .eq("id", risk.id);
     setSaving(false);
   }
@@ -360,6 +368,11 @@ function RiskRow({ risk, ct }: { risk: RiskRowData; ct: Dictionary["controlTower
         <span>
           <span className="font-medium text-ink">{risk.name}</span>
           {risk.reason && <span className="text-muted"> — {risk.reason}</span>}
+          {risk.impacted_object && (
+            <span className="mt-0.5 block text-muted">
+              {ct.impactedObjectLabel} : <span className="font-medium text-ink">{risk.impacted_object}</span>
+            </span>
+          )}
         </span>
         <span className={`shrink-0 font-mono text-xs uppercase tracking-wide ${status === "évalué" ? "text-danger" : "text-muted"}`}>
           {severity !== null ? `${ct.severityLabel} ${severity}/25` : ct.severityNotEvaluated}
@@ -404,6 +417,16 @@ function RiskRow({ risk, ct }: { risk: RiskRowData; ct: Dictionary["controlTower
           {ct.treatmentLabel}
           <input value={treatment} onChange={(e) => setTreatment(e.target.value)} className="border border-border bg-surface px-1.5 py-1 text-ink" />
         </label>
+        <label className="flex min-w-[10rem] flex-[2] flex-col gap-0.5 text-xs text-muted">
+          {ct.impactedObjectLabel}
+          <input
+            value={impactedObject}
+            onChange={(e) => setImpactedObject(e.target.value)}
+            list={suggestionsId}
+            placeholder={ct.impactedObjectPlaceholder}
+            className="border border-border bg-surface px-1.5 py-1 text-ink"
+          />
+        </label>
         <button
           type="button"
           onClick={() => void save()}
@@ -413,6 +436,78 @@ function RiskRow({ risk, ct }: { risk: RiskRowData; ct: Dictionary["controlTower
           {ct.saveLabel}
         </button>
       </div>
+    </div>
+  );
+}
+
+// AR — manual entry in the risk register (until now risks only came from
+// the AI diagnostic/scenarios). "Impacted object" is free text with
+// suggestions built from what this card already loaded: roadmap phases,
+// opportunities and actions — no extra query.
+function AddRiskForm({
+  transformationId,
+  suggestionsId,
+  ct,
+}: {
+  transformationId: string;
+  suggestionsId: string;
+  ct: Dictionary["controlTower"];
+}) {
+  const [name, setName] = useState("");
+  const [reason, setReason] = useState("");
+  const [impactedObject, setImpactedObject] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function addRisk() {
+    if (!name.trim()) return;
+    setSaving(true);
+    await createClient()
+      .from("risks")
+      .insert({
+        transformation_id: transformationId,
+        name: name.trim(),
+        reason: reason.trim() || null,
+        impacted_object: impactedObject.trim() || null,
+        module_origin: "control_tower",
+      });
+    setSaving(false);
+    setName("");
+    setReason("");
+    setImpactedObject("");
+  }
+
+  return (
+    <div className="flex flex-wrap items-end gap-2 pt-1">
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder={ct.riskNamePlaceholder}
+        aria-label={ct.riskNamePlaceholder}
+        className="min-w-[10rem] flex-[2] border border-border bg-surface px-2 py-1.5 text-xs text-ink"
+      />
+      <input
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder={ct.riskReasonPlaceholder}
+        aria-label={ct.riskReasonPlaceholder}
+        className="min-w-[10rem] flex-[2] border border-border bg-surface px-2 py-1.5 text-xs text-ink"
+      />
+      <input
+        value={impactedObject}
+        onChange={(e) => setImpactedObject(e.target.value)}
+        list={suggestionsId}
+        placeholder={ct.impactedObjectPlaceholder}
+        aria-label={ct.impactedObjectLabel}
+        className="min-w-[10rem] flex-[2] border border-border bg-surface px-2 py-1.5 text-xs text-ink"
+      />
+      <button
+        type="button"
+        onClick={() => void addRisk()}
+        disabled={saving || !name.trim()}
+        className="shrink-0 bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink disabled:opacity-50"
+      >
+        {ct.addRiskLabel}
+      </button>
     </div>
   );
 }
@@ -538,6 +633,7 @@ function ProjectCard({
   const [panel, setPanel] = useState<Panel>(null);
   const relevantRecs = project.moduleRecommendations.filter((r) => r.relevance !== "not_relevant");
   const winCount = project.opportunities.length + project.keyMetrics.length;
+  const riskSuggestionsId = `risk-objects-${project.transformationId}`;
 
   function toggle(next: Exclude<Panel, null>) {
     setPanel((p) => (p === next ? null : next));
@@ -572,7 +668,7 @@ function ProjectCard({
       <ModulePath moduleStatus={project.moduleStatus} moduleLabels={MODULE_LABELS} statusLabels={STATUS_LABELS} />
 
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" disabled={project.risks.length === 0} onClick={() => toggle("risks")} className={chip(panel === "risks", "danger")}>
+        <button type="button" onClick={() => toggle("risks")} className={chip(panel === "risks", "danger")}>
           <AlertIcon aria-hidden className="h-3.5 w-3.5" />
           <span className="tabular-nums">{project.risks.length}</span> {ct.risksLabel}
         </button>
@@ -607,10 +703,18 @@ function ProjectCard({
 
       {panel === "risks" && (
         <div className="flex flex-col gap-3 border-t border-border pt-4">
-          <RiskMatrix risks={project.risks} ct={ct} />
+          {project.risks.length > 0 ? <RiskMatrix risks={project.risks} ct={ct} /> : <p className="text-xs text-muted">{ct.noRisksYet}</p>}
           {project.risks.map((r) => (
-            <RiskRow key={r.id} risk={r} ct={ct} />
+            <RiskRow key={r.id} risk={r} ct={ct} suggestionsId={riskSuggestionsId} />
           ))}
+          <AddRiskForm transformationId={project.transformationId} suggestionsId={riskSuggestionsId} ct={ct} />
+          <datalist id={riskSuggestionsId}>
+            {[...new Set([...project.phaseNames, ...project.opportunities.map((o) => o.name), ...project.actions.map((a) => a.title)])].map(
+              (option) => (
+                <option key={option} value={option} />
+              )
+            )}
+          </datalist>
         </div>
       )}
 

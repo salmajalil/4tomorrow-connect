@@ -92,11 +92,16 @@ export async function POST(request: Request) {
     const settled = await Promise.allSettled(
       missingKinds.map(async (kind) => {
         const kindInputs = body.inputs[kind] ?? {};
-        const userPrompt = buildDeliverableUserPrompt(
-          { ...mission.context, sourceDocText: body.sourceDocText || undefined },
-          kind,
-          kindInputs
-        );
+        const userPrompt =
+          buildDeliverableUserPrompt(
+            { ...mission.context, sourceDocText: body.sourceDocText || undefined },
+            kind,
+            kindInputs
+          ) +
+          // Same phase listing as /api/deliver/generate for the roadmap kind.
+          (kind === "roadmap" && mission.phaseNames.length > 0
+            ? `\n\nPhases de la roadmap déjà choisies, dans l'ordre : ${mission.phaseNames.join(" → ")}`
+            : "");
         const createCall = () =>
           anthropic.messages.create({
             model: MATCHING_MODEL,

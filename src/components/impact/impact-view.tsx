@@ -4,6 +4,7 @@ import { CeoValidationPanel } from "@/components/impact/ceo-validation-panel";
 import { MODULE_COLORS } from "@/lib/module-colors";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { ImpactIndicator, ImpactModule, ProjectImpact } from "@/lib/project-impact";
+import { buildExecutiveSnapshot, type BriefingEvent, type ExecutiveSnapshot } from "@/lib/impact-briefing-calc";
 import type { IndicatorConfidence, Language, ModuleName } from "@/types/database";
 
 // The confidence level is a selling point, not a footnote: every figure on
@@ -71,8 +72,167 @@ function KeyIndicatorCard({ indicator, t }: { indicator: ImpactIndicator; t: Dic
   );
 }
 
+function SummaryCard({
+  title,
+  tone,
+  children,
+}: {
+  title: string;
+  tone: "success" | "danger" | "accent" | "urgent";
+  children: React.ReactNode;
+}) {
+  const border = {
+    success: "border-t-success",
+    danger: "border-t-accent",
+    accent: "border-t-accent-strong",
+    urgent: "border-t-danger",
+  }[tone];
+  return (
+    <div className={`flex min-w-0 flex-col border border-t-4 border-border bg-surface p-5 ${border}`}>
+      <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted">{title}</h2>
+      <div className="mt-3 flex flex-col gap-2 text-sm">{children}</div>
+    </div>
+  );
+}
+
+// Top block, always visible: the four short sections the founder asked for
+// — achievements, risks, opportunities, urgent hot spots. Every entry comes
+// from buildExecutiveSnapshot (src/lib/impact-briefing-calc.ts), a pure
+// function over rows already entered; nothing here is AI-written.
+function ExecutiveSummary({ snap, t, language }: { snap: ExecutiveSnapshot; t: Dictionary; language: Language }) {
+  const im = t.impact;
+  const zoneLabel = (zone: string | null) => (zone ? im.riskZones[zone as keyof typeof im.riskZones] : im.notEvaluated);
+  return (
+    <section className="mt-8" aria-labelledby="executive-summary">
+      <h2 id="executive-summary" className="sr-only">
+        {im.summaryTitle}
+      </h2>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard title={im.achievementsTitle} tone="success">
+          {snap.achievements.length === 0 ? (
+            <p className="text-muted">{im.achievementsEmpty}</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5">
+              {snap.achievements.slice(0, 5).map((a) => (
+                <li key={`${a.kind}-${a.label}-${a.date}`} className="border-l-2 border-success pl-2">
+                  <span className="text-ink">{a.label}</span>
+                  <span className="block text-xs text-muted">
+                    {a.kind === "phase" ? im.achievementPhase : im.achievementAction} · {formatDate(a.date, language)}
+                    {a.owner ? ` · ${a.owner}` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {snap.undatedDoneActions > 0 && (
+            <p className="text-xs text-muted">{im.undatedDone.replace("{n}", String(snap.undatedDoneActions))}</p>
+          )}
+        </SummaryCard>
+
+        <SummaryCard title={im.risksTitle} tone="danger">
+          {snap.risks.length === 0 ? (
+            <p className="text-muted">{snap.riskCount > 0 ? im.risksOnlyCritical : im.noRisks}</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5">
+              {snap.risks.map((r) => (
+                <li key={r.name} className="border-l-2 border-accent pl-2">
+                  <span className="text-ink">{r.name}</span>
+                  <span className="block text-xs text-muted">
+                    {r.severity !== null ? `${zoneLabel(r.zone)} · ${r.severity}/25` : im.notEvaluated}
+                    {r.impactedObject ? ` · ${im.impacts} ${r.impactedObject}` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {snap.riskCount > snap.risks.length && (
+            <p className="text-xs text-muted">{im.totalCount.replace("{n}", String(snap.riskCount))}</p>
+          )}
+        </SummaryCard>
+
+        <SummaryCard title={im.opportunitiesTitle} tone="accent">
+          {snap.opportunities.length === 0 ? (
+            <p className="text-muted">{im.opportunitiesEmpty}</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5">
+              {snap.opportunities.map((o) => (
+                <li key={o.name} className="border-l-2 border-success pl-2">
+                  <span className="text-ink">{o.name}</span>
+                  {o.reason && <span className="block line-clamp-2 text-xs text-muted">{o.reason}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+          {snap.opportunityCount > snap.opportunities.length && (
+            <p className="text-xs text-muted">{im.totalCount.replace("{n}", String(snap.opportunityCount))}</p>
+          )}
+        </SummaryCard>
+
+        <SummaryCard title={im.urgentTitle} tone="urgent">
+          {snap.hotSpots.length === 0 ? (
+            <p className="text-muted">{im.urgentEmpty}</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5">
+              {snap.hotSpots.slice(0, 6).map((h) => (
+                <li key={`${h.kind}-${h.label}`} className="border border-danger/40 bg-danger/5 p-2">
+                  <span className="font-semibold text-ink">{h.label}</span>
+                  <span className="block text-xs text-danger">
+                    {h.kind === "critical_risk"
+                      ? `${im.criticalRisk} · ${h.severity}/25${h.impactedObject ? ` · ${im.impacts} ${h.impactedObject}` : ""}`
+                      : `${im.overdueAction} · ${im.daysLate.replace("{n}", String(h.daysLate))}`}
+                    {h.owner ? ` · ${h.owner}` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SummaryCard>
+      </div>
+    </section>
+  );
+}
+
+function briefingLabel(e: BriefingEvent, t: Dictionary): string {
+  if (e.kind === "ceo_response") {
+    return t.impact.ceoValidation.outcome[e.label as keyof typeof t.impact.ceoValidation.outcome] ?? e.label;
+  }
+  return e.label;
+}
+
+// "Briefing équipe": no activity log table exists, so this list is rebuilt
+// from the dates already stored on each row (action completion, phase
+// start/end, risk/opportunity creation, CEO answer, scenario choice).
+function TeamBriefing({ events, t, language }: { events: BriefingEvent[]; t: Dictionary; language: Language }) {
+  const im = t.impact;
+  return (
+    <section className="mt-4 border border-border bg-surface p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-display text-2xl text-ink">{im.briefingTitle}</h2>
+        <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">{im.briefingHint}</span>
+      </div>
+      {events.length === 0 ? (
+        <p className="mt-3 text-sm text-muted">{im.briefingEmpty}</p>
+      ) : (
+        <ol className="mt-3 flex flex-col">
+          {events.map((e, i) => (
+            <li key={`${e.kind}-${e.label}-${e.date}-${i}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-t border-border py-2 text-sm first:border-t-0">
+              <span className="w-24 shrink-0 font-mono text-[11px] text-muted">{formatDate(e.date, language)}</span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-accent-strong">{im.briefingKinds[e.kind]}</span>
+              <span className="min-w-0 flex-1 text-ink">
+                {briefingLabel(e, t)}
+                {e.detail && <span className="text-muted"> · {e.detail}</span>}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
 export function ImpactView({ project, t, language }: { project: ProjectImpact; t: Dictionary; language: Language }) {
   const im = t.impact;
+  const snapshot = buildExecutiveSnapshot({ ...project.snapshotInput, today: new Date().toISOString().slice(0, 10) });
   const total = project.indicators.length || 1;
   const target = formatDate(project.targetDate, language);
 
@@ -138,9 +298,21 @@ export function ImpactView({ project, t, language }: { project: ProjectImpact; t
         </div>
       </section>
 
+      {/* 1. Executive summary — always visible */}
+      <ExecutiveSummary snap={snapshot} t={t} language={language} />
+
+      {/* 2. Team briefing */}
+      <TeamBriefing events={snapshot.teamBriefing} t={t} language={language} />
+
+      {/* 3. Detailed report */}
+      <div className="mt-14 flex items-center gap-3 font-mono text-xs uppercase tracking-[0.26em] text-muted">
+        <span className="h-px w-12 bg-accent" />
+        {im.detailedTitle}
+      </div>
+
       {/* Key indicators */}
       {project.keyIndicators.length > 0 && (
-        <section className="mt-12">
+        <section className="mt-6">
           <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted">{im.keyIndicators}</h2>
           <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
             {project.keyIndicators.map((indicator) => (
@@ -199,6 +371,27 @@ export function ImpactView({ project, t, language }: { project: ProjectImpact; t
         </div>
       </section>
 
+      {/* AI narrative (Livrer's Executive Report): each observation is shown
+          with the solution the prompt is required to pair with it. */}
+      {project.executiveReport && (
+        <section className="mt-4 border border-border bg-surface p-6">
+          <h3 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted">{im.recommendationsTitle}</h3>
+          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-ink">{project.executiveReport.summary}</p>
+          <ul className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
+            {project.executiveReport.keyPoints.map((k, i) => (
+              <li key={i} className="border border-border bg-surface-2 p-3 text-sm">
+                <p className="text-ink">{k.observation}</p>
+                {k.solution && (
+                  <p className="mt-1.5 border-l-2 border-success pl-2 text-ink">
+                    <span className="font-semibold text-success">{im.solutionLabel}</span> {k.solution}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {project.trajectory && <CeoValidationPanel transformationId={project.transformationId} />}
 
       {/* Journey */}
@@ -241,7 +434,7 @@ export function ImpactView({ project, t, language }: { project: ProjectImpact; t
       {/* Hot spots + next steps */}
       <section className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-5">
         <div className="border border-border bg-surface p-6 lg:col-span-2">
-          <h3 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted">{im.hotTitle}</h3>
+          <h3 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted">{im.riskRegisterTitle}</h3>
           {project.risks.length === 0 ? (
             <p className="mt-4 text-sm text-muted">{im.noRisks}</p>
           ) : (
@@ -326,6 +519,7 @@ export function ImpactView({ project, t, language }: { project: ProjectImpact; t
           <li>{im.howCalculatedConfidence}</li>
           <li>{im.howCalculatedBenefit}</li>
           <li>{im.howCalculatedModules}</li>
+          <li>{im.howCalculatedSummary}</li>
         </ul>
       </details>
     </div>

@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, TrajectoryIndicators } from "@/types/database";
 import type { Domain } from "@/lib/decide";
-import type { DeliverGenerationContext } from "@/lib/deliver";
+import { buildMeasuredDataLines, type DeliverGenerationContext } from "@/lib/deliver";
 
 // Same flattening as src/app/api/decide/roadmap/route.ts's helper — the
 // prompt just needs human-readable indicator text, not the
@@ -43,7 +43,17 @@ export async function loadMissionContext(
 
   if (!transformation || !transformation.selected_trajectory_id) return null;
 
-  const [{ data: trajectory }, { data: org }, { data: gaps }, { data: priorities }, { data: phases }] = await Promise.all([
+  const [
+    { data: trajectory },
+    { data: org },
+    { data: gaps },
+    { data: priorities },
+    { data: phases },
+    { data: capabilities },
+    { data: flow },
+    { data: benefitExpectation },
+    { data: benefitObservations },
+  ] = await Promise.all([
     supabase
       .from("trajectories")
       .select("id, name, stance, description, executive_briefing, tech_stack, indicators")
@@ -57,6 +67,13 @@ export async function loadMissionContext(
       .select("phase_name")
       .eq("trajectory_id", transformation.selected_trajectory_id)
       .order("order_index"),
+    // Figures already entered in D01 / D02 / L06 — the automatic path of
+    // every deliverable (notably the KPI dashboard) builds on them. Each is
+    // best-effort: a missing row or table just contributes nothing.
+    supabase.from("capability_assessments").select("domain, observed, target, status").eq("transformation_id", transformationId),
+    supabase.from("process_flows").select("demand, steps").eq("transformation_id", transformationId).maybeSingle(),
+    supabase.from("benefit_expectations").select("expected_annual").eq("transformation_id", transformationId).maybeSingle(),
+    supabase.from("benefit_observations").select("month, value").eq("transformation_id", transformationId),
   ]);
 
   if (!trajectory) return null;
@@ -78,6 +95,14 @@ export async function loadMissionContext(
       indicators: flattenIndicators((trajectory.indicators as TrajectoryIndicators) ?? {}),
       gaps: (gaps ?? []).map((g) => ({ name: g.name, reason: g.reason ?? "" })),
       priorities: (priorities ?? []).map((p) => ({ name: p.name, reason: p.reason ?? "" })),
+      measuredData: buildMeasuredDataLines({
+        capabilities: capabilities ?? [],
+        flow: flow ? { demand: Number(flow.demand), steps: flow.steps ?? [] } : null,
+        benefits: {
+          expectedAnnual: benefitExpectation?.expected_annual ?? null,
+          observations: (benefitObservations ?? []).map((o) => ({ month: o.month, value: Number(o.value) })),
+        },
+      }),
     },
     phaseNames: (phases ?? []).map((p) => p.phase_name),
   };

@@ -105,6 +105,7 @@ export default async function DeliverPage({
     { data: benefitExpectation },
     { data: benefitItems },
     { data: benefitObservations },
+    { data: trajectory },
   ] = await Promise.all([
     loadActor(supabase, user.id, transformation.id),
     supabase
@@ -121,6 +122,9 @@ export default async function DeliverPage({
     supabase.from("benefit_expectations").select("*").eq("transformation_id", transformation.id).maybeSingle(),
     supabase.from("benefit_items").select("*").eq("transformation_id", transformation.id).order("created_at"),
     supabase.from("benefit_observations").select("*").eq("transformation_id", transformation.id).order("month"),
+    // Only the indicator names: they drive the KPI dashboard's
+    // per-indicator questions (baseline + owner for each).
+    supabase.from("trajectories").select("indicators").eq("id", trajectoryId).maybeSingle(),
   ]);
 
   // Confiance v2 — un executive report encore « Brouillon IA » n'est
@@ -161,6 +165,7 @@ export default async function DeliverPage({
         initialBenefitExpectation={(benefitExpectation as BenefitExpectation | null) ?? null}
         initialBenefitItems={(benefitItems as BenefitItem[] | null) ?? []}
         initialBenefitObservations={(benefitObservations as BenefitObservation[] | null) ?? []}
+        indicatorNames={Object.keys(trajectory?.indicators ?? {})}
       />
     </DeliverThemeWrap>
   );

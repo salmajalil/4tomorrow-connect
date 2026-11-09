@@ -40,7 +40,10 @@ export type ControlTowerProject = {
     impact: number | null;
     owner: string | null;
     treatment: string | null;
+    impacted_object: string | null;
   }[];
+  // Roadmap phase names — suggestions for a risk's "impacted object".
+  phaseNames: string[];
   opportunities: { id: string; name: string; reason: string | null }[];
   actions: { id: string; title: string; owner: string | null; due_date: string | null; status: ActionStatus; source_module: string | null }[];
   keyMetrics: { key: string; value: string | number }[];
@@ -102,17 +105,20 @@ export async function fetchControlTowerProjects(
       .select("transformation_id, module, relevance, reason")
       .in("transformation_id", txIds),
     supabase.from("priorities").select("transformation_id, name, reason").in("transformation_id", txIds),
-    supabase
-      .from("risks")
-      .select("id, transformation_id, name, reason, probability, impact, owner, treatment")
-      .in("transformation_id", txIds),
+    // "*" so impacted_object (0027) is read when present without failing
+    // the whole control tower on a database that hasn't run it yet.
+    supabase.from("risks").select("*").in("transformation_id", txIds),
     supabase
       .from("opportunities")
       .select("id, transformation_id, name, reason")
       .in("transformation_id", txIds),
     supabase.from("trajectories").select("transformation_id, indicators").in("transformation_id", txIds),
     supabase.from("matches").select("id, transformation_id").in("transformation_id", txIds),
-    supabase.from("roadmap_phases").select("transformation_id, end_date").in("transformation_id", txIds),
+    supabase
+      .from("roadmap_phases")
+      .select("transformation_id, phase_name, end_date, order_index")
+      .in("transformation_id", txIds)
+      .order("order_index"),
     supabase
       .from("actions")
       .select("id, transformation_id, title, owner, due_date, status, source_module")
@@ -187,7 +193,19 @@ export async function fetchControlTowerProjects(
         .filter((r) => r.transformation_id === t.id)
         .map((r) => ({ module: r.module, relevance: r.relevance, reason: r.reason })),
       priorities: (priorities ?? []).filter((p) => p.transformation_id === t.id),
-      risks: (risks ?? []).filter((r) => r.transformation_id === t.id),
+      risks: (risks ?? [])
+        .filter((r) => r.transformation_id === t.id)
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          reason: r.reason,
+          probability: r.probability,
+          impact: r.impact,
+          owner: r.owner,
+          treatment: r.treatment,
+          impacted_object: r.impacted_object ?? null,
+        })),
+      phaseNames: (roadmapPhases ?? []).filter((r) => r.transformation_id === t.id).map((r) => r.phase_name),
       opportunities: (opportunities ?? []).filter((o) => o.transformation_id === t.id),
       actions: (actions ?? []).filter((a) => a.transformation_id === t.id),
       keyMetrics,

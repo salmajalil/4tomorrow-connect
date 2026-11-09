@@ -9,7 +9,7 @@ import { Icon, type IconName } from "@/components/icons";
 // always one tap away, the way native apps do it. Hidden from md upward,
 // where the top bar carries the same links, and on public pages (landing,
 // sign-in) where there is nothing to switch between yet.
-const HIDDEN_ON = ["/", "/login", "/auth", "/ecosystem/join"];
+const HIDDEN_ON = ["/", "/login", "/auth", "/ecosystem/join", "/legal", "/account"];
 
 export function MobileTabBar() {
   const pathname = usePathname() ?? "/";

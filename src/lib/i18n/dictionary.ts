@@ -123,6 +123,10 @@ const fr = {
       forgotPassword: "Mot de passe oublié ?",
       forgotPasswordNeedsEmail: "Renseigne d'abord ton email ci-dessus.",
       resetPasswordSent: "Email envoyé. Ouvre-le pour choisir un nouveau mot de passe.",
+      consentPrefix: "J'accepte les",
+      consentCgu: "CGU",
+      consentAnd: "et la",
+      consentPrivacy: "politique de confidentialité",
     },
     resetPassword: {
       title: "Nouveau mot de passe",
@@ -564,6 +568,7 @@ const fr = {
         requestMeetingSubmitting: "Envoi...",
         requestMeetingSuccess: "Demande enregistrée.",
         requestMeetingNotice: "Aucun e-mail n'est envoyé automatiquement pour l'instant — contacte directement ce partenaire en attendant.",
+        requestMeetingPrivacyNotice: "Ces informations sont transmises à 4 Tomorrow uniquement. Voir la politique de confidentialité.",
         requestMeetingError: "Impossible d'enregistrer la demande.",
         assessment: {
           evaluate: "Évaluer ce fournisseur",
@@ -1041,6 +1046,7 @@ const fr = {
       teamInviteSubmit: "Envoyer l'invitation",
       teamInviteSubmitting: "Envoi...",
       teamInviteNotice: "Aucun e-mail n'est envoyé automatiquement pour l'instant — transmets le lien du projet à la personne invitée.",
+      teamInvitePrivacyNotice: "Cet e-mail est utilisé uniquement pour gérer l'accès au projet. Voir la politique de confidentialité.",
       teamInviteSuccess: "Invitation enregistrée.",
       teamInviteError: "Impossible d'enregistrer l'invitation.",
       teamRemove: "Retirer",
@@ -1249,6 +1255,30 @@ const fr = {
         hiddenDraft: "Un brouillon existe mais n'a pas encore été relu par le consultant : il apparaîtra ici une fois revu.",
       },
     },
+    footer: {
+      mentions: "Mentions légales",
+      confidentialite: "Confidentialité",
+      cgu: "CGU",
+      account: "Mon compte",
+      rights: "4 Tomorrow Strategy",
+    },
+    account: {
+      title: "Mon compte",
+      signedInAs: "Connecté en tant que",
+      dangerZoneTitle: "Zone dangereuse",
+      deleteAccountHint:
+        "Supprime définitivement ton compte, les organisations que tu possèdes et toutes leurs données (transformations, diagnostics, livrables). Cette action est irréversible.",
+      deleteAccountButton: "Supprimer mon compte",
+      deleteAccountConfirmTitle: "Supprimer définitivement ton compte ?",
+      deleteAccountConfirmBody:
+        "Toutes les données des organisations que tu possèdes seront supprimées sans possibilité de retour. Tape SUPPRIMER pour confirmer.",
+      deleteAccountConfirmPlaceholder: "SUPPRIMER",
+      deleteAccountConfirmWord: "SUPPRIMER",
+      deleteAccountCancel: "Annuler",
+      deleteAccountSubmit: "Supprimer définitivement",
+      deleteAccountSubmitting: "Suppression en cours...",
+      deleteAccountError: "Impossible de supprimer le compte. Réessaie ou contacte le support.",
+    },
 };
 
 export type Dictionary = typeof fr;
@@ -1370,6 +1400,10 @@ const en: Dictionary = {
       forgotPassword: "Forgot your password?",
       forgotPasswordNeedsEmail: "Enter your email above first.",
       resetPasswordSent: "Email sent. Open it to choose a new password.",
+      consentPrefix: "I accept the",
+      consentCgu: "Terms of Use",
+      consentAnd: "and the",
+      consentPrivacy: "Privacy Policy",
     },
     resetPassword: {
       title: "New password",
@@ -1811,6 +1845,7 @@ const en: Dictionary = {
         requestMeetingSubmitting: "Sending...",
         requestMeetingSuccess: "Request saved.",
         requestMeetingNotice: "No email is sent automatically yet — contact this partner directly in the meantime.",
+        requestMeetingPrivacyNotice: "This information is shared with 4 Tomorrow only. See our privacy policy.",
         requestMeetingError: "Couldn't save the request.",
         assessment: {
           evaluate: "Assess this supplier",
@@ -2288,6 +2323,7 @@ const en: Dictionary = {
       teamInviteSubmit: "Send invitation",
       teamInviteSubmitting: "Sending...",
       teamInviteNotice: "No email is sent automatically yet — share the project link with the invited person yourself.",
+      teamInvitePrivacyNotice: "This email is used only to manage project access. See our privacy policy.",
       teamInviteSuccess: "Invitation saved.",
       teamInviteError: "Couldn't save the invitation.",
       teamRemove: "Remove",
@@ -2493,6 +2529,30 @@ const en: Dictionary = {
         saveError: "Could not save the review.",
         hiddenDraft: "A draft exists but hasn't been reviewed by the consultant yet: it will show up here once reviewed.",
       },
+    },
+    footer: {
+      mentions: "Legal notice",
+      confidentialite: "Privacy",
+      cgu: "Terms of Use",
+      account: "My account",
+      rights: "4 Tomorrow Strategy",
+    },
+    account: {
+      title: "My account",
+      signedInAs: "Signed in as",
+      dangerZoneTitle: "Danger zone",
+      deleteAccountHint:
+        "Permanently deletes your account, the organizations you own and all their data (transformations, diagnostics, deliverables). This cannot be undone.",
+      deleteAccountButton: "Delete my account",
+      deleteAccountConfirmTitle: "Permanently delete your account?",
+      deleteAccountConfirmBody:
+        "All data from the organizations you own will be deleted with no way back. Type DELETE to confirm.",
+      deleteAccountConfirmPlaceholder: "DELETE",
+      deleteAccountConfirmWord: "DELETE",
+      deleteAccountCancel: "Cancel",
+      deleteAccountSubmit: "Permanently delete",
+      deleteAccountSubmitting: "Deleting...",
+      deleteAccountError: "Could not delete the account. Try again or contact support.",
     },
 };
 

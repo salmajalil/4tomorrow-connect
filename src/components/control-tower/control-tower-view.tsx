@@ -311,6 +311,11 @@ function TeamPanel({
       </form>
       {error && <p className="text-xs text-danger">{error}</p>}
       <p className="text-xs text-muted">{ct.teamInviteNotice}</p>
+      <p className="text-xs text-muted">
+        <Link href="/legal/confidentialite" className="underline underline-offset-2 hover:text-ink">
+          {ct.teamInvitePrivacyNotice}
+        </Link>
+      </p>
     </div>
   );
 }

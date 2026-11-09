@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import type { ModelOutput, MatchOutput } from "@/lib/matching";
 import { EcosystemDiagram } from "@/components/connect/ecosystem-diagram";
 import { Eyebrow } from "@/components/eyebrow";
@@ -159,6 +160,9 @@ function RequestMeetingForm({
           {r.requestMeetingCancel}
         </button>
       </div>
+      <Link href="/legal/confidentialite" className="text-muted underline underline-offset-2 hover:text-ink">
+        {r.requestMeetingPrivacyNotice}
+      </Link>
     </div>
   );
 }

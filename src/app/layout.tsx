@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Instrument_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/nav";
+import { Footer } from "@/components/footer";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { LanguageProvider } from "@/components/language-provider";
 import { TomorrowChat } from "@/components/assistant/tomorrow-chat";
@@ -72,6 +73,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             <TomorrowProvider>
               <Nav />
               <main className="flex flex-1 flex-col pb-20 md:pb-0">{children}</main>
+              <Footer />
               <MobileTabBar />
               <TomorrowChat />
             </TomorrowProvider>

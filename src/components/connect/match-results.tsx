@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import type { ModelOutput, MatchOutput } from "@/lib/matching";
 import { EcosystemDiagram } from "@/components/connect/ecosystem-diagram";
 import { Eyebrow } from "@/components/eyebrow";
 import { Icon } from "@/components/icons";
 import { useLanguage } from "@/components/language-provider";
-import { BRICKS, brickOf, type BrickKey } from "@/lib/ecosystem-bricks";
+import { BRICKS, brickOf, countByBrick, splitCompetitorReferences, type BrickKey } from "@/lib/ecosystem-bricks";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import { SupplierAssessmentPanel } from "@/components/connect/supplier-assessment-panel";
 
@@ -35,16 +36,21 @@ function useShortlist(storageKey: string) {
   return { list, toggle };
 }
 
+// The label used to live only in a `title` tooltip — invisible on a touch
+// screen, so "9/10" next to a real company name read as an unlabeled,
+// unexplained rating of the firm itself instead of "how well this match
+// fits your need." Now always visible as text, never hover-only.
 function FitGauge({ value, label }: { value: number; label: string }) {
   const v = Math.max(0, Math.min(10, Math.round(value)));
   return (
-    <span className="flex items-center gap-1.5" title={`${label} ${v}/10`}>
+    <span className="flex items-center gap-1.5">
+      <span className="text-xs text-muted">{label}</span>
       <span className="flex gap-[2px]" aria-hidden>
         {Array.from({ length: 5 }, (_, i) => (
           <span key={i} className={`h-2.5 w-1.5 ${i < Math.round(v / 2) ? "bg-accent" : "bg-border"}`} />
         ))}
       </span>
-      <span className="font-mono text-[10.5px] tabular-nums text-muted">{v}/10</span>
+      <span className="font-mono text-xs tabular-nums text-muted">{v}/10</span>
     </span>
   );
 }
@@ -154,6 +160,9 @@ function RequestMeetingForm({
           {r.requestMeetingCancel}
         </button>
       </div>
+      <Link href="/legal/confidentialite" className="text-muted underline underline-offset-2 hover:text-ink">
+        {r.requestMeetingPrivacyNotice}
+      </Link>
     </div>
   );
 }
@@ -166,6 +175,7 @@ function MatchCard({
   shortlisted,
   onToggle,
   brickLabel,
+  watchOnly = false,
 }: {
   match: MatchOutput;
   matchId: string | null;
@@ -174,41 +184,59 @@ function MatchCard({
   shortlisted: boolean;
   onToggle: () => void;
   brickLabel: string;
+  // Competitor reference (internal market watch): no fit gauge, no
+  // shortlist, no meeting request — nothing that reads as a recommendation.
+  watchOnly?: boolean;
 }) {
   const r = t.connect.results;
   const [open, setOpen] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const brick = BRICKS.find((b) => b.key === brickOf(match.category));
   return (
-    <article className={`flex flex-col gap-3 border bg-surface p-4 transition ${shortlisted ? "border-accent" : "border-border"}`}>
+    <article
+      className={`flex flex-col gap-3 border p-4 transition ${
+        watchOnly ? "border-dashed border-border-strong bg-surface-2" : shortlisted ? "border-accent bg-surface" : "border-border bg-surface"
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+          <p className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.14em] text-muted">
             {brick && <Icon name={brick.icon} className="h-3 w-3" />}
             {brickLabel}
           </p>
           <h4 className="mt-1 font-display text-xl leading-tight text-ink">{match.name}</h4>
         </div>
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-pressed={shortlisted}
-          className={`flex shrink-0 items-center gap-1 border px-2.5 py-1.5 text-xs font-medium transition ${
-            shortlisted ? "border-accent bg-accent text-accent-ink" : "border-border-strong text-ink hover:border-accent"
-          }`}
-        >
-          <Icon name="check" className="h-3.5 w-3.5" />
-          {shortlisted ? r.shortlisted : r.shortlist}
-        </button>
+        {watchOnly ? (
+          <span className="shrink-0 border border-dashed border-border-strong px-2 py-1 text-xs font-medium text-muted">{r.competitorBadge}</span>
+        ) : (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-pressed={shortlisted}
+            className={`flex shrink-0 items-center gap-1 border px-2.5 py-1.5 text-xs font-medium transition ${
+              shortlisted ? "border-accent bg-accent text-accent-ink" : "border-border-strong text-ink hover:border-accent"
+            }`}
+          >
+            <Icon name="check" className="h-3.5 w-3.5" />
+            {shortlisted ? r.shortlisted : r.shortlist}
+          </button>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        {typeof match.fit === "number" && match.fit > 0 && <FitGauge value={match.fit} label={r.fit} />}
-        {match.source === "registry" && (
-          <span className="border border-success/40 px-1.5 py-0.5 text-[10.5px] font-medium text-success">{r.registrySource}</span>
+        {!watchOnly && typeof match.fit === "number" && match.fit > 0 && <FitGauge value={match.fit} label={r.fit} />}
+        {/* Provenance, always visible as text on every card (never a
+            tooltip): the 4 Tomorrow registry vs. a live web search. */}
+        {match.source === "registry" ? (
+          <span className="flex items-center gap-1 border border-success/40 px-1.5 py-0.5 text-xs font-medium text-success">
+            <Icon name="check" className="h-3 w-3" />
+            {r.registrySource}
+          </span>
+        ) : (
+          <span className="border border-border-strong px-1.5 py-0.5 text-xs font-medium text-body">{r.webSource}</span>
         )}
         {match.gapAddressed && (
-          <span className="border border-border bg-surface-2 px-1.5 py-0.5 text-[10.5px] text-body">{match.gapAddressed}</span>
+          <span className="border border-border bg-surface-2 px-1.5 py-0.5 text-xs text-body">{match.gapAddressed}</span>
         )}
       </div>
 
@@ -234,7 +262,7 @@ function MatchCard({
         </div>
       )}
 
-      {transformationId && !requesting && (
+      {!watchOnly && transformationId && !requesting && (
         <button
           type="button"
           onClick={() => setRequesting(true)}
@@ -255,7 +283,7 @@ function MatchCard({
 
       {/* C02 — pertinence fournisseur : seulement pour les matches "supplier",
           c'est le périmètre exact de la règle métier du brief. */}
-      {match.category === "supplier" && <SupplierAssessmentPanel matchId={matchId} transformationId={transformationId} />}
+      {!watchOnly && match.category === "supplier" && <SupplierAssessmentPanel matchId={matchId} transformationId={transformationId} />}
     </article>
   );
 }
@@ -266,6 +294,7 @@ export function MatchResults({
   transformationId = null,
   projectLabel,
   storageKey = "connect-shortlist",
+  canSeeCompetitors = true,
 }: {
   result: ModelOutput;
   // C02 — DB id of each match, same order as result.matches (see
@@ -275,6 +304,13 @@ export function MatchResults({
   transformationId?: string | null;
   projectLabel?: string;
   storageKey?: string;
+  // Veille concurrentielle interne : réservée au propriétaire et au
+  // consultant (modifie tout / porte la stratégie) — pas au client (son
+  // usine) ni à l'expert (son domaine), qui n'ont pas besoin de voir les
+  // concurrents directs de 4 Tomorrow. Par défaut true (session fraîche,
+  // hors transformation partagée : l'utilisateur qui lance le matching est
+  // toujours propriétaire ou consultant).
+  canSeeCompetitors?: boolean;
 }) {
   const { t } = useLanguage();
   const r = t.connect.results;
@@ -282,17 +318,16 @@ export function MatchResults({
   const [briefOpen, setBriefOpen] = useState(false);
   const { list: shortlist, toggle } = useShortlist(storageKey);
 
-  const counts = useMemo(() => {
-    const c = Object.fromEntries(BRICKS.map((b) => [b.key, 0])) as Record<BrickKey, number>;
-    for (const m of result.matches) c[brickOf(m.category)] += 1;
-    return c;
-  }, [result.matches]);
+  // Competitor references (same job as 4 Tomorrow) never count in a brick
+  // nor appear among the recommendations — see their own section below.
+  const counts = useMemo(() => countByBrick(result.matches), [result.matches]);
   const covered = BRICKS.filter((b) => counts[b.key] > 0).length;
 
   // Carry each match's DB id along through sort/filter so the assessment
   // panel still knows which row to save against after reordering.
-  const withIds = result.matches.map((m, i) => ({ match: m, matchId: matchIds?.[i] ?? null }));
-  const sorted = [...withIds].sort((a, b) => (b.match.fit ?? 0) - (a.match.fit ?? 0));
+  const withIds = result.matches.map((m, i) => ({ match: m, matchId: matchIds?.[i] ?? null, category: m.category }));
+  const { recommendations, competitors } = splitCompetitorReferences(withIds);
+  const sorted = [...recommendations].sort((a, b) => (b.match.fit ?? 0) - (a.match.fit ?? 0));
   const visible =
     active === "shortlist"
       ? sorted.filter((x) => shortlist.includes(x.match.name))
@@ -326,7 +361,7 @@ export function MatchResults({
           <Eyebrow>{r.yourEcosystem}</Eyebrow>
           <p className="flex items-baseline gap-4 text-xs text-muted">
             <span>
-              <span className="font-display text-2xl text-ink tabular-nums">{result.matches.length}</span> {r.actorsFound}
+              <span className="font-display text-2xl text-ink tabular-nums">{recommendations.length}</span> {r.actorsFound}
             </span>
             <span>
               <span className="font-display text-2xl text-ink tabular-nums">{covered}</span> {r.bricksCovered}
@@ -379,7 +414,7 @@ export function MatchResults({
             onClick={() => setActive(null)}
             className={`border px-3 py-1.5 text-xs font-medium ${active === null ? "border-accent bg-accent/15 text-accent-strong" : "border-border text-muted hover:text-ink"}`}
           >
-            {r.allBricks} · {result.matches.length}
+            {r.allBricks} · {recommendations.length}
           </button>
           {BRICKS.filter((b) => counts[b.key] > 0).map((b) => (
             <button
@@ -418,12 +453,41 @@ export function MatchResults({
                 t={t}
                 shortlisted={shortlist.includes(m.name)}
                 onToggle={() => toggle(m.name)}
-                brickLabel={r.bricks[brickOf(m.category)]}
+                brickLabel={r.bricks[brickOf(m.category) ?? "strategy"]}
               />
             ))}
           </div>
         )}
       </section>
+
+      {/* Same-sector players (category "competitor_reference"): kept for the
+          firm's internal market watch, in their own dashed section, never
+          mixed into the recommendations above, the bricks or the counts. */}
+      {competitors.length > 0 && canSeeCompetitors && (
+        <section aria-labelledby="connect-competitors-title" className="flex flex-col gap-3 border border-dashed border-border-strong p-4">
+          <div>
+            <h3 id="connect-competitors-title" className="text-sm font-semibold text-ink">
+              {r.competitorsTitle}
+            </h3>
+            <p className="mt-1 text-xs text-muted">{r.competitorsHint}</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {competitors.map(({ match: m, matchId }, i) => (
+              <MatchCard
+                key={`competitor-${m.name}-${i}`}
+                match={m}
+                matchId={matchId}
+                transformationId={transformationId}
+                t={t}
+                shortlisted={false}
+                onToggle={() => {}}
+                brickLabel={r.categoryCompetitorReference}
+                watchOnly
+              />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

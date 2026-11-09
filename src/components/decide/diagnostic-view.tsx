@@ -4,6 +4,7 @@ import { Icon } from "@/components/icons";
 import { useState } from "react";
 import Link from "next/link";
 import { Eyebrow } from "@/components/eyebrow";
+import { ComputedBadge } from "@/components/computed-badge";
 import { createClient } from "@/lib/supabase/client";
 import { DOMAIN_LABELS, DOMAIN_ICONS, type Domain } from "@/lib/decide";
 import type { CapabilityGapResult } from "@/lib/decide-diagnostic-calc";
@@ -153,12 +154,15 @@ export function DiagnosticView({
           ))}
         </div>
         {topCapability ? (
-          <p className="mt-4 font-display text-2xl text-ink">
-            <span className="text-accent">{gapsToClose.length}</span> {diagnostic.headlineGapsSuffix}{" "}
-            <span className="text-muted">
-              — {diagnostic.headlineTopCapability} {DOMAIN_LABELS[topCapability.domain]}
-            </span>
-          </p>
+          <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <p className="font-display text-2xl text-ink">
+              <span className="text-accent">{gapsToClose.length}</span> {diagnostic.headlineGapsSuffix}{" "}
+              <span className="text-muted">
+                — {diagnostic.headlineTopCapability} {DOMAIN_LABELS[topCapability.domain]}
+              </span>
+            </p>
+            <ComputedBadge />
+          </div>
         ) : topPriority ? (
           <p className="mt-4 font-display text-2xl text-ink">
             {diagnostic.headlineTopPriority} <span className="text-accent">{topPriority.name}</span>
@@ -329,17 +333,21 @@ export function DiagnosticView({
                         {c.status === "vérifié" ? diagnostic.capabilityStatusVerified : diagnostic.capabilityStatusUnverified}
                       </span>
                     </div>
+                    {/* Saisie (observé / cible / importance) d'un côté, résultat
+                        calculé (écart / priorité, decide-diagnostic-calc.ts) de
+                        l'autre, sur fond distinct et marqué « Calculé ». */}
                     <p className="mt-1.5 text-xs text-muted">
                       {diagnostic.capabilityObserved} {c.observed}/5 · {diagnostic.capabilityTarget} {c.target}/5 ·{" "}
                       {diagnostic.capabilityImportance} {c.importance}/5
                     </p>
-                    <div className="mt-2 flex items-center gap-4 text-xs">
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md bg-surface-2/60 px-2 py-1.5 text-xs">
                       <span className="text-ink">
                         {diagnostic.capabilityGap} : <span className="font-semibold text-accent">{c.gap}</span>
                       </span>
                       <span className="text-ink">
                         {diagnostic.capabilityPriority} : <span className="font-semibold text-accent">{c.priority}</span>
                       </span>
+                      <ComputedBadge className="ml-auto" />
                     </div>
                     {c.proofNote && <p className="mt-1.5 text-muted">{c.proofNote}</p>}
                   </li>

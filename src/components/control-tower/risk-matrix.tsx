@@ -35,9 +35,23 @@ const IMPACT_COLS = [1, 2, 3, 4, 5];
 // jusqu'à ~340px de large sans défilement horizontal.
 export function RiskMatrix({ risks, ct }: { risks: MatrixRisk[]; ct: Dictionary["controlTower"] }) {
   const evaluated = risks.filter((r) => r.probability !== null && r.impact !== null);
+  // Les risques sans probabilité ou impact ne peuvent pas être placés sur la
+  // grille — on le dit au lieu de les exclure en silence.
+  const unevaluatedCount = risks.length - evaluated.length;
+  const unevaluatedNote =
+    unevaluatedCount > 0 ? (
+      <p role="status" className="text-xs font-medium text-danger">
+        {ct.riskUnevaluated.replace("{n}", String(unevaluatedCount))}
+      </p>
+    ) : null;
 
   if (evaluated.length === 0) {
-    return <p className="border border-dashed border-border bg-surface-2 px-3 py-4 text-center text-xs text-muted">{ct.riskMatrixEmpty}</p>;
+    return (
+      <div className="flex flex-col gap-1.5">
+        <p className="border border-dashed border-border bg-surface-2 px-3 py-4 text-center text-xs text-muted">{ct.riskMatrixEmpty}</p>
+        {unevaluatedNote}
+      </div>
+    );
   }
 
   const byCell = new Map<string, MatrixRisk[]>();
@@ -51,6 +65,7 @@ export function RiskMatrix({ risks, ct }: { risks: MatrixRisk[]; ct: Dictionary[
       <p className="font-mono text-[9.5px] uppercase tracking-wide text-muted">
         {ct.probabilityLabel} ↕ · {ct.impactLabel} ↔
       </p>
+      {unevaluatedNote}
       <div className="grid grid-cols-[20px_repeat(5,1fr)] gap-1">
         {PROBABILITY_ROWS.map((p) => (
           <Fragment key={p}>

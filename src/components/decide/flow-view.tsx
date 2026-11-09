@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Eyebrow } from "@/components/eyebrow";
+import { ComputedBadge } from "@/components/computed-badge";
 import { createClient } from "@/lib/supabase/client";
 import { parseJsonResponse } from "@/lib/parse-json-response";
 import {
@@ -349,6 +350,7 @@ export function FlowView({ transformationId }: { transformationId: string }) {
             onChange={(e) => setDemand(Number(e.target.value))}
             className="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-ink focus:border-accent focus:outline-none"
           />
+          {demand === 0 && <span className="text-xs text-muted">Ex : 120 pièces/jour demandées.</span>}
         </label>
 
         {validationErrors.length > 0 && (
@@ -454,10 +456,15 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
   );
 }
 
+// Résultat de computeFlow (decide-flow-calc.ts) — jamais saisi, marqué
+// « Calculé » pour le distinguer des champs de saisie des étapes/leviers.
 function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className="rounded-lg border border-border p-3">
-      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{label}</p>
+    <div className="rounded-lg border border-border bg-surface-2/40 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{label}</p>
+        <ComputedBadge />
+      </div>
       <p className={`mt-1 font-display text-xl tabular-nums ${accent ? "text-danger" : "text-ink"}`}>{value}</p>
     </div>
   );

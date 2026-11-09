@@ -22,3 +22,16 @@ export function riskCellTone(likelihood: Severity, impact: Severity): "good" | "
   if (score >= 3) return "warn";
   return "good";
 }
+
+/**
+ * Executive report key point → {observation, solution}. New rows always
+ * carry both (schema in src/lib/deliver.ts); rows generated before the
+ * pairing rule stored a plain string, shown as-is with no solution rather
+ * than a solution made up after the fact.
+ */
+export function normalizeKeyPoint(
+  point: { observation: string; solution: string } | string
+): { observation: string; solution: string | null } {
+  if (typeof point === "string") return { observation: point, solution: null };
+  return { observation: point.observation, solution: point.solution.trim() ? point.solution : null };
+}

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getLanguage } from "@/lib/i18n/language";
 import { canPerform } from "@/lib/transformation-roles";
+import { loadActor } from "@/lib/transformation-actor";
 import type { ModuleName } from "@/types/database";
 
 const inviteSchema = z
@@ -16,6 +17,8 @@ const inviteSchema = z
     message: "Un expert doit avoir un domaine.",
     path: ["domain"],
   });
+
+const memberIdSchema = z.string().uuid();
 
 // No email is actually sent here — there is no mailer configured anywhere
 // in this codebase (src/lib/anthropic.ts is the only outbound integration).
@@ -40,12 +43,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
 
-  // Only the owner can reach this today (control-tower only lists the
-  // caller's own projects — see src/lib/control-tower.ts), so ownership is
-  // implicit; canPerform is still called explicitly so the rule lives in
-  // one place and this route fails the same way any future caller would.
-  const allowed = canPerform({ role: "consultant", isOwner: true }, "manage_members");
-  if (!allowed) {
+  // The caller's real role on this project (owner, or accepted member) —
+  // the control tower now also lists projects the caller was invited to, so
+  // ownership can no longer be assumed. RLS stays the safety net under this.
+  const actor = await loadActor(supabase, user.id, body.transformationId);
+  if (!actor || !canPerform(actor, "manage_members")) {
     return NextResponse.json({ error: language === "en" ? "Not allowed." : "Non autorisé." }, { status: 403 });
   }
 
@@ -90,14 +92,32 @@ export async function DELETE(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const memberId = searchParams.get("id");
-  if (!memberId) {
+  const parsedId = memberIdSchema.safeParse(searchParams.get("id"));
+  if (!parsedId.success) {
     return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
+  const memberId = parsedId.data;
+  const notFound = () =>
+    NextResponse.json({ error: language === "en" ? "Member not found." : "Membre introuvable." }, { status: 404 });
 
-  const { error } = await supabase.from("transformation_members").delete().eq("id", memberId);
+  const { data: memberRow } = await supabase
+    .from("transformation_members")
+    .select("transformation_id")
+    .eq("id", memberId)
+    .maybeSingle();
+  if (!memberRow) return notFound();
+
+  const actor = await loadActor(supabase, user.id, memberRow.transformation_id);
+  if (!actor || !canPerform(actor, "manage_members")) {
+    return NextResponse.json({ error: language === "en" ? "Not allowed." : "Non autorisé." }, { status: 403 });
+  }
+
+  // .select() so a delete RLS silently filtered out (0 rows) is reported as
+  // such instead of a false { ok: true }.
+  const { data: deleted, error } = await supabase.from("transformation_members").delete().eq("id", memberId).select("id");
   if (error) {
     return NextResponse.json({ error: language === "en" ? "Couldn't remove this member." : "Impossible de retirer ce membre." }, { status: 500 });
   }
+  if (!deleted || deleted.length === 0) return notFound();
   return NextResponse.json({ ok: true });
 }

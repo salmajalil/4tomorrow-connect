@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import mammoth from "mammoth";
 import { createClient } from "@/lib/supabase/server";
 import { getLanguage } from "@/lib/i18n/language";
+import { MAX_UPLOAD_BYTES } from "@/lib/input-limits";
 
 // .docx only — mammoth extracts reliably from it. We deliberately don't
 // claim PDF support: PDF text extraction is unreliable without a much
@@ -26,6 +27,12 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: language === "en" ? "No file received." : "Aucun fichier reçu." },
       { status: 400 }
+    );
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return NextResponse.json(
+      { error: language === "en" ? "File too large." : "Fichier trop volumineux." },
+      { status: 413 }
     );
   }
   if (!file.name.toLowerCase().endsWith(".docx")) {

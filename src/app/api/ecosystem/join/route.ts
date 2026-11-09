@@ -4,11 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getLanguage } from "@/lib/i18n/language";
 
 const joinSchema = z.object({
-  name: z.string().trim().min(1, "Le nom est requis."),
-  type: z.string().trim().min(1, "Le type est requis."),
-  website: z.string().trim().optional(),
-  description: z.string().trim().optional(),
-  contact: z.string().trim().optional(),
+  name: z.string().trim().min(1, "Le nom est requis.").max(200),
+  type: z.string().trim().min(1, "Le type est requis.").max(200),
+  website: z.string().trim().max(500).optional(),
+  description: z.string().trim().max(500).optional(),
+  contact: z.string().trim().max(500).optional(),
 });
 
 export async function POST(request: Request) {
@@ -32,9 +32,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
 
-  // No manual validation step by design — this insert is what feeds the
-  // "living directory" re-injected into every future matching run (see
-  // src/lib/matching.ts).
+  // Moderated: the row is created with status 'pending' (DB default, and
+  // the only value RLS accepts on insert — see
+  // 0024_ecosystem_members_moderation.sql). It only reaches the shared
+  // "living directory" re-injected into every user's prompts (match,
+  // decide/scenarios) once manually marked 'approved'.
   const { data, error } = await supabase
     .from("ecosystem_members")
     .insert({

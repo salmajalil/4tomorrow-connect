@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { fetchControlTowerProjects, MODULE_ORDER, type ControlTowerProject } from "@/lib/control-tower";
+import {
+  fetchControlTowerProjects,
+  fetchPendingInvitationCount,
+  MODULE_ORDER,
+  type ControlTowerProject,
+} from "@/lib/control-tower";
 import { Eyebrow } from "@/components/eyebrow";
 import { ExportPdfButton } from "@/components/export-pdf-button";
 import { DOMAIN_LABELS, type Domain } from "@/lib/decide";
@@ -32,7 +37,7 @@ function moduleHref(module: ModuleName, transformationId: string): string | null
 function LivePulse({ lastSync, t }: { lastSync: Date | null; t: Dictionary }) {
   const language = useLanguage().language;
   return (
-    <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-live">
+    <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-live">
       <span className="relative flex h-2 w-2">
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-live opacity-60" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-live" />
@@ -47,7 +52,7 @@ function LivePulse({ lastSync, t }: { lastSync: Date | null; t: Dictionary }) {
 function StatTile({ label, value, tone }: { label: string; value: number | string; tone?: "danger" | "live" | "accent" }) {
   return (
     <div className="flex flex-col gap-1 border border-border bg-surface p-4">
-      <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-muted">{label}</span>
+      <span className="font-mono text-xs uppercase tracking-[0.16em] text-muted">{label}</span>
       <span
         className={`font-display text-4xl leading-none tabular-nums ${
           tone === "danger" ? "text-danger" : tone === "live" ? "text-live" : tone === "accent" ? "text-accent-strong" : "text-ink"
@@ -115,7 +120,7 @@ function ModulePath({
                 background: st === "done" ? color : st === "in_progress" ? `color-mix(in srgb, ${color} 45%, transparent)` : "var(--border)",
               }}
             />
-            <span className={`flex items-center gap-1 text-[10.5px] ${st === "not_started" ? "text-muted" : "text-body"}`}>
+            <span className={`flex items-center gap-1 text-xs ${st === "not_started" ? "text-muted" : "text-body"}`}>
               <Icon name={m} className="h-3 w-3 shrink-0" style={{ color: st === "not_started" ? undefined : color }} />
               <span className="truncate">{moduleLabels[m]}</span>
             </span>
@@ -256,7 +261,7 @@ function TeamPanel({
 
       <form onSubmit={submitInvite} className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
         <div className="flex min-w-[180px] flex-1 flex-col gap-1">
-          <label className="text-[11px] text-muted">{ct.teamInvite}</label>
+          <label className="text-xs text-muted">{ct.teamInvite}</label>
           <input
             type="email"
             required
@@ -267,7 +272,7 @@ function TeamPanel({
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-[11px] text-muted">{ct.teamInviteRoleLabel}</label>
+          <label className="text-xs text-muted">{ct.teamInviteRoleLabel}</label>
           <select
             value={role}
             onChange={(e) => setRole(e.target.value as TransformationMemberRole)}
@@ -282,7 +287,7 @@ function TeamPanel({
         </div>
         {role === "expert" && (
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] text-muted">{ct.teamInviteDomainLabel}</label>
+            <label className="text-xs text-muted">{ct.teamInviteDomainLabel}</label>
             <select
               value={domain}
               onChange={(e) => setDomain(e.target.value as ModuleName)}
@@ -305,7 +310,12 @@ function TeamPanel({
         </button>
       </form>
       {error && <p className="text-xs text-danger">{error}</p>}
-      <p className="text-[11px] text-muted">{ct.teamInviteNotice}</p>
+      <p className="text-xs text-muted">{ct.teamInviteNotice}</p>
+      <p className="text-xs text-muted">
+        <Link href="/legal/confidentialite" className="underline underline-offset-2 hover:text-ink">
+          {ct.teamInvitePrivacyNotice}
+        </Link>
+      </p>
     </div>
   );
 }
@@ -324,14 +334,16 @@ type RiskRowData = {
   impact: number | null;
   owner: string | null;
   treatment: string | null;
+  impacted_object: string | null;
 };
 
 // probability/impact/owner/treatment are set here by the user — never by
 // the AI, which only ever supplied name/reason (see risks table comment,
 // supabase/migrations/0012_actions_and_benefits.sql). Severity itself is
 // computed, never stored (src/lib/risk-scoring.ts).
-function RiskRow({ risk, ct }: { risk: RiskRowData; ct: Dictionary["controlTower"] }) {
+function RiskRow({ risk, ct, suggestionsId }: { risk: RiskRowData; ct: Dictionary["controlTower"]; suggestionsId: string }) {
   const [probability, setProbability] = useState(risk.probability);
+  const [impactedObject, setImpactedObject] = useState(risk.impacted_object ?? "");
   const [impact, setImpact] = useState(risk.impact);
   const [owner, setOwner] = useState(risk.owner ?? "");
   const [treatment, setTreatment] = useState(risk.treatment ?? "");
@@ -342,7 +354,13 @@ function RiskRow({ risk, ct }: { risk: RiskRowData; ct: Dictionary["controlTower
     setSaving(true);
     await createClient()
       .from("risks")
-      .update({ probability, impact, owner: owner.trim() || null, treatment: treatment.trim() || null })
+      .update({
+        probability,
+        impact,
+        owner: owner.trim() || null,
+        treatment: treatment.trim() || null,
+        impacted_object: impactedObject.trim() || null,
+      })
       .eq("id", risk.id);
     setSaving(false);
   }
@@ -355,13 +373,18 @@ function RiskRow({ risk, ct }: { risk: RiskRowData; ct: Dictionary["controlTower
         <span>
           <span className="font-medium text-ink">{risk.name}</span>
           {risk.reason && <span className="text-muted"> — {risk.reason}</span>}
+          {risk.impacted_object && (
+            <span className="mt-0.5 block text-muted">
+              {ct.impactedObjectLabel} : <span className="font-medium text-ink">{risk.impacted_object}</span>
+            </span>
+          )}
         </span>
-        <span className={`shrink-0 font-mono text-[10px] uppercase tracking-wide ${status === "évalué" ? "text-danger" : "text-muted"}`}>
+        <span className={`shrink-0 font-mono text-xs uppercase tracking-wide ${status === "évalué" ? "text-danger" : "text-muted"}`}>
           {severity !== null ? `${ct.severityLabel} ${severity}/25` : ct.severityNotEvaluated}
         </span>
       </div>
       <div className="mt-2 flex flex-wrap items-end gap-2">
-        <label className="flex flex-col gap-0.5 text-[10px] text-muted">
+        <label className="flex flex-col gap-0.5 text-xs text-muted">
           {ct.probabilityLabel}
           <select
             value={probability ?? ""}
@@ -376,7 +399,7 @@ function RiskRow({ risk, ct }: { risk: RiskRowData; ct: Dictionary["controlTower
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-0.5 text-[10px] text-muted">
+        <label className="flex flex-col gap-0.5 text-xs text-muted">
           {ct.impactLabel}
           <select
             value={impact ?? ""}
@@ -391,23 +414,105 @@ function RiskRow({ risk, ct }: { risk: RiskRowData; ct: Dictionary["controlTower
             ))}
           </select>
         </label>
-        <label className="flex min-w-[8rem] flex-1 flex-col gap-0.5 text-[10px] text-muted">
+        <label className="flex min-w-[8rem] flex-1 flex-col gap-0.5 text-xs text-muted">
           {ct.ownerLabel}
           <input value={owner} onChange={(e) => setOwner(e.target.value)} className="border border-border bg-surface px-1.5 py-1 text-ink" />
         </label>
-        <label className="flex min-w-[10rem] flex-[2] flex-col gap-0.5 text-[10px] text-muted">
+        <label className="flex min-w-[10rem] flex-[2] flex-col gap-0.5 text-xs text-muted">
           {ct.treatmentLabel}
           <input value={treatment} onChange={(e) => setTreatment(e.target.value)} className="border border-border bg-surface px-1.5 py-1 text-ink" />
+        </label>
+        <label className="flex min-w-[10rem] flex-[2] flex-col gap-0.5 text-xs text-muted">
+          {ct.impactedObjectLabel}
+          <input
+            value={impactedObject}
+            onChange={(e) => setImpactedObject(e.target.value)}
+            list={suggestionsId}
+            placeholder={ct.impactedObjectPlaceholder}
+            className="border border-border bg-surface px-1.5 py-1 text-ink"
+          />
         </label>
         <button
           type="button"
           onClick={() => void save()}
           disabled={saving}
-          className="shrink-0 bg-accent px-2.5 py-1.5 text-[10px] font-medium text-accent-ink disabled:opacity-50"
+          className="shrink-0 bg-accent px-2.5 py-1.5 text-xs font-medium text-accent-ink disabled:opacity-50"
         >
           {ct.saveLabel}
         </button>
       </div>
+    </div>
+  );
+}
+
+// AR — manual entry in the risk register (until now risks only came from
+// the AI diagnostic/scenarios). "Impacted object" is free text with
+// suggestions built from what this card already loaded: roadmap phases,
+// opportunities and actions — no extra query.
+function AddRiskForm({
+  transformationId,
+  suggestionsId,
+  ct,
+}: {
+  transformationId: string;
+  suggestionsId: string;
+  ct: Dictionary["controlTower"];
+}) {
+  const [name, setName] = useState("");
+  const [reason, setReason] = useState("");
+  const [impactedObject, setImpactedObject] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function addRisk() {
+    if (!name.trim()) return;
+    setSaving(true);
+    await createClient()
+      .from("risks")
+      .insert({
+        transformation_id: transformationId,
+        name: name.trim(),
+        reason: reason.trim() || null,
+        impacted_object: impactedObject.trim() || null,
+        module_origin: "control_tower",
+      });
+    setSaving(false);
+    setName("");
+    setReason("");
+    setImpactedObject("");
+  }
+
+  return (
+    <div className="flex flex-wrap items-end gap-2 pt-1">
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder={ct.riskNamePlaceholder}
+        aria-label={ct.riskNamePlaceholder}
+        className="min-w-[10rem] flex-[2] border border-border bg-surface px-2 py-1.5 text-xs text-ink"
+      />
+      <input
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder={ct.riskReasonPlaceholder}
+        aria-label={ct.riskReasonPlaceholder}
+        className="min-w-[10rem] flex-[2] border border-border bg-surface px-2 py-1.5 text-xs text-ink"
+      />
+      <input
+        value={impactedObject}
+        onChange={(e) => setImpactedObject(e.target.value)}
+        list={suggestionsId}
+        placeholder={ct.impactedObjectPlaceholder}
+        aria-label={ct.impactedObjectLabel}
+        className="min-w-[10rem] flex-[2] border border-border bg-surface px-2 py-1.5 text-xs text-ink"
+      />
+      <button
+        type="button"
+        onClick={() => void addRisk()}
+        disabled={saving || !name.trim()}
+        className="shrink-0 bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink disabled:opacity-50"
+      >
+        {ct.addRiskLabel}
+      </button>
     </div>
   );
 }
@@ -463,7 +568,7 @@ function ActionsPanel({
             <button
               type="button"
               onClick={() => void createClient().from("actions").update({ status: ACTION_STATUS_CYCLE[a.status] }).eq("id", a.id)}
-              className="border border-border px-2 py-1 font-mono text-[10px] uppercase tracking-wide text-ink hover:border-accent"
+              className="border border-border px-2 py-1 font-mono text-xs uppercase tracking-wide text-ink hover:border-accent"
             >
               {STATUS_LABELS[a.status]}
             </button>
@@ -533,6 +638,7 @@ function ProjectCard({
   const [panel, setPanel] = useState<Panel>(null);
   const relevantRecs = project.moduleRecommendations.filter((r) => r.relevance !== "not_relevant");
   const winCount = project.opportunities.length + project.keyMetrics.length;
+  const riskSuggestionsId = `risk-objects-${project.transformationId}`;
 
   function toggle(next: Exclude<Panel, null>) {
     setPanel((p) => (p === next ? null : next));
@@ -554,7 +660,7 @@ function ProjectCard({
           <div className="flex items-center gap-2">
             <h3 className="truncate font-display text-xl leading-tight text-ink">{shortName(project, t)}</h3>
             {project.archived && (
-              <span className="shrink-0 border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+              <span className="shrink-0 border border-border px-1.5 py-0.5 font-mono text-xs uppercase tracking-[0.12em] text-muted">
                 {ct.archivedBadge}
               </span>
             )}
@@ -567,7 +673,7 @@ function ProjectCard({
       <ModulePath moduleStatus={project.moduleStatus} moduleLabels={MODULE_LABELS} statusLabels={STATUS_LABELS} />
 
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" disabled={project.risks.length === 0} onClick={() => toggle("risks")} className={chip(panel === "risks", "danger")}>
+        <button type="button" onClick={() => toggle("risks")} className={chip(panel === "risks", "danger")}>
           <AlertIcon aria-hidden className="h-3.5 w-3.5" />
           <span className="tabular-nums">{project.risks.length}</span> {ct.risksLabel}
         </button>
@@ -602,10 +708,18 @@ function ProjectCard({
 
       {panel === "risks" && (
         <div className="flex flex-col gap-3 border-t border-border pt-4">
-          <RiskMatrix risks={project.risks} ct={ct} />
+          {project.risks.length > 0 ? <RiskMatrix risks={project.risks} ct={ct} /> : <p className="text-xs text-muted">{ct.noRisksYet}</p>}
           {project.risks.map((r) => (
-            <RiskRow key={r.id} risk={r} ct={ct} />
+            <RiskRow key={r.id} risk={r} ct={ct} suggestionsId={riskSuggestionsId} />
           ))}
+          <AddRiskForm transformationId={project.transformationId} suggestionsId={riskSuggestionsId} ct={ct} />
+          <datalist id={riskSuggestionsId}>
+            {[...new Set([...project.phaseNames, ...project.opportunities.map((o) => o.name), ...project.actions.map((a) => a.title)])].map(
+              (option) => (
+                <option key={option} value={option} />
+              )
+            )}
+          </datalist>
         </div>
       )}
 
@@ -705,12 +819,25 @@ function ProjectCard({
 
 type TodayAction = { key: string; tone: "accent" | "danger" | "live"; icon: IconName; label: string; project: string; href: string };
 
-// At most three things to do now, across all active projects: figures to
-// confirm first (they unlock reliable reports), then open risks, then the
-// next module on the path.
+// At most three things to do now, across all active projects: CEO answers
+// received first (someone is waiting on the consultant's follow-up), then
+// figures to confirm (they unlock reliable reports), then open risks, then
+// the next module on the path. Pending invitations are shown separately,
+// above this list, so they are never cut by the three-item limit.
 function todayActions(projects: ControlTowerProject[], t: Dictionary): TodayAction[] {
   const ct = t.controlTower;
   const out: TodayAction[] = [];
+  for (const p of projects) {
+    for (const r of p.ceoResponses)
+      out.push({
+        key: `c-${r.id}`,
+        tone: r.outcome === "validated" ? "live" : r.outcome === "rejected" ? "danger" : "accent",
+        icon: r.outcome === "validated" ? "check" : r.outcome === "rejected" ? "alert" : "question",
+        label: ct.actionCeoResponse[r.outcome],
+        project: r.outcomeNote ? `${shortName(p, t)} — ${r.outcomeNote}` : shortName(p, t),
+        href: `/decide?transformationId=${p.transformationId}`,
+      });
+  }
   for (const p of projects) {
     if (p.pendingValidationCount > 0)
       out.push({
@@ -751,24 +878,47 @@ function todayActions(projects: ControlTowerProject[], t: Dictionary): TodayActi
 
 export function ControlTowerView({
   userId,
+  userEmail,
   initialProjects,
+  initialPendingInvitations,
 }: {
   userId: string;
+  userEmail: string | null;
   initialProjects: ControlTowerProject[];
+  initialPendingInvitations: number;
 }) {
   const { t } = useLanguage();
   const ct = t.controlTower;
   const [projects, setProjects] = useState(initialProjects);
+  const [pendingInvitations, setPendingInvitations] = useState(initialPendingInvitations);
+  const [accepting, setAccepting] = useState(false);
+  const [acceptError, setAcceptError] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "hot" | "done" | "archived">("all");
 
   const refresh = useCallback(async () => {
     const supabase = createClient();
-    const next = await fetchControlTowerProjects(supabase, userId, t.common.untitledProject);
+    const [next, pending] = await Promise.all([
+      fetchControlTowerProjects(supabase, userId, t.common.untitledProject),
+      fetchPendingInvitationCount(supabase, userEmail),
+    ]);
     setProjects(next);
+    setPendingInvitations(pending);
     setLastSync(new Date());
-  }, [userId, t.common.untitledProject]);
+  }, [userId, userEmail, t.common.untitledProject]);
+
+  // Accepting = claim_pending_invitations() (0025), the only way an invitee
+  // can attach their account to an invitation; then a full re-fetch so the
+  // newly joined projects appear.
+  async function acceptInvitations() {
+    setAccepting(true);
+    setAcceptError(null);
+    const { error } = await createClient().rpc("claim_pending_invitations");
+    if (error) setAcceptError(ct.actionAcceptFailed);
+    await refresh();
+    setAccepting(false);
+  }
 
   // All these tables are already in the supabase_realtime publication
   // (migration 0002) and RLS-scoped, so subscribing without a per-row
@@ -872,11 +1022,32 @@ export function ControlTowerView({
         <StatTile label={ct.achievements} value={totalWin} />
       </div>
 
-      {active.length > 0 && (
+      {(active.length > 0 || pendingInvitations > 0) && (
         <section className="mt-8 border border-border bg-surface p-5">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-accent-strong">{ct.todayTitle}</h2>
+          <h2 className="font-mono text-xs uppercase tracking-[0.18em] text-accent-strong">{ct.todayTitle}</h2>
+          {pendingInvitations > 0 && (
+            <div className="mt-3 flex items-center gap-4 border-b border-border pb-3">
+              <Icon name="chat" className="h-5 w-5 shrink-0 text-accent-strong" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-ink">
+                  {pendingInvitations} {ct.actionInvitations}
+                </span>
+                <span className="block truncate text-xs text-muted">{acceptError ?? ct.actionInvitationsHint}</span>
+              </span>
+              <button
+                type="button"
+                onClick={acceptInvitations}
+                disabled={accepting}
+                className="shrink-0 bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:bg-accent-strong disabled:opacity-50"
+              >
+                {accepting ? ct.actionAccepting : ct.actionAcceptInvitations}
+              </button>
+            </div>
+          )}
           {actions.length === 0 ? (
-            <p className="mt-3 text-sm text-muted">{ct.todayEmpty}</p>
+            pendingInvitations > 0 ? null : (
+              <p className="mt-3 text-sm text-muted">{ct.todayEmpty}</p>
+            )
           ) : (
             <ol className="mt-3 flex flex-col divide-y divide-border">
               {actions.map((a, i) => (

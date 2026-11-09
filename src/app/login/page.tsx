@@ -4,19 +4,23 @@ import { useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/components/language-provider";
+import { safeNextPath } from "@/lib/safe-redirect";
 
 type Mode = "password" | "magic-link";
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/connect";
+  // `next` comes from the URL: only a same-site path is ever reused for
+  // emailRedirectTo or router.push (open redirect otherwise).
+  const next = safeNextPath(searchParams.get("next"));
   const { t } = useLanguage();
 
   const [mode, setMode] = useState<Mode>("password");
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -43,6 +47,10 @@ export default function LoginPage() {
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
+        // Password sign-in never goes through /auth/callback, so pending
+        // team invitations are claimed here too (best-effort, never blocks
+        // the sign-in itself).
+        await supabase.rpc("claim_pending_invitations");
         router.push(next);
         router.refresh();
       }
@@ -65,6 +73,12 @@ export default function LoginPage() {
         email,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+          // Supabase defaults shouldCreateUser to true, which would silently
+          // create an account — and so bypass the CGU/privacy consent
+          // checkbox below, only shown on the explicit password sign-up
+          // path. The magic link is sign-in only; create an account with
+          // a password first.
+          shouldCreateUser: false,
         },
       });
       if (otpError) throw otpError;
@@ -168,6 +182,29 @@ export default function LoginPage() {
           </button>
         )}
 
+        {mode === "password" && isSignUp && (
+          <label className="flex items-start gap-2 text-xs text-muted">
+            <input
+              type="checkbox"
+              required
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-accent"
+            />
+            <span>
+              {t.login.consentPrefix}{" "}
+              <a href="/legal/cgu" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-ink">
+                {t.login.consentCgu}
+              </a>{" "}
+              {t.login.consentAnd}{" "}
+              <a href="/legal/confidentialite" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-ink">
+                {t.login.consentPrivacy}
+              </a>
+              .
+            </span>
+          </label>
+        )}
+
         {error && (
           <p role="alert" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
             {error}
@@ -179,7 +216,7 @@ export default function LoginPage() {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || (mode === "password" && isSignUp && !consent)}
           className="mt-1 rounded-lg bg-accent py-2.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong disabled:opacity-50"
         >
           {loading

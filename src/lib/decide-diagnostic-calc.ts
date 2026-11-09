@@ -82,3 +82,25 @@ export function computeCapabilityGaps(inputs: CapabilityAssessmentInput[]): Capa
 export function rankCapabilityGaps(results: CapabilityGapResult[]): CapabilityGapResult[] {
   return [...results].sort((a, b) => b.priority - a.priority || b.gap - a.gap || a.domain.localeCompare(b.domain));
 }
+
+// ---------------------------------------------------------------------------
+// Gabarit D01 — une capacité n'est « évaluée » que si l'utilisateur l'a
+// explicitement renseignée (curseur bougé ou confirmée). Les niveaux par
+// défaut affichés ne sont jamais envoyés : une capacité non saisie reste
+// distincte d'une capacité sans écart.
+// ---------------------------------------------------------------------------
+export type CapabilityAssessmentState = "vide" | "incomplet" | "complet";
+
+export interface CapabilityAssessmentProgress {
+  state: CapabilityAssessmentState;
+  assessed: number;
+  total: number;
+}
+
+/** Fonction pure : à partir du drapeau « évaluée » de chaque capacité, dit où en est l'évaluation. */
+export function capabilityAssessmentProgress(assessedFlags: boolean[]): CapabilityAssessmentProgress {
+  const total = assessedFlags.length;
+  const assessed = assessedFlags.filter(Boolean).length;
+  const state: CapabilityAssessmentState = assessed === 0 ? "vide" : assessed < total ? "incomplet" : "complet";
+  return { state, assessed, total };
+}

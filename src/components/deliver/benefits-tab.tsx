@@ -9,22 +9,32 @@
 // computed by src/lib/deliver-benefits-calc.ts (pure, tested).
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { compareBenefits, computeItemsTotal, computeObservedAnnual } from "@/lib/deliver-benefits-calc";
+import {
+  compareBenefits,
+  compareToTrajectory,
+  computeExpectedTrajectory,
+  computeItemsTotal,
+  computeObservedAnnual,
+  resolveTrajectoryWindow,
+} from "@/lib/deliver-benefits-calc";
 import { useLanguage } from "@/components/language-provider";
-import type { BenefitExpectation, BenefitItem, BenefitObservation } from "@/types/database";
+import type { BenefitExpectation, BenefitItem, BenefitObservation, RoadmapPhaseEntry } from "@/types/database";
 
 export function BenefitsTab({
   transformationId,
   initialExpectation,
   initialItems,
   initialObservations,
+  roadmapPhases = [],
 }: {
   transformationId: string;
   initialExpectation: BenefitExpectation | null;
   initialItems: BenefitItem[];
   initialObservations: BenefitObservation[];
+  // Roadmap phases (start / target dates of the expected trajectory).
+  roadmapPhases?: RoadmapPhaseEntry[];
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const b = t.deliver.benefits;
   const [expectation, setExpectation] = useState<BenefitExpectation | null>(initialExpectation);
   const [expectedInput, setExpectedInput] = useState(initialExpectation?.expected_annual != null ? String(initialExpectation.expected_annual) : "");
@@ -84,10 +94,49 @@ export function BenefitsTab({
 
   const itemsResult = computeItemsTotal(items.map((i) => ({ label: i.label, perimeter: i.perimeter, value: i.value })));
   const observedResult = computeObservedAnnual(observations.map((o) => ({ month: o.month, value: o.value })));
+  // L06 — gabarit « à revoir » : une valeur tapée mais pas encore
+  // enregistrée ne compte pas encore dans l'écart ci-dessous.
+  const expectedUnsaved = expectedInput !== String(expectation?.expected_annual ?? "");
   const comparison = compareBenefits(expectation?.expected_annual ?? null, observedResult?.observedAnnual ?? null);
+  // Expected trajectory at today's date (linear from the project start to
+  // the roadmap's target date, baseline 0 for a gain). Missing start, target
+  // date, expected value or observed value → no headline, screen unchanged.
+  const trajWindow = resolveTrajectoryWindow(roadmapPhases, observations);
+  const trajectory = computeExpectedTrajectory({
+    startDate: trajWindow.startDate,
+    targetDate: trajWindow.targetDate,
+    today: new Date().toISOString().slice(0, 10),
+    baseline: 0,
+    target: expectation?.expected_annual ?? null,
+  });
+  const vsTrajectory =
+    trajectory && comparison.observedAnnual !== null ? compareToTrajectory(comparison.observedAnnual, trajectory.expectedToDate) : null;
+  const fmt = (n: number) => new Intl.NumberFormat(language === "fr" ? "fr-FR" : "en-US").format(n);
 
   return (
     <div className="flex flex-col gap-6">
+      {vsTrajectory && trajectory && (
+        <div className="border border-border bg-surface p-4">
+          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{b.trajectoryEyebrow}</p>
+          <h2 className="mt-2 font-display text-2xl leading-tight text-ink tabular-nums">
+            {fmt(vsTrajectory.realized)} <span className="text-muted">{b.trajectoryVs}</span> {fmt(vsTrajectory.expectedToDate)}{" "}
+            <span
+              className={
+                vsTrajectory.status === "behind" ? "text-danger" : vsTrajectory.status === "ahead" ? "text-success" : "text-accent-strong"
+              }
+            >
+              ({vsTrajectory.gapPercent !== null ? `${vsTrajectory.gapPercent > 0 ? "+" : ""}${vsTrajectory.gapPercent} %` : "—"})
+            </span>
+          </h2>
+          <p className="mt-1 text-xs text-muted">
+            {b.trajectoryStatus[vsTrajectory.status]} ·{" "}
+            {b.trajectoryHint
+              .replace("{elapsed}", String(Math.round(trajectory.elapsedRatio * 100)))
+              .replace("{start}", trajWindow.startDate ?? "")
+              .replace("{target}", trajWindow.targetDate ?? "")}
+          </p>
+        </div>
+      )}
       <div className="border border-border bg-surface p-4">
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-1 flex-col gap-1 text-xs text-muted">
@@ -98,8 +147,16 @@ export function BenefitsTab({
               placeholder="0"
               className="border border-border bg-surface px-2 py-1.5 text-sm text-ink"
             />
+            {Number.isFinite(Number(expectedInput)) && expectedInput.trim() !== "" && (
+              <span className="font-mono text-[11px] text-muted">= {new Intl.NumberFormat("fr-FR").format(Number(expectedInput))}</span>
+            )}
             <span className="text-[11px]">{expectation?.source === "business_case" ? b.expectedFromBusinessCase : b.expectedManualHint}</span>
           </label>
+          {expectedUnsaved && (
+            <span role="status" className="shrink-0 self-center border border-danger/50 px-2 py-0.5 text-xs font-medium text-danger">
+              {b.unsaved}
+            </span>
+          )}
           <button type="button" onClick={() => void saveExpected()} className="shrink-0 bg-accent px-3 py-2 text-xs font-medium text-accent-ink">
             {b.saveExpected}
           </button>
@@ -137,18 +194,21 @@ export function BenefitsTab({
             value={newItem.label}
             onChange={(e) => setNewItem((v) => ({ ...v, label: e.target.value }))}
             placeholder={b.labelPlaceholder}
+            aria-label={b.labelPlaceholder}
             className="min-w-[8rem] flex-[2] border border-border bg-surface px-2 py-1.5 text-xs text-ink"
           />
           <input
             value={newItem.perimeter}
             onChange={(e) => setNewItem((v) => ({ ...v, perimeter: e.target.value }))}
             placeholder={b.perimeterPlaceholder}
+            aria-label={b.perimeterPlaceholder}
             className="min-w-[8rem] flex-1 border border-border bg-surface px-2 py-1.5 text-xs text-ink"
           />
           <input
             value={newItem.value}
             onChange={(e) => setNewItem((v) => ({ ...v, value: e.target.value }))}
             placeholder={b.valuePlaceholder}
+            aria-label={b.valuePlaceholder}
             className="w-24 border border-border bg-surface px-2 py-1.5 text-xs text-ink"
           />
           <button type="button" onClick={() => void addItem()} className="shrink-0 bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink">
@@ -173,12 +233,14 @@ export function BenefitsTab({
             value={newObs.month}
             onChange={(e) => setNewObs((v) => ({ ...v, month: e.target.value }))}
             placeholder={b.monthPlaceholder}
+            aria-label={b.monthPlaceholder}
             className="w-28 border border-border bg-surface px-2 py-1.5 text-xs text-ink"
           />
           <input
             value={newObs.value}
             onChange={(e) => setNewObs((v) => ({ ...v, value: e.target.value }))}
             placeholder={b.valuePlaceholder}
+            aria-label={b.valuePlaceholder}
             className="w-24 border border-border bg-surface px-2 py-1.5 text-xs text-ink"
           />
           <button type="button" onClick={() => void addObservation()} className="shrink-0 bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink">

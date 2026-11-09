@@ -9,6 +9,9 @@ import { DeliverFlow } from "./deliver-flow";
 import type { DeliverableKind, Deliverable, BenefitExpectation, BenefitItem, BenefitObservation } from "@/types/database";
 import type { Domain } from "@/lib/decide";
 import { projectTitle as toProjectTitle } from "@/lib/text";
+import { fetchProjectAccessScope, isAccessibleTransformation } from "@/lib/project-access";
+import { loadActor } from "@/lib/transformation-actor";
+import { canReview, filterVisibleDeliverables } from "@/lib/review-status";
 
 function EmptyState({
   title,
@@ -52,18 +55,23 @@ export default async function DeliverPage({
   const t = getDictionary(language);
   const empty = t.deliver.empty;
 
-  const { data: orgs } = await supabase.from("organizations").select("id, name, industry").eq("owner_id", user.id);
-  const orgIds = (orgs ?? []).map((o) => o.id);
+  // Owned organizations' projects OR projects the user is an accepted
+  // member of (src/lib/project-access.ts). The RLS-scoped transformations
+  // query runs in parallel with the scope lookup, then is filtered by it.
+  const [accessScope, { data: visibleTransformations }] = await Promise.all([
+    fetchProjectAccessScope(supabase, user.id),
+    supabase
+      .from("transformations")
+      .select("id, organization_id, challenges, objectives, domains, constraints, selected_trajectory_id, created_at")
+      .order("created_at", { ascending: false }),
+  ]);
+  const orgs = accessScope.ownedOrganizations;
 
-  if (orgIds.length === 0) {
+  if (orgs.length === 0 && accessScope.memberTransformationIds.length === 0) {
     return <EmptyState title={empty.title} message={empty.noOrgMessage} candidates={[]} />;
   }
 
-  const { data: allTransformations } = await supabase
-    .from("transformations")
-    .select("id, organization_id, challenges, objectives, domains, constraints, selected_trajectory_id, created_at")
-    .in("organization_id", orgIds)
-    .order("created_at", { ascending: false });
+  const allTransformations = (visibleTransformations ?? []).filter((tr) => isAccessibleTransformation(accessScope, tr));
 
   const candidates = (allTransformations ?? []).filter((tr) => tr.selected_trajectory_id);
   // "Connect to Decide" candidates — a diagnostic already started in Decide
@@ -79,22 +87,27 @@ export default async function DeliverPage({
     return <EmptyState title={empty.title} message={empty.noTrajectoryMessage} candidates={connectCandidates} />;
   }
 
-  // Only trust the query param if it's actually one of this user's own
-  // eligible projects (RLS-derived list above) — never pass through an
+  // Only trust the query param if it's actually one of this user's
+  // eligible projects (owned or accepted member, list above) — never pass through an
   // arbitrary id from the URL unchecked.
   const transformation =
     candidates.find((c) => c.id === requestedTransformationId) ?? candidates[0];
-  const org = (orgs ?? []).find((o) => o.id === transformation.organization_id);
+  // Undefined on a project shared with the user: organizations RLS is
+  // owner-only, so its name/industry fall back to "" below.
+  const org = orgs.find((o) => o.id === transformation.organization_id);
   const trajectoryId = transformation.selected_trajectory_id as string;
 
   const [
+    actor,
     { data: deliverableRows },
     { data: phases },
     { data: priorities },
     { data: benefitExpectation },
     { data: benefitItems },
     { data: benefitObservations },
+    { data: trajectory },
   ] = await Promise.all([
+    loadActor(supabase, user.id, transformation.id),
     supabase
       .from("deliverables")
       .select("*")
@@ -109,10 +122,22 @@ export default async function DeliverPage({
     supabase.from("benefit_expectations").select("*").eq("transformation_id", transformation.id).maybeSingle(),
     supabase.from("benefit_items").select("*").eq("transformation_id", transformation.id).order("created_at"),
     supabase.from("benefit_observations").select("*").eq("transformation_id", transformation.id).order("month"),
+    // Only the indicator names: they drive the KPI dashboard's
+    // per-indicator questions (baseline + owner for each).
+    supabase.from("trajectories").select("indicators").eq("id", trajectoryId).maybeSingle(),
   ]);
 
+  // Confiance v2 — un executive report encore « Brouillon IA » n'est
+  // montré qu'à son propriétaire / aux consultants (src/lib/review-status.ts) ;
+  // le client et le CEO ne voient que ce qu'un humain a relu. La RLS de
+  // `deliverables` (owner-only) reste le filet de sécurité en dessous.
+  const viewerCanReview = canReview(actor);
+  const { visible: visibleDeliverables, hiddenDraftKinds } = filterVisibleDeliverables(
+    actor,
+    (deliverableRows ?? []) as Deliverable[]
+  );
   const deliverables: Partial<Record<DeliverableKind, Deliverable>> = {};
-  for (const row of (deliverableRows ?? []) as Deliverable[]) {
+  for (const row of visibleDeliverables) {
     deliverables[row.kind] = row;
   }
 
@@ -133,11 +158,14 @@ export default async function DeliverPage({
         domains={(transformation.domains as Domain[]) ?? []}
         initialConstraints={transformation.constraints ?? ""}
         initialDeliverables={deliverables}
+        canReview={viewerCanReview}
+        hiddenDraftKinds={hiddenDraftKinds as DeliverableKind[]}
         roadmapPhases={phases ?? []}
         priorities={priorities ?? []}
         initialBenefitExpectation={(benefitExpectation as BenefitExpectation | null) ?? null}
         initialBenefitItems={(benefitItems as BenefitItem[] | null) ?? []}
         initialBenefitObservations={(benefitObservations as BenefitObservation[] | null) ?? []}
+        indicatorNames={Object.keys(trajectory?.indicators ?? {})}
       />
     </DeliverThemeWrap>
   );

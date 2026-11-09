@@ -96,7 +96,20 @@ describe("allowedActions", () => {
 
   it("renvoie toutes les actions pour le propriétaire", () => {
     expect(allowedActions({ role: "ceo", isOwner: true }, { module: "decide" }).sort()).toEqual(
-      ["comment", "edit_data", "manage_members", "read", "send_to_ceo", "validate_decision"].sort()
+      ["comment", "edit_data", "manage_members", "read", "review_deliverable", "send_to_ceo", "validate_decision"].sort()
     );
+  });
+});
+
+describe("review_deliverable (Brouillon IA / Revu / Validé)", () => {
+  it("est permis au propriétaire et au consultant", () => {
+    expect(canPerform({ role: "client", isOwner: true }, "review_deliverable")).toBe(true);
+    expect(canPerform({ role: "consultant" }, "review_deliverable")).toBe(true);
+  });
+
+  it("est refusé au client, à l'expert (même dans son domaine) et au CEO", () => {
+    expect(canPerform({ role: "client" }, "review_deliverable", { module: "decide" })).toBe(false);
+    expect(canPerform({ role: "expert", domain: "deliver" }, "review_deliverable", { module: "deliver" })).toBe(false);
+    expect(canPerform({ role: "ceo" }, "review_deliverable")).toBe(false);
   });
 });

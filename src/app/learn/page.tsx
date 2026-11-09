@@ -5,6 +5,7 @@ import { getDictionary } from "@/lib/i18n/dictionary";
 import { LearnFlow } from "./learn-flow";
 import type { Training } from "@/types/database";
 import { projectTitle } from "@/lib/text";
+import { fetchProjectAccessScope, isAccessibleTransformation } from "@/lib/project-access";
 
 export default async function LearnPage({
   searchParams,
@@ -24,27 +25,28 @@ export default async function LearnPage({
   const language = await getLanguage();
   const t = getDictionary(language);
 
-  const { data: orgs } = await supabase.from("organizations").select("id").eq("owner_id", user.id);
-  const orgIds = (orgs ?? []).map((o) => o.id);
-
-  let existingProjects: { id: string; title: string }[] = [];
-  if (orgIds.length > 0) {
-    const { data: transformations } = await supabase
+  // Owned organizations' projects OR projects the user is an accepted
+  // member of (src/lib/project-access.ts). The RLS-scoped transformations
+  // query runs in parallel with the scope lookup, then is filtered by it.
+  const [accessScope, { data: visibleTransformations }] = await Promise.all([
+    fetchProjectAccessScope(supabase, user.id),
+    supabase
       .from("transformations")
-      .select("id, challenges, objectives")
-      .in("organization_id", orgIds)
-      .order("created_at", { ascending: false });
+      .select("id, organization_id, challenges, objectives")
+      .order("created_at", { ascending: false }),
+  ]);
 
-    existingProjects = (transformations ?? []).map((tr) => ({
+  const existingProjects: { id: string; title: string }[] = (visibleTransformations ?? [])
+    .filter((tr) => isAccessibleTransformation(accessScope, tr))
+    .map((tr) => ({
       id: tr.id,
       title:
         (tr.challenges?.trim() ? projectTitle(tr.challenges, 60) : tr.objectives?.trim() ? projectTitle(tr.objectives, 60) : "") ||
         t.common.untitledProject,
     }));
-  }
 
   // Only trust the query param transformationId if it's actually one of
-  // this user's own projects (RLS-derived list above) — never pass through
+  // this user's projects (owned or accepted member, list above) — never pass through
   // an arbitrary id from the URL unchecked.
   const initialTransformationId =
     requestedTransformationId && existingProjects.some((p) => p.id === requestedTransformationId)

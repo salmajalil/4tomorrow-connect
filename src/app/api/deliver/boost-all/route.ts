@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { MAX_DOC_LENGTH } from "@/lib/input-limits";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
+import { enforceAiQuota, getAnthropicClient, MATCHING_MODEL } from "@/lib/anthropic";
 import {
   buildDeliverableSystemPrompt,
   buildDeliverableUserPrompt,
@@ -24,7 +25,7 @@ export const maxDuration = 120;
 
 const requestSchema = z.object({
   transformationId: z.string().uuid(),
-  sourceDocText: z.string().trim().default(""),
+  sourceDocText: z.string().trim().max(MAX_DOC_LENGTH).default(""),
   // Per-kind guided questionnaire answers, keyed by DeliverableKind — {} for
   // any kind the client didn't answer (the whole "Boost All" one-click path
   // keeps working with this entirely omitted).
@@ -44,6 +45,10 @@ export async function POST(request: Request) {
       { status: 401 }
     );
   }
+
+  // Daily AI quota per user and route (see assertAiQuota, src/lib/anthropic.ts).
+  const quotaResponse = await enforceAiQuota(supabase, user.id, "deliver/boost-all", language);
+  if (quotaResponse) return quotaResponse;
 
   let body: z.infer<typeof requestSchema>;
   try {
@@ -87,11 +92,16 @@ export async function POST(request: Request) {
     const settled = await Promise.allSettled(
       missingKinds.map(async (kind) => {
         const kindInputs = body.inputs[kind] ?? {};
-        const userPrompt = buildDeliverableUserPrompt(
-          { ...mission.context, sourceDocText: body.sourceDocText || undefined },
-          kind,
-          kindInputs
-        );
+        const userPrompt =
+          buildDeliverableUserPrompt(
+            { ...mission.context, sourceDocText: body.sourceDocText || undefined },
+            kind,
+            kindInputs
+          ) +
+          // Same phase listing as /api/deliver/generate for the roadmap kind.
+          (kind === "roadmap" && mission.phaseNames.length > 0
+            ? `\n\nPhases de la roadmap déjà choisies, dans l'ordre : ${mission.phaseNames.join(" → ")}`
+            : "");
         const createCall = () =>
           anthropic.messages.create({
             model: MATCHING_MODEL,

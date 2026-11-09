@@ -6,6 +6,7 @@ import { getDictionary } from "@/lib/i18n/dictionary";
 import { ConnectThemeWrap } from "@/components/connect/connect-theme";
 import { ConnectFlow } from "./connect-flow";
 import type { ModelOutput, MatchOutput } from "@/lib/matching";
+import { loadActor } from "@/lib/transformation-actor";
 
 export default async function ConnectPage({
   searchParams,
@@ -32,6 +33,11 @@ export default async function ConnectPage({
   let initialDescription = "";
   let transformationId: string | null = null;
   let initialResult: ModelOutput | null = null;
+  // Veille concurrentielle interne (voir match-results.tsx) : réservée au
+  // propriétaire et au consultant. Par défaut true tant qu'aucune
+  // transformation partagée n'est en jeu (nouvelle session de matching,
+  // toujours lancée par le propriétaire ou un consultant).
+  let canSeeCompetitors = true;
   if (requestedTransformationId) {
     const { data: transformation } = await supabase
       .from("transformations")
@@ -41,6 +47,8 @@ export default async function ConnectPage({
     if (transformation) {
       transformationId = transformation.id;
       initialDescription = transformation.challenges ?? "";
+      const actor = await loadActor(supabase, user.id, transformation.id);
+      canSeeCompetitors = actor?.isOwner === true || actor?.role === "consultant";
       const { data: org } = await supabase
         .from("organizations")
         .select("industry")
@@ -93,6 +101,7 @@ export default async function ConnectPage({
         initialDescription={initialDescription}
         transformationId={transformationId}
         initialResult={initialResult}
+        canSeeCompetitors={canSeeCompetitors}
       />
     </ConnectThemeWrap>
   );

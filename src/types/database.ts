@@ -107,6 +107,20 @@ export type EcosystemMember = {
   website: string | null;
   description: string | null;
   contact: string | null;
+  // Moderation gate (0024_ecosystem_members_moderation.sql): only 'approved'
+  // rows are ever injected into a model prompt.
+  status: EcosystemMemberStatus;
+  created_at: string;
+};
+
+export type EcosystemMemberStatus = "pending" | "approved" | "rejected";
+
+// Per-user, per-route AI call log backing the daily quota
+// (0023_ai_usage.sql, assertAiQuota in src/lib/anthropic.ts).
+export type AiUsage = {
+  id: string;
+  user_id: string;
+  route: string;
   created_at: string;
 };
 
@@ -228,6 +242,9 @@ export type Risk = {
   impact: number | null;
   owner: string | null;
   treatment: string | null;
+  // AR — objet impacté (option de décision, jalon, bénéfice…), texte libre
+  // saisi par l'utilisateur (0027_risk_impacted_object_action_completed_at.sql).
+  impacted_object: string | null;
   created_at: string;
 };
 
@@ -241,6 +258,9 @@ export type Action = {
   due_date: string | null;
   status: ActionStatus;
   source_module: string | null;
+  // Posée par un trigger base de données au passage à "done", remise à null
+  // sinon (0027) — null aussi pour les actions terminées avant cette migration.
+  completed_at: string | null;
   created_at: string;
 };
 
@@ -453,9 +473,14 @@ export type DeliverableRiskMapContent = {
     mitigation: string;
   }[];
 };
+// Each key point pairs an observation with its concrete solution — never a
+// problem stated alone. Plain strings are the pre-pairing shape still stored
+// on older rows; renderers normalize both (normalizeKeyPoint in
+// src/lib/deliver-content-display.ts).
+export type ExecutiveKeyPoint = { observation: string; solution: string };
 export type DeliverableExecutiveReportContent = {
   summary: string;
-  keyPoints: string[];
+  keyPoints: (ExecutiveKeyPoint | string)[];
 };
 export type DeliverableToolkitContent = {
   tools: { name: string; purpose: string; whyThisProject: string }[];
@@ -469,6 +494,9 @@ export type DeliverableContent =
   | DeliverableExecutiveReportContent
   | DeliverableToolkitContent;
 
+// 0026 — Brouillon IA / Revu / Validé (src/lib/review-status.ts).
+export type ReviewStatusValue = "ai_draft" | "reviewed" | "validated";
+
 export type Deliverable = {
   id: string;
   transformation_id: string;
@@ -481,6 +509,13 @@ export type Deliverable = {
   // (e.g. the "Boost All" fast path). Shown back on the view as "basé sur
   // tes réponses" transparency, same spirit as "Comment c'est calculé".
   inputs: Record<string, string>;
+  // 0026 — statut de revue humaine (jamais écrit par l'IA, voir
+  // src/lib/review-status.ts). Retombe à 'ai_draft' en base dès que le
+  // contenu change (trigger deliverables_reset_review_status).
+  review_status: ReviewStatusValue;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  reviewed_by_name: string | null;
   created_at: string;
 };
 
@@ -533,6 +568,11 @@ export type BusinessCase = {
   payback_years: number | null;
   npv: number | null;
   cumulative_by_year: number[];
+  // 0026 — statut de revue humaine, voir Deliverable ci-dessus.
+  review_status: ReviewStatusValue;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  reviewed_by_name: string | null;
   created_at: string;
 };
 
@@ -563,6 +603,9 @@ export type CeoValidationToken = {
   used_at: string | null;
   outcome: ValidationOutcomeValue | null;
   outcome_note: string | null;
+  // 0026 — SHA-256 de la décision à l'émission (src/lib/decision-hash.ts) ;
+  // null pour un jeton émis avant cette migration.
+  decision_hash: string | null;
   created_at: string;
 };
 
@@ -584,6 +627,7 @@ export type Database = {
         Partial<CapabilityAssessment> &
           Pick<CapabilityAssessment, "transformation_id" | "domain" | "observed" | "target" | "importance" | "gap" | "priority" | "status">
       >;
+      ai_usage: Table<AiUsage, Partial<AiUsage> & Pick<AiUsage, "user_id" | "route">>;
       ecosystem_members: Table<EcosystemMember, Partial<EcosystemMember> & Pick<EcosystemMember, "name" | "type">>;
       matches: Table<Match, Partial<Match> & Pick<Match, "transformation_id" | "category" | "name" | "source">>;
       meeting_requests: Table<
@@ -664,6 +708,9 @@ export type Database = {
       process_flows: Table<ProcessFlow, Partial<ProcessFlow> & Pick<ProcessFlow, "transformation_id">>;
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      // 0025_claim_pending_invitations.sql — renvoie le nombre d'invitations acceptées.
+      claim_pending_invitations: { Args: Record<string, never>; Returns: number };
+    };
   };
 };

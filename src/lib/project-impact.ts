@@ -1,12 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   Database,
+  DeliverableExecutiveReportContent,
   IndicatorConfidence,
   ModuleName,
   ModuleStatusValue,
   RoadmapExecutionStatus,
 } from "@/types/database";
 import { MODULE_ORDER } from "@/lib/control-tower";
+import type { ExecutiveSnapshotInput } from "@/lib/impact-briefing-calc";
+import { normalizeKeyPoint } from "@/lib/deliver-content-display";
 
 // Everything the "Impact" view and the two project reports (CEO one-pager,
 // detailed report) need, assembled from rows that already exist — no new
@@ -78,6 +81,14 @@ export type ProjectImpact = {
   // promise, measured on this project rather than asserted. Null until a
   // roadmap exists.
   hoursToRoadmap: number | null;
+  // Raw, already-entered rows for the executive summary block (achievements,
+  // risks, opportunities, hot spots, team briefing) — turned into sections
+  // by buildExecutiveSnapshot (src/lib/impact-briefing-calc.ts), never by AI.
+  snapshotInput: Omit<ExecutiveSnapshotInput, "today">;
+  // Livrer's Executive Report deliverable for the current scenario, if
+  // generated — observation/solution pairs (legacy plain strings have no
+  // solution, shown as-is).
+  executiveReport: { summary: string; keyPoints: { observation: string; solution: string | null }[] } | null;
 };
 
 const CONFIDENCE_RANK: Record<IndicatorConfidence, number> = { verified: 0, estimate: 1, unknown: 2 };
@@ -105,7 +116,7 @@ export async function fetchProjectImpact(
   const { data: tx } = await supabase
     .from("transformations")
     .select(
-      "id, organization_id, challenges, objectives, constraints, domains, selected_trajectory_id, strategic_brief, starting_recommendation, good_ideas, created_at"
+      "id, organization_id, challenges, objectives, constraints, domains, selected_trajectory_id, strategic_brief, starting_recommendation, good_ideas, decision_updated_at, created_at"
     )
     .eq("id", transformationId)
     .maybeSingle();
@@ -122,6 +133,8 @@ export async function fetchProjectImpact(
     { data: matches },
     { data: trainings },
     { data: deliverables },
+    { data: actions },
+    ceoTokensResult,
   ] = await Promise.all([
     supabase.from("organizations").select("name, industry").eq("id", tx.organization_id).maybeSingle(),
     supabase
@@ -131,16 +144,29 @@ export async function fetchProjectImpact(
       .order("created_at", { ascending: true }),
     supabase.from("module_status").select("module, status").eq("transformation_id", tx.id),
     supabase.from("priorities").select("name, reason, weight").eq("transformation_id", tx.id),
-    supabase.from("risks").select("name, reason").eq("transformation_id", tx.id),
-    supabase.from("opportunities").select("name, reason").eq("transformation_id", tx.id),
+    // "*" rather than a column list for risks/actions: impacted_object and
+    // completed_at come from 0027 — on a database that hasn't run it yet they
+    // are simply absent (read as null below) instead of failing the query.
+    supabase.from("risks").select("*").eq("transformation_id", tx.id),
+    supabase.from("opportunities").select("name, reason, created_at").eq("transformation_id", tx.id),
     supabase
       .from("roadmap_phases")
-      .select("phase_name, start_date, end_date, execution_status, deliverables, kpis, order_index, created_at")
+      .select(
+        "phase_name, start_date, end_date, execution_status, actual_start_date, actual_end_date, deliverables, kpis, order_index, created_at"
+      )
       .eq("transformation_id", tx.id)
       .order("order_index", { ascending: true }),
     supabase.from("matches").select("name, category, reason").eq("transformation_id", tx.id),
     supabase.from("trainings").select("topic, mode").eq("transformation_id", tx.id),
-    supabase.from("deliverables").select("kind").eq("transformation_id", tx.id),
+    supabase.from("deliverables").select("kind, trajectory_id, content").eq("transformation_id", tx.id),
+    supabase.from("actions").select("*").eq("transformation_id", tx.id),
+    // Best-effort, same as the control tower: RLS is owner-only on this
+    // table, so a member simply gets no rows — never a failed page.
+    supabase
+      .from("ceo_validation_tokens")
+      .select("outcome, used_at")
+      .eq("transformation_id", tx.id)
+      .not("outcome", "is", null),
   ]);
 
   const selected =
@@ -204,6 +230,13 @@ export async function fetchProjectImpact(
     ? Math.max(1, Math.round((Date.parse(firstRoadmapAt) - Date.parse(tx.created_at)) / 3_600_000))
     : null;
 
+  const reportRow = (deliverables ?? []).find((d) => d.kind === "executive_report" && d.trajectory_id === selected?.id);
+  const reportContent = reportRow?.content as DeliverableExecutiveReportContent | undefined;
+  const executiveReport =
+    reportContent && typeof reportContent.summary === "string" && Array.isArray(reportContent.keyPoints)
+      ? { summary: reportContent.summary, keyPoints: reportContent.keyPoints.map(normalizeKeyPoint) }
+      : null;
+
   return {
     transformationId: tx.id,
     title: projectTitle(tx.challenges, tx.objectives, org?.name || untitledProjectLabel),
@@ -243,5 +276,35 @@ export async function fetchProjectImpact(
     matches: (matches ?? []).map((m) => ({ name: m.name, category: m.category, reason: m.reason })),
     trainings: (trainings ?? []).map((t) => ({ topic: t.topic, mode: t.mode })),
     hoursToRoadmap,
+    executiveReport,
+    snapshotInput: {
+      risks: (risks ?? []).map((r) => ({
+        name: r.name,
+        reason: r.reason,
+        probability: r.probability,
+        impact: r.impact,
+        owner: r.owner,
+        impactedObject: r.impacted_object ?? null,
+        createdAt: r.created_at,
+      })),
+      opportunities: (opportunities ?? []).map((o) => ({ name: o.name, reason: o.reason, createdAt: o.created_at })),
+      actions: (actions ?? []).map((a) => ({
+        title: a.title,
+        owner: a.owner,
+        dueDate: a.due_date,
+        status: a.status,
+        completedAt: a.completed_at ?? null,
+      })),
+      phases: (phases ?? []).map((p) => ({
+        name: p.phase_name,
+        status: p.execution_status,
+        actualStartDate: p.actual_start_date,
+        actualEndDate: p.actual_end_date,
+      })),
+      ceoResponses: (ceoTokensResult.data ?? [])
+        .filter((c) => c.outcome !== null && c.used_at !== null)
+        .map((c) => ({ outcome: c.outcome as "validated" | "needs_more_info" | "rejected", respondedAt: c.used_at as string })),
+      decision: selected && tx.selected_trajectory_id ? { label: selected.name, updatedAt: tx.decision_updated_at } : null,
+    },
   };
 }

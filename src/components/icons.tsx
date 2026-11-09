@@ -291,6 +291,13 @@ const ICON_PATHS = {
       <path d="M5 10v10h14V10" />
     </>
   ),
+  // Champ calculé (non modifiable) — voir src/components/computed-badge.tsx.
+  lock: (
+    <>
+      <rect x="5" y="11" width="14" height="9" rx="1.5" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </>
+  ),
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;

@@ -4,6 +4,9 @@ import { useRef, useState } from "react";
 import { Eyebrow } from "@/components/eyebrow";
 import { parseJsonResponse } from "@/lib/parse-json-response";
 import { useLanguage } from "@/components/language-provider";
+import { DeliverableInputsForm } from "@/components/deliver/deliverables-tab";
+import { GanttTimeline } from "@/components/deliver/gantt-timeline";
+import { isIsoDate, parseMilestones } from "@/lib/deliver-gantt-calc";
 
 export interface RoadmapPhase {
   phase_name: string;
@@ -16,74 +19,6 @@ export interface RoadmapPhase {
 }
 
 const GANTT_COLORS = ["#c8955a", "#7fb8c4", "#d48a6a", "#9cc08a", "#d9c3a5"];
-
-function daysBetween(a: string, b: string) {
-  return (new Date(b).getTime() - new Date(a).getTime()) / 86_400_000;
-}
-
-// Gantt bars and phase cards cross-highlight on click/tap — the only
-// interactivity that doesn't cost an AI call, unlike re-generating on every
-// slider nudge would (a real risk after tonight's credits scare).
-function Gantt({
-  phases,
-  activeIndex,
-  onSelectPhase,
-  totalWeeksLabel,
-}: {
-  phases: RoadmapPhase[];
-  activeIndex: number | null;
-  onSelectPhase: (index: number) => void;
-  totalWeeksLabel: string;
-}) {
-  if (phases.length === 0) return null;
-  const sorted = [...phases].sort((a, b) => a.order_index - b.order_index);
-  const rangeStart = sorted[0].start_date;
-  const rangeEnd = sorted.reduce((max, p) => (p.end_date > max ? p.end_date : max), sorted[0].end_date);
-  const totalDays = Math.max(1, daysBetween(rangeStart, rangeEnd));
-
-  return (
-    <div className="rounded-xl border border-border bg-surface p-4">
-      <div className="flex items-center justify-between text-xs text-muted">
-        <span>{rangeStart}</span>
-        <span>
-          {Math.round(totalDays / 7)} {totalWeeksLabel} — {rangeEnd}
-        </span>
-      </div>
-      <div className="mt-2 flex flex-col gap-2">
-        {sorted.map((phase) => {
-          const offsetPct = (daysBetween(rangeStart, phase.start_date) / totalDays) * 100;
-          const widthPct = Math.max(3, (daysBetween(phase.start_date, phase.end_date) / totalDays) * 100);
-          const isActive = activeIndex === phase.order_index;
-          return (
-            <button
-              key={phase.order_index}
-              type="button"
-              onClick={() => onSelectPhase(phase.order_index)}
-              className="flex items-center gap-3 text-left"
-            >
-              <span
-                className={`w-28 shrink-0 truncate text-xs font-medium ${isActive ? "text-accent-strong" : "text-ink"}`}
-                title={phase.phase_name}
-              >
-                {phase.phase_name}
-              </span>
-              <div className="relative h-6 flex-1 rounded bg-surface-2">
-                <div
-                  className={`absolute top-0 h-6 rounded transition-all ${isActive ? "ring-2 ring-accent-strong" : ""}`}
-                  style={{
-                    left: `${offsetPct}%`,
-                    width: `${widthPct}%`,
-                    backgroundColor: GANTT_COLORS[phase.order_index % GANTT_COLORS.length],
-                  }}
-                />
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 function Slider({
   label,
@@ -119,7 +54,7 @@ export function RoadmapView({
   trajectoryId: string;
   co2SliderLabel: string;
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const roadmap = t.decide.roadmap;
   const today = new Date().toISOString().slice(0, 10);
   const [startDate, setStartDate] = useState(today);
@@ -132,6 +67,12 @@ export function RoadmapView({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  // Guided path: the same questionnaire as Livrer's roadmap deliverable
+  // (INPUT_FIELDS.roadmap). Skipping it keeps the original generation from
+  // the diagnostic/scenario alone, unchanged.
+  const [formOpen, setFormOpen] = useState(false);
+  const [guidedInputs, setGuidedInputs] = useState<Record<string, string>>({});
+  const [appliedInputs, setAppliedInputs] = useState<Record<string, string>>({});
   const phaseRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   function selectPhase(index: number) {
@@ -139,7 +80,7 @@ export function RoadmapView({
     phaseRefs.current[index]?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
-  async function generate() {
+  async function generate(inputs: Record<string, string>) {
     setGenerating(true);
     setError("");
 
@@ -154,11 +95,21 @@ export function RoadmapView({
         const res = await fetch("/api/decide/roadmap", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ trajectoryId, startDate, priorityCost, priorityCo2, priorityRisk, prioritySpeed }),
+          body: JSON.stringify({
+            trajectoryId,
+            startDate,
+            priorityCost,
+            priorityCo2,
+            priorityRisk,
+            prioritySpeed,
+            guidedInputs: inputs,
+          }),
         });
         const { data } = await parseJsonResponse(res);
         if (!res.ok) throw new Error((data.error as string) || t.common.anErrorOccurred);
         setPhases(data.phases as RoadmapPhase[]);
+        setAppliedInputs(inputs);
+        setFormOpen(false);
         setActiveIndex(null);
         setGenerating(false);
         return;
@@ -173,6 +124,15 @@ export function RoadmapView({
   }
 
   const sortedPhases = [...phases].sort((a, b) => a.order_index - b.order_index);
+  // Weeks from the first start to the last end — date difference only.
+  const totalWeeks =
+    sortedPhases.length > 0
+      ? Math.round(
+          (Date.parse(sortedPhases.reduce((max, p) => (p.end_date > max ? p.end_date : max), sortedPhases[0].end_date)) -
+            Date.parse(sortedPhases[0].start_date)) /
+            (7 * 86_400_000)
+        )
+      : 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -196,20 +156,61 @@ export function RoadmapView({
         <Slider label={roadmap.riskReduction} value={priorityRisk} onChange={setPriorityRisk} />
         <Slider label={roadmap.speed} value={prioritySpeed} onChange={setPrioritySpeed} />
 
-        <button
-          type="button"
-          onClick={generate}
-          disabled={generating}
-          className="self-start rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40 sm:col-span-2"
-        >
-          {generating ? roadmap.generating : phases.length > 0 ? roadmap.regenerate : roadmap.generate}
-        </button>
+        {!formOpen && (
+          <button
+            type="button"
+            onClick={() => setFormOpen(true)}
+            disabled={generating}
+            className="self-start rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40 sm:col-span-2"
+          >
+            {generating ? roadmap.generating : phases.length > 0 ? roadmap.regenerate : roadmap.generate}
+          </button>
+        )}
+        {formOpen && (
+          <div className="sm:col-span-2">
+            <DeliverableInputsForm
+              kind="roadmap"
+              language={language}
+              values={guidedInputs}
+              onChange={(key, value) => setGuidedInputs((prev) => ({ ...prev, [key]: value }))}
+              onSubmit={() => void generate(guidedInputs)}
+              onSkip={() => void generate({})}
+              onCancel={() => setFormOpen(false)}
+              hasDocuments={false}
+              submitting={generating}
+              d={t.deliver.deliverables}
+              excludeKeys={["startDate"]}
+            />
+          </div>
+        )}
         {error && <p className="text-sm text-danger sm:col-span-2">{error}</p>}
       </div>
 
       {phases.length > 0 && (
         <>
-          <Gantt phases={phases} activeIndex={activeIndex} onSelectPhase={selectPhase} totalWeeksLabel={roadmap.totalWeeks} />
+          <GanttTimeline
+            rows={sortedPhases.map((phase) => ({
+              key: String(phase.order_index),
+              label: phase.phase_name,
+              start: phase.start_date,
+              end: phase.end_date,
+              color: GANTT_COLORS[phase.order_index % GANTT_COLORS.length],
+              barClassName: activeIndex === phase.order_index ? "ring-2 ring-accent-strong" : "",
+              labelClassName: activeIndex === phase.order_index ? "text-accent-strong" : "text-ink",
+              onClick: () => selectPhase(phase.order_index),
+            }))}
+            milestones={parseMilestones(appliedInputs.milestones)}
+            targetDate={isIsoDate(appliedInputs.targetEndDate?.trim()) ? appliedInputs.targetEndDate.trim() : null}
+            today={today}
+            language={language}
+            labels={{
+              today: t.deliver.gantt.today,
+              target: t.deliver.gantt.target,
+              milestones: t.deliver.gantt.milestones,
+              undated: t.deliver.gantt.undatedMilestone,
+            }}
+            footer={`${totalWeeks} ${roadmap.totalWeeks}`}
+          />
           <div className="flex flex-col gap-3">
             {sortedPhases.map((phase, i) => (
               <div

@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { computeBusinessCase, validateBusinessCaseInputs, type BusinessCaseInput } from "./decide-business-case-calc";
+import {
+  businessCaseFormValuesFromInput,
+  businessCaseInputsSignature,
+  computeBusinessCase,
+  invalidBusinessCaseFields,
+  readBusinessCaseForm,
+  validateBusinessCaseInputs,
+  type BusinessCaseInput,
+} from "./decide-business-case-calc";
 
 const base: BusinessCaseInput = {
   capex: 120,
@@ -78,5 +86,69 @@ describe("computeBusinessCase", () => {
     expect(result.cumulativeByYear).toHaveLength(base.horizonYears + 1);
     expect(result.cumulativeByYear[0]).toBe(-120);
     expect(result.cumulativeByYear.at(-1)).toBe(-120 + 80 * 3);
+  });
+});
+
+describe("readBusinessCaseForm (gabarit D05)", () => {
+  const filled = { capex: "120", annualGains: "100", annualCosts: "20", horizonYears: "3", discountRatePercent: "" };
+
+  it("is empty before any input (horizon default alone does not count)", () => {
+    const r = readBusinessCaseForm({ capex: "", annualGains: "", annualCosts: "", horizonYears: "3", discountRatePercent: "" });
+    expect(r.status).toBe("vide");
+    expect(r.input).toBeNull();
+  });
+
+  it("is incomplete when a required field is left blank — never treated as zero", () => {
+    const r = readBusinessCaseForm({ ...filled, annualCosts: "" });
+    expect(r.status).toBe("incomplet");
+    expect(r.missing).toEqual(["annualCosts"]);
+    expect(r.input).toBeNull();
+  });
+
+  it("accepts an explicit zero as a real value", () => {
+    const r = readBusinessCaseForm({ ...filled, annualCosts: "0" });
+    expect(r.status).toBe("pret");
+    expect(r.input).toEqual({ capex: 120, annualGains: 100, annualCosts: 0, horizonYears: 3, discountRatePercent: null });
+  });
+
+  it("reports calcul impossible for out-of-range values, by field", () => {
+    const r = readBusinessCaseForm({ ...filled, capex: "0", horizonYears: "20" });
+    expect(r.status).toBe("calcul_impossible");
+    expect(r.invalid).toEqual(["capex", "horizonYears"]);
+  });
+
+  it("reports calcul impossible for a non-numeric value", () => {
+    const r = readBusinessCaseForm({ ...filled, discountRatePercent: "abc" });
+    expect(r.status).toBe("calcul_impossible");
+    expect(r.invalid).toEqual(["discountRatePercent"]);
+  });
+
+  it("accepts a decimal comma", () => {
+    const r = readBusinessCaseForm({ ...filled, discountRatePercent: "4,5" });
+    expect(r.input?.discountRatePercent).toBe(4.5);
+  });
+});
+
+describe("invalidBusinessCaseFields", () => {
+  it("lists nothing for a valid input", () => {
+    expect(invalidBusinessCaseFields(base)).toEqual([]);
+  });
+  it("flags an out-of-range discount rate", () => {
+    expect(invalidBusinessCaseFields({ ...base, discountRatePercent: 60 })).toEqual(["discountRatePercent"]);
+  });
+});
+
+describe("businessCaseInputsSignature (« à revoir »)", () => {
+  it("is identical for identical inputs", () => {
+    expect(businessCaseInputsSignature(base)).toBe(businessCaseInputsSignature({ ...base }));
+  });
+  it("changes when any input changes", () => {
+    expect(businessCaseInputsSignature(base)).not.toBe(businessCaseInputsSignature({ ...base, annualCosts: 21 }));
+    expect(businessCaseInputsSignature(base)).not.toBe(businessCaseInputsSignature({ ...base, discountRatePercent: 5 }));
+  });
+  it("round-trips through the form values rebuilt from a saved case", () => {
+    const values = businessCaseFormValuesFromInput({ ...base, discountRatePercent: 5 });
+    const r = readBusinessCaseForm(values);
+    expect(r.input && businessCaseInputsSignature(r.input)).toBe(businessCaseInputsSignature({ ...base, discountRatePercent: 5 }));
   });
 });

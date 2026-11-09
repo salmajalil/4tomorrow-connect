@@ -6,6 +6,7 @@ import { LanguageToggle } from "@/components/language-toggle";
 import { BrandThemeControl } from "@/components/brand-theme-control";
 import { getLanguage } from "@/lib/i18n/language";
 import { getDictionary } from "@/lib/i18n/dictionary";
+import { fetchPendingInvitationCount } from "@/lib/control-tower";
 
 // Top bar. On desktop it carries the full navigation; on a phone it keeps
 // only the logo, language and account, and the five sections move to the
@@ -17,6 +18,9 @@ export async function Nav() {
   } = await supabase.auth.getUser();
   const language = await getLanguage();
   const t = getDictionary(language);
+  // Team invitations waiting for this account (accepted from the control
+  // tower) — shown as a badge on the control tower link.
+  const pendingInvitations = user ? await fetchPendingInvitationCount(supabase, user.email) : 0;
 
   const links = [
     { href: "/control-tower", label: t.nav.controlTower },
@@ -36,8 +40,16 @@ export async function Nav() {
         {user && (
           <nav aria-label={t.nav.mainNavLabel} className="hidden items-center gap-6 text-sm md:flex">
             {links.map((l) => (
-              <Link key={l.href} href={l.href} className="text-body transition hover:text-accent-strong">
+              <Link key={l.href} href={l.href} className="flex items-center gap-1.5 text-body transition hover:text-accent-strong">
                 {l.label}
+                {l.href === "/control-tower" && pendingInvitations > 0 && (
+                  <span
+                    aria-label={`${pendingInvitations} ${t.nav.pendingInvitations}`}
+                    className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-semibold text-accent-ink tabular-nums"
+                  >
+                    {pendingInvitations}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>

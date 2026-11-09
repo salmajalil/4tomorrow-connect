@@ -132,3 +132,52 @@ export function topGapPerDomain(results: SkillGapResult[]): SkillGapResult[] {
   }
   return out;
 }
+
+/**
+ * Une formation suggérée, avec son impact visé — tout dérivé des niveaux
+ * saisis (jamais une valeur inventée) :
+ *   - topGap : l'écart le plus prioritaire du domaine (celui que la
+ *     formation vise en premier) ;
+ *   - levelsTargeted : l'écart de ce rôle (requis − démontré), c'est-à-dire
+ *     le nombre de niveaux que la formation vise à combler pour lui ;
+ *   - rolesAffected / totalGapLevels / totalWeighted : tous les rôles en
+ *     écart sur ce domaine (même sujet de formation), et leur somme.
+ */
+export interface TrainingSuggestionImpact {
+  domain: Domain;
+  suggestion: string;
+  topGap: SkillGapResult;
+  levelsTargeted: number;
+  rolesAffected: number;
+  totalGapLevels: number;
+  totalWeighted: number;
+}
+
+/**
+ * Formations suggérées par domaine en écart (une seule par domaine, voir
+ * topGapPerDomain), triées par priorité pondérée cumulée décroissante puis
+ * par niveaux d'écart cumulés, puis par domaine — déterministe.
+ */
+export function buildTrainingSuggestions(
+  results: SkillGapResult[],
+  catalog: Partial<Record<Domain, string>>
+): TrainingSuggestionImpact[] {
+  const out: TrainingSuggestionImpact[] = [];
+  for (const top of topGapPerDomain(results)) {
+    const suggestion = suggestTrainingForGap(top.domain, catalog);
+    if (!suggestion) continue;
+    const inDomain = results.filter((r) => r.domain === top.domain && r.gap > 0);
+    out.push({
+      domain: top.domain,
+      suggestion,
+      topGap: top,
+      levelsTargeted: top.gap,
+      rolesAffected: inDomain.length,
+      totalGapLevels: inDomain.reduce((sum, r) => sum + r.gap, 0),
+      totalWeighted: inDomain.reduce((sum, r) => sum + r.weighted, 0),
+    });
+  }
+  return out.sort(
+    (a, b) => b.totalWeighted - a.totalWeighted || b.totalGapLevels - a.totalGapLevels || a.domain.localeCompare(b.domain)
+  );
+}

@@ -7,7 +7,9 @@ import { DeliverablesTab } from "@/components/deliver/deliverables-tab";
 import { ControlTowerTab } from "@/components/deliver/control-tower-tab";
 import { BenefitsTab } from "@/components/deliver/benefits-tab";
 import { ModuleCrossLinks } from "@/components/module-cross-links";
-import { DELIVERABLE_KINDS, type DeliverableKind } from "@/lib/deliver";
+import { ReviewStatusBar } from "@/components/review-status";
+import { normalizeReviewStatus } from "@/lib/review-status";
+import { DELIVERABLE_KINDS, DELIVERABLE_LABELS, type DeliverableKind } from "@/lib/deliver";
 import { useLanguage } from "@/components/language-provider";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { BenefitExpectation, BenefitItem, BenefitObservation, Deliverable, RoadmapPhaseEntry } from "@/types/database";
@@ -39,11 +41,14 @@ export function DeliverFlow({
   domains,
   initialConstraints,
   initialDeliverables,
+  canReview,
+  hiddenDraftKinds,
   roadmapPhases,
   priorities,
   initialBenefitExpectation,
   initialBenefitItems,
   initialBenefitObservations,
+  indicatorNames,
 }: {
   transformationId: string;
   organizationId: string;
@@ -53,11 +58,16 @@ export function DeliverFlow({
   domains: Domain[];
   initialConstraints: string;
   initialDeliverables: Partial<Record<DeliverableKind, Deliverable>>;
+  /** Propriétaire / consultant : voit les brouillons IA et peut les marquer revus / validés. */
+  canReview: boolean;
+  /** Livrables existants mais masqués à ce lecteur car encore en brouillon IA. */
+  hiddenDraftKinds: DeliverableKind[];
   roadmapPhases: RoadmapPhaseEntry[];
   priorities: { id: string; name: string; reason: string | null }[];
   initialBenefitExpectation: BenefitExpectation | null;
   initialBenefitItems: BenefitItem[];
   initialBenefitObservations: BenefitObservation[];
+  indicatorNames: string[];
 }) {
   const { t } = useLanguage();
   const TABS = tabs(t.deliver.tabs);
@@ -67,6 +77,7 @@ export function DeliverFlow({
   const [documentCount, setDocumentCount] = useState(0);
 
   const readyCount = DELIVERABLE_KINDS.filter((k) => deliverables[k]).length;
+  const executiveReport = deliverables.executive_report;
   const readinessPercent = Math.round((readyCount / DELIVERABLE_KINDS.length) * 100);
 
   return (
@@ -81,11 +92,13 @@ export function DeliverFlow({
         phase={missionPhase(readyCount)}
       />
 
-      <div className="mt-6 flex gap-1 overflow-x-auto border-b border-border pb-2">
+      <div role="tablist" className="mt-6 flex gap-1 overflow-x-auto border-b border-border pb-2">
         {TABS.map((tabDef) => (
           <button
             key={tabDef.id}
             type="button"
+            role="tab"
+            aria-selected={tab === tabDef.id}
             onClick={() => setTab(tabDef.id)}
             className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition ${
               tab === tabDef.id ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
@@ -112,6 +125,36 @@ export function DeliverFlow({
           />
         )}
 
+        {tab === "deliverables" && executiveReport && (
+          <div className="mb-4 rounded-xl border border-border bg-surface p-4">
+            <p className="mb-2 font-mono text-[10px] uppercase tracking-wide text-muted">
+              {DELIVERABLE_LABELS.executive_report}
+            </p>
+            <ReviewStatusBar
+              key={`${executiveReport.id}-${executiveReport.review_status}`}
+              target="deliverable"
+              id={executiveReport.id}
+              state={{
+                review_status: normalizeReviewStatus(executiveReport.review_status),
+                reviewed_by_name: executiveReport.reviewed_by_name ?? null,
+                reviewed_at: executiveReport.reviewed_at ?? null,
+              }}
+              canReview={canReview}
+              onChange={(review) =>
+                setDeliverables((prev) =>
+                  prev.executive_report ? { ...prev, executive_report: { ...prev.executive_report, ...review } } : prev
+                )
+              }
+            />
+          </div>
+        )}
+
+        {tab === "deliverables" && !executiveReport && hiddenDraftKinds.includes("executive_report") && (
+          <p className="mb-4 rounded-lg border border-dashed border-border bg-surface px-4 py-3 text-xs text-muted">
+            {DELIVERABLE_LABELS.executive_report} — {t.trust.review.hiddenDraft}
+          </p>
+        )}
+
         {tab === "deliverables" && (
           <DeliverablesTab
             transformationId={transformationId}
@@ -119,6 +162,7 @@ export function DeliverFlow({
             onDeliverablesChange={setDeliverables}
             roadmapPhases={roadmapPhases}
             sourceDocText={sourceDocText}
+            indicatorNames={indicatorNames}
           />
         )}
 
@@ -138,6 +182,7 @@ export function DeliverFlow({
             initialExpectation={initialBenefitExpectation}
             initialItems={initialBenefitItems}
             initialObservations={initialBenefitObservations}
+            roadmapPhases={roadmapPhases}
           />
         )}
       </div>

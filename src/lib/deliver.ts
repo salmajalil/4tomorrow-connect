@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { DOMAINS, DOMAIN_LABELS, type Domain } from "@/lib/decide";
+import { EXECUTIVE_NARRATIVE_RULES } from "@/lib/executive-narrative";
+import { computeFlow, validateFlowInputs, type FlowStepInput } from "@/lib/decide-flow-calc";
+import { computeObservedAnnual, type BenefitObservationInput } from "@/lib/deliver-benefits-calc";
 import {
   DELIVERABLE_KINDS,
   type DeliverableKind,
@@ -68,33 +71,69 @@ export type DeliverableInputFieldDef = {
   label: { fr: string; en: string };
   placeholder: { fr: string; en: string };
   multiline?: boolean;
+  // "date" renders a native date picker and stores AAAA-MM-JJ, so the value
+  // can feed deterministic date math (src/lib/deliver-gantt-calc.ts).
+  inputType?: "date";
 };
 
 const INPUT_FIELDS: Record<DeliverableKind, DeliverableInputFieldDef[]> = {
+  // Feuille de route — the guided path of the Gantt: what the client already
+  // knows (dates, milestones, must-do actions, expected outputs). Shared by
+  // Décider's roadmap generation (src/components/decide/roadmap-view.tsx)
+  // and Livrer's roadmap deliverable. Dates are never left to the AI: the
+  // start/target dates drive the phase dates server-side.
   roadmap: [
     {
       key: "startDate",
-      promptLabel: "Actual execution start date",
+      promptLabel: "Actual execution start date (YYYY-MM-DD)",
       label: { fr: "Date de démarrage réelle", en: "Actual start date" },
-      placeholder: { fr: "Ex : 15 janvier 2026", en: "E.g.: January 15, 2026" },
+      placeholder: { fr: "AAAA-MM-JJ", en: "YYYY-MM-DD" },
+      inputType: "date",
     },
     {
-      key: "teamAvailable",
-      promptLabel: "Team/resources actually available to execute",
-      label: { fr: "Équipe/ressources réellement disponibles", en: "Team/resources actually available" },
+      key: "targetEndDate",
+      promptLabel: "Target end date for the whole roadmap (YYYY-MM-DD) — phases must fit before it",
+      label: { fr: "Date cible de fin", en: "Target end date" },
+      placeholder: { fr: "AAAA-MM-JJ", en: "YYYY-MM-DD" },
+      inputType: "date",
+    },
+    {
+      key: "milestones",
+      promptLabel: "Milestones already committed (name — date when known); each must appear as the exit of a phase",
+      label: { fr: "Jalons déjà fixés (un par ligne : nom — date si connue)", en: "Committed milestones (one per line: name — date if known)" },
       placeholder: {
-        fr: "Ex : 2 chefs de projet, 1 intégrateur externe à partir de mars",
-        en: "E.g.: 2 project leads, 1 external integrator from March",
+        fr: "Ex :\nGo/No-go pilote — 2026-03-15\nMise en service ligne 2 — 2026-06-01\nAudit client",
+        en: "E.g.:\nPilot go/no-go — 2026-03-15\nLine 2 commissioning — 2026-06-01\nCustomer audit",
+      },
+      multiline: true,
+    },
+    {
+      key: "priorityActions",
+      promptLabel: "Priority actions already known — they must be placed in the right phase, not replaced",
+      label: { fr: "Actions prioritaires déjà connues", en: "Priority actions already known" },
+      placeholder: {
+        fr: "Ex : signer l'intégrateur MES, former les chefs d'équipe, auditer les stocks de la ligne 2",
+        en: "E.g.: sign the MES integrator, train team leads, audit line 2 inventory",
+      },
+      multiline: true,
+    },
+    {
+      key: "expectedDeliverables",
+      promptLabel: "Deliverables expected by management — each must be produced by one phase",
+      label: { fr: "Livrables attendus", en: "Expected deliverables" },
+      placeholder: {
+        fr: "Ex : cahier des charges MES, rapport de pilote, procédure qualité mise à jour",
+        en: "E.g.: MES specification, pilot report, updated quality procedure",
       },
       multiline: true,
     },
     {
       key: "constraints",
-      promptLabel: "Known scheduling constraints or blackout periods",
-      label: { fr: "Contraintes de planning connues", en: "Known scheduling constraints" },
+      promptLabel: "Known scheduling constraints, blackout periods and resources actually available",
+      label: { fr: "Contraintes de planning et ressources disponibles", en: "Scheduling constraints and available resources" },
       placeholder: {
-        fr: "Ex : arrêt usine en août, budget bloqué jusqu'au T2",
-        en: "E.g.: plant shutdown in August, budget locked until Q2",
+        fr: "Ex : arrêt usine en août, 2 chefs de projet, budget bloqué jusqu'au T2",
+        en: "E.g.: plant shutdown in August, 2 project leads, budget locked until Q2",
       },
       multiline: true,
     },
@@ -120,30 +159,46 @@ const INPUT_FIELDS: Record<DeliverableKind, DeliverableInputFieldDef[]> = {
       placeholder: { fr: "Ex : 30 jours, 90 jours", en: "E.g.: 30 days, 90 days" },
     },
   ],
+  // Tableau de bord KPI — the per-indicator questions (baseline + owner for
+  // each indicator already identified in Décider) are built dynamically by
+  // kpiIndicatorFields below; these are the dashboard-wide ones. When the
+  // project has no indicator yet, "currentBaseline" stays as the fallback.
   kpi_dashboard: [
     {
       key: "currentBaseline",
       promptLabel: "Real current measured values for the indicators — use these instead of guessing",
-      label: { fr: "Valeurs actuelles réellement mesurées", en: "Real current measured values" },
+      label: { fr: "Valeurs de référence actuelles des indicateurs suivis", en: "Current reference values of tracked indicators" },
       placeholder: {
-        fr: "Ex : taux de service actuel 92%, délai moyen 6j",
-        en: "E.g.: current service rate 92%, average lead time 6d",
+        fr: "Ex : taux de service 92 % (oct.), délai moyen 6 j, rebut 3,1 %",
+        en: "E.g.: service rate 92% (Oct.), average lead time 6d, scrap 3.1%",
       },
       multiline: true,
     },
     {
       key: "reportingFrequency",
-      promptLabel: "How often these KPIs will actually be tracked",
-      label: { fr: "Fréquence de suivi prévue", en: "Tracking frequency" },
-      placeholder: { fr: "Ex : hebdomadaire, comité mensuel", en: "E.g.: weekly, monthly steering committee" },
+      promptLabel: "Real steering rhythm: which body reviews these KPIs, and how often",
+      label: { fr: "Fréquence de pilotage réelle (quelle instance, quel rythme)", en: "Real steering rhythm (which body, how often)" },
+      placeholder: {
+        fr: "Ex : point hebdo atelier le lundi, comité de direction mensuel",
+        en: "E.g.: weekly shop-floor review on Mondays, monthly executive committee",
+      },
     },
     {
       key: "dataSource",
-      promptLabel: "Where this data actually comes from",
-      label: { fr: "Source des données", en: "Data source" },
+      promptLabel: "Where each figure actually comes from (system, file, manual count)",
+      label: { fr: "Source réelle des chiffres", en: "Actual source of the figures" },
       placeholder: {
-        fr: "Ex : ERP, tableur partagé, reporting terrain",
-        en: "E.g.: ERP, shared spreadsheet, field reporting",
+        fr: "Ex : ERP pour les délais, relevé manuel pour le rebut",
+        en: "E.g.: ERP for lead times, manual count for scrap",
+      },
+    },
+    {
+      key: "alertThresholds",
+      promptLabel: "Deviation thresholds that must trigger an action",
+      label: { fr: "Seuils d'alerte qui déclenchent une action", en: "Alert thresholds that trigger an action" },
+      placeholder: {
+        fr: "Ex : taux de service < 90 % deux semaines de suite",
+        en: "E.g.: service rate < 90% two weeks in a row",
       },
     },
   ],
@@ -222,29 +277,102 @@ const INPUT_FIELDS: Record<DeliverableKind, DeliverableInputFieldDef[]> = {
   ],
 };
 
+// Per-indicator questions for the KPI dashboard: one baseline and one owner
+// question for each indicator the chosen trajectory already carries — the
+// founder's ask was "valeur de référence PAR indicateur", not one generic
+// box. Capped so the form stays answerable.
+export const MAX_KPI_INDICATOR_QUESTIONS = 6;
+
+function kpiIndicatorFields(indicatorNames: string[]): DeliverableInputFieldDef[] {
+  return indicatorNames.slice(0, MAX_KPI_INDICATOR_QUESTIONS).flatMap((name) => [
+    {
+      key: `baseline:${name}`,
+      promptLabel: `Current measured baseline of indicator "${name}" (use as its "current" value, verbatim)`,
+      label: { fr: `${name} — valeur actuelle mesurée`, en: `${name} — current measured value` },
+      placeholder: { fr: "Ex : 92 % mesuré en octobre", en: "E.g.: 92% measured in October" },
+    },
+    {
+      key: `owner:${name}`,
+      promptLabel: `Person or role accountable for tracking indicator "${name}"`,
+      label: { fr: `${name} — responsable du suivi`, en: `${name} — accountable for tracking` },
+      placeholder: { fr: "Ex : responsable qualité usine", en: "E.g.: plant quality manager" },
+    },
+  ]);
+}
+
+export type DeliverableFieldContext = { indicatorNames?: string[] };
+
+function fieldDefs(kind: DeliverableKind, ctx: DeliverableFieldContext = {}): DeliverableInputFieldDef[] {
+  const names = (ctx.indicatorNames ?? []).map((n) => n.trim()).filter(Boolean);
+  if (kind === "kpi_dashboard" && names.length > 0) {
+    return [...kpiIndicatorFields(names), ...INPUT_FIELDS.kpi_dashboard.filter((f) => f.key !== "currentBaseline")];
+  }
+  return INPUT_FIELDS[kind];
+}
+
 export function getDeliverableInputFields(
   kind: DeliverableKind,
-  language: Language
-): { key: string; label: string; placeholder: string; multiline?: boolean }[] {
-  return INPUT_FIELDS[kind].map((f) => ({
+  language: Language,
+  ctx: DeliverableFieldContext = {}
+): { key: string; label: string; placeholder: string; multiline?: boolean; inputType?: "date" }[] {
+  return fieldDefs(kind, ctx).map((f) => ({
     key: f.key,
     label: f.label[language],
     placeholder: f.placeholder[language],
     multiline: f.multiline,
+    inputType: f.inputType,
   }));
 }
 
 // Only known keys for this kind are read — anything else the client sends
 // is ignored rather than rejected, same permissive-but-bounded approach as
 // the rest of Deliver's free-text fields. Each value capped defensively.
-function buildInputsBlock(kind: DeliverableKind, inputs: Record<string, string>): string {
-  const filled = INPUT_FIELDS[kind]
+export function buildInputsBlock(
+  kind: DeliverableKind,
+  inputs: Record<string, string>,
+  ctx: DeliverableFieldContext = {}
+): string {
+  const filled = fieldDefs(kind, ctx)
     .map((f) => ({ label: f.promptLabel, value: (inputs[f.key] ?? "").trim().slice(0, 600) }))
     .filter((f) => f.value.length > 0);
   if (filled.length === 0) return "";
   return `\n\nReal-world inputs provided by the client for this specific deliverable (ground the output in these first, they are more reliable than anything inferred) :\n${filled
     .map((f) => `- ${f.label}: ${f.value}`)
     .join("\n")}`;
+}
+
+// "Génération automatique" path: figures the client already entered in the
+// other modules (D01 capability levels, D02 flow map, L06 benefits), turned
+// into prompt lines. Every derived figure comes from the modules' own pure
+// calculators (computeFlow, computeObservedAnnual) — the AI only reads them.
+// An invalid or empty source simply contributes no line.
+export interface MeasuredDataInput {
+  capabilities: { domain: string; observed: number; target: number; status: string }[];
+  flow: { demand: number; steps: FlowStepInput[] } | null;
+  benefits: { expectedAnnual: number | null; observations: BenefitObservationInput[] };
+}
+
+export function buildMeasuredDataLines(input: MeasuredDataInput): string[] {
+  const lines: string[] = [];
+  for (const c of input.capabilities) {
+    lines.push(`Diagnostic D01 — ${c.domain} : niveau observé ${c.observed}/5, cible ${c.target}/5 (${c.status})`);
+  }
+  if (input.flow && validateFlowInputs(input.flow.steps, input.flow.demand).length === 0) {
+    const { current } = computeFlow(input.flow.steps, input.flow.demand);
+    lines.push(
+      `Cartographie des flux D02 — délai total ${current.lead} j (traitement ${current.process} j, attente ${current.wait} j, soit ${current.waitShare} % d'attente) ; goulot : ${current.bottleneck.name} (${current.bottleneck.capacity} pièces/j) pour une demande de ${input.flow.demand} pièces/j`
+    );
+  }
+  if (input.benefits.expectedAnnual !== null) {
+    lines.push(`Bénéfices L06 — bénéfice annuel attendu : ${input.benefits.expectedAnnual}`);
+  }
+  const observed = computeObservedAnnual(input.benefits.observations);
+  if (observed) {
+    lines.push(
+      `Bénéfices L06 — bénéfice annuel observé : ${observed.observedAnnual} (moyenne des ${observed.monthsUsed} derniers mois mesurés × 12)`
+    );
+  }
+  return lines;
 }
 
 export interface DeliverGenerationContext {
@@ -261,6 +389,10 @@ export interface DeliverGenerationContext {
   indicators: Record<string, string>;
   gaps: { name: string; reason: string }[];
   priorities: { name: string; reason: string }[];
+  // Figures already entered in other modules (diagnostic, flow map, benefits),
+  // pre-formatted by buildMeasuredDataLines — the "automatic" path builds on
+  // these when the client skips the questionnaire.
+  measuredData?: string[];
   sourceDocText?: string;
 }
 
@@ -325,9 +457,15 @@ const riskMapContentSchema = z.object({
     .max(8),
 });
 
+// keyPoints pair every observation with its solution in the schema itself:
+// the prompt rule "never a problem stated alone" is then enforced on parse,
+// not just requested in prose.
 const executiveReportContentSchema = z.object({
   summary: z.string().min(1),
-  keyPoints: z.array(z.string().min(1)).min(2).max(8),
+  keyPoints: z
+    .array(z.object({ observation: z.string().min(1), solution: z.string().min(1) }))
+    .min(2)
+    .max(8),
 });
 
 const toolkitContentSchema = z.object({
@@ -361,11 +499,16 @@ const deliverableOutputSchema = z.object({
 });
 
 const KIND_INSTRUCTIONS: Record<DeliverableKind, string> = {
-  roadmap: `Produce a DETAILED EXECUTION VERSION of the already-chosen roadmap phases given below — same phase names and sequence, do not invent a new sequence or rename phases. For each phase: detailedActions (granular execution steps beyond the high-level ones already listed), dependencies (what must be true/done before this phase can start — internal or external), ownerSuggestion (what role/function should own this phase, e.g. "Responsable production" — never a named individual).`,
+  roadmap: `Produce a DETAILED EXECUTION VERSION of the already-chosen roadmap phases given below — same phase names and sequence, do not invent a new sequence or rename phases. For each phase: detailedActions (granular execution steps beyond the high-level ones already listed), dependencies (what must be true/done before this phase can start — internal or external), ownerSuggestion (what role/function should own this phase, e.g. "Responsable production" — never a named individual).
+If the client listed priority actions, expected deliverables or milestones, place each one in the phase where it belongs (as a detailedAction, or a dependency for a milestone) — never drop or rephrase them away. Never write a calendar date yourself: dates come from the client's answers or the existing phase dates only.`,
   action_plan: `Concrete, short-term actions to start executing the chosen trajectory now. Each action: title, description (specific and actionable, never "improve X"), ownerSuggestion (role/function, not a named individual), timeframe (e.g. "Semaine 1-2", "Ce mois-ci").`,
-  kpi_dashboard: `Build a KPI dashboard STRICTLY FROM the trajectory's own indicators given below — do not invent new, disconnected metrics. For each indicator you're given, produce one kpi entry: name (the indicator's own name), target (the indicator's own value if verified, or a reasonable near-term target framed clearly as such), current (the current state if inferable, else null), unit, source ("trajectory" if it comes directly from a given indicator, "estimate" only if you had to add a plausible operational KPI absent from the list — use "estimate" sparingly, at most 1-2 entries).`,
+  kpi_dashboard: `Build a KPI dashboard STRICTLY FROM the trajectory's own indicators given below — do not invent new, disconnected metrics. For each indicator you're given, produce one kpi entry: name (the indicator's own name), target (the indicator's own value if verified, or a reasonable near-term target framed clearly as such), current, unit, source ("trajectory" if it comes directly from a given indicator, "estimate" only if you had to add an operational KPI absent from the list — use "estimate" sparingly, at most 1-2 entries, and prefer one grounded in the "already measured" data below, e.g. the flow map's lead time or the benefits tracked).
+"current" rules — never a guess: (1) if the client gave a measured baseline for this indicator, copy it verbatim; (2) else if the "already measured" data below contains this exact figure, copy it verbatim; (3) else null. Never derive, average or extrapolate a figure yourself.
+If the client named who tracks an indicator, how often it is reviewed, its data source or an alert threshold, append it to that kpi's "name" in parentheses only when short (e.g. "Taux de service (resp. : qualité usine, hebdo)"), so the dashboard says who owns what.`,
   risk_map: `Execution risks specific to actually RUNNING this project — distinct from the trajectory's own strategic risks given below (do not just repeat them; think about implementation, adoption, resourcing, timing risks instead). Each risk: name, description, likelihood (low/medium/high), impact (low/medium/high), mitigation (a concrete counter-measure, never "monitor closely").`,
-  executive_report: `A board-level synthesis of the chosen trajectory and its execution plan: summary (one dense paragraph — what's being done, why, and the expected outcome) + keyPoints (the handful of facts a director would want to know before signing off).`,
+  executive_report: `A board-level synthesis of the chosen trajectory and its execution plan: summary (what's being done, why, and the expected outcome — 3 to 4 short sentences, never a longer block) + keyPoints (the handful of points a director must know before signing off).
+${EXECUTIVE_NARRATIVE_RULES}
+- keyPoints: each entry is an object { "observation", "solution" } — "observation" states one finding (a fact, a gap, a risk, a figure from the context); "solution" is the concrete recommendation that answers it, written right after it: who acts, what exactly, by when or at which phase. Never an observation without its solution, never a solution that just restates the problem ("monitor", "pay attention to", "improve X" are not solutions).`,
   toolkit: `Recommend practical tools/templates/frameworks that genuinely fit THIS project — a specific tracker type, a governance template, a specific methodology — never a generic "use a project management tool" list. Each tool: name, purpose, whyThisProject (why this specific project needs exactly this, not a generality).`,
 };
 
@@ -374,7 +517,7 @@ const KIND_SCHEMA_BLOCK: Record<DeliverableKind, string> = {
   action_plan: `{ "actions": [{ "title": string, "description": string, "ownerSuggestion": string, "timeframe": string }] }`,
   kpi_dashboard: `{ "kpis": [{ "name": string, "target": string, "current": string|null, "unit": string, "source": "trajectory" | "estimate" }] }`,
   risk_map: `{ "risks": [{ "name": string, "description": string, "likelihood": "low"|"medium"|"high", "impact": "low"|"medium"|"high", "mitigation": string }] }`,
-  executive_report: `{ "summary": string, "keyPoints": [string] }`,
+  executive_report: `{ "summary": string, "keyPoints": [{ "observation": string, "solution": string }] }`,
   toolkit: `{ "tools": [{ "name": string, "purpose": string, "whyThisProject": string }] }`,
 };
 
@@ -415,9 +558,13 @@ Stack / solutions : ${context.techStack.map((t) => `${t.name}${t.detail ? ` — 
 Indicateurs de la trajectoire : ${JSON.stringify(context.indicators)}
 
 Gaps identifiés : ${context.gaps.map((g) => `${g.name} — ${g.reason}`).join("; ") || "(aucun)"}
-Priorités : ${context.priorities.map((p) => `${p.name} — ${p.reason}`).join("; ") || "(aucune)"}
+Priorités : ${context.priorities.map((p) => `${p.name} — ${p.reason}`).join("; ") || "(aucune)"}${
+    context.measuredData && context.measuredData.length > 0
+      ? `\n\nDonnées déjà mesurées dans les autres modules (chiffres exacts calculés par la plateforme — à reprendre tels quels, jamais recalculés ni extrapolés) :\n${context.measuredData.map((l) => `- ${l}`).join("\n")}`
+      : ""
+  }
 ${context.sourceDocText ? `\nDocument(s) projet fourni(s) (contexte supplémentaire) :\n${context.sourceDocText}` : ""}${
-    kind && inputs ? buildInputsBlock(kind, inputs) : ""
+    kind && inputs ? buildInputsBlock(kind, inputs, { indicatorNames: Object.keys(context.indicators) }) : ""
   }`;
 }
 

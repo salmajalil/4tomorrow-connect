@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  capabilityAssessmentProgress,
   computeCapabilityGaps,
   rankCapabilityGaps,
   validateCapabilityInputs,
@@ -123,5 +124,19 @@ describe("validateCapabilityInputs", () => {
       input({ domain: "rd", importance: 0 }),
     ]);
     expect(errors).toHaveLength(3);
+  });
+});
+
+describe("capabilityAssessmentProgress (gabarit D01)", () => {
+  it("is empty while no capability has been assessed — defaults never count", () => {
+    expect(capabilityAssessmentProgress([false, false, false])).toEqual({ state: "vide", assessed: 0, total: 3 });
+  });
+
+  it("is incomplete while only some capabilities are assessed", () => {
+    expect(capabilityAssessmentProgress([true, false, false])).toEqual({ state: "incomplet", assessed: 1, total: 3 });
+  });
+
+  it("is complete once every capability is assessed", () => {
+    expect(capabilityAssessmentProgress([true, true])).toEqual({ state: "complet", assessed: 2, total: 2 });
   });
 });

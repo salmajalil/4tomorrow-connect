@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { MAX_FREE_TEXT_LENGTH } from "@/lib/input-limits";
 import { createClient } from "@/lib/supabase/server";
 import { getLanguage } from "@/lib/i18n/language";
 
@@ -9,7 +10,7 @@ const requestSchema = z.object({
   partnerName: z.string().trim().min(1),
   requesterName: z.string().trim().min(1),
   requesterEmail: z.string().trim().email(),
-  message: z.string().trim().default(""),
+  message: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
 });
 
 // No email is actually sent here — same finding as

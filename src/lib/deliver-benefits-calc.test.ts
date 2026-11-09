@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { compareBenefits, computeItemsTotal, computeObservedAnnual } from "./deliver-benefits-calc";
+import {
+  compareBenefits,
+  compareToTrajectory,
+  computeExpectedTrajectory,
+  computeItemsTotal,
+  computeObservedAnnual,
+  resolveTrajectoryWindow,
+} from "./deliver-benefits-calc";
 
 describe("computeItemsTotal", () => {
   it("sums distinct perimeters normally", () => {
@@ -94,5 +101,64 @@ describe("compareBenefits", () => {
     const result = compareBenefits(0, 50);
     expect(result.percentOfExpected).toBeNull();
     expect(result.gap).toBe(50);
+  });
+});
+
+describe("computeExpectedTrajectory", () => {
+  it("interpolates linearly: at 60% of the elapsed time, 60% of the baseline→target delta", () => {
+    const r = computeExpectedTrajectory({ startDate: "2026-01-01", targetDate: "2026-04-11", today: "2026-03-02", baseline: 0, target: 1000 });
+    expect(r).toEqual({ elapsedRatio: 0.6, expectedToDate: 600 });
+  });
+
+  it("starts from a non-zero baseline", () => {
+    const r = computeExpectedTrajectory({ startDate: "2026-01-01", targetDate: "2026-04-11", today: "2026-02-20", baseline: 200, target: 1200 });
+    expect(r?.expectedToDate).toBe(700);
+  });
+
+  it("clamps before the start and after the target date", () => {
+    expect(
+      computeExpectedTrajectory({ startDate: "2026-01-01", targetDate: "2026-04-11", today: "2025-12-01", baseline: 0, target: 1000 })
+    ).toEqual({ elapsedRatio: 0, expectedToDate: 0 });
+    expect(
+      computeExpectedTrajectory({ startDate: "2026-01-01", targetDate: "2026-04-11", today: "2027-01-01", baseline: 0, target: 1000 })
+    ).toEqual({ elapsedRatio: 1, expectedToDate: 1000 });
+  });
+
+  it("computes nothing when the start, the target date or the target value is unknown", () => {
+    const base = { startDate: "2026-01-01", targetDate: "2026-04-11", today: "2026-03-02", baseline: 0, target: 1000 };
+    expect(computeExpectedTrajectory({ ...base, startDate: null })).toBeNull();
+    expect(computeExpectedTrajectory({ ...base, targetDate: null })).toBeNull();
+    expect(computeExpectedTrajectory({ ...base, target: null })).toBeNull();
+    expect(computeExpectedTrajectory({ ...base, targetDate: "2025-12-01" })).toBeNull();
+  });
+});
+
+describe("compareToTrajectory", () => {
+  it("reports the gap in value and in % of the expected trajectory", () => {
+    expect(compareToTrajectory(480, 600)).toEqual({ realized: 480, expectedToDate: 600, gap: -120, gapPercent: -20, status: "behind" });
+    expect(compareToTrajectory(660, 600).status).toBe("ahead");
+    expect(compareToTrajectory(590, 600).status).toBe("on_track");
+  });
+
+  it("has no % gap when nothing was expected yet", () => {
+    expect(compareToTrajectory(50, 0)).toMatchObject({ gapPercent: null, status: "ahead" });
+  });
+});
+
+describe("resolveTrajectoryWindow", () => {
+  const phases = [
+    { start_date: "2026-03-01", end_date: "2026-06-01", actual_start_date: null, order_index: 1 },
+    { start_date: "2026-01-05", end_date: "2026-03-01", actual_start_date: "2026-01-12", order_index: 0 },
+  ];
+
+  it("uses the first phase's actual start and the latest planned end", () => {
+    expect(resolveTrajectoryWindow(phases, [])).toEqual({ startDate: "2026-01-12", targetDate: "2026-06-01" });
+  });
+
+  it("falls back to the first observation for the start, and has no target without a roadmap", () => {
+    expect(resolveTrajectoryWindow([], [{ month: "2026-04", value: 1 }, { month: "2026-02", value: 1 }])).toEqual({
+      startDate: "2026-02-01",
+      targetDate: null,
+    });
   });
 });

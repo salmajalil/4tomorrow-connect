@@ -2,10 +2,16 @@
 
 import { Icon, type IconName } from "@/components/icons";
 import { Fragment, useState } from "react";
-import { DELIVERABLE_KINDS, DELIVERABLE_LABELS, getDeliverableInputFields, type DeliverableKind } from "@/lib/deliver";
+import {
+  DELIVERABLE_KINDS,
+  DELIVERABLE_LABELS,
+  getDeliverableInputFields,
+  type DeliverableFieldContext,
+  type DeliverableKind,
+} from "@/lib/deliver";
 import { ExecutionGantt } from "@/components/deliver/execution-gantt";
 import { parseJsonResponse } from "@/lib/parse-json-response";
-import { leadingNumber, riskCellTone } from "@/lib/deliver-content-display";
+import { leadingNumber, normalizeKeyPoint, riskCellTone } from "@/lib/deliver-content-display";
 import { useLanguage } from "@/components/language-provider";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type {
@@ -52,11 +58,19 @@ function ExecutiveReportContent({
         </button>
       </div>
       <ul className="flex flex-col gap-1.5">
-        {content.keyPoints.map((k, i) => (
-          <li key={i} className="rounded-lg border border-border bg-surface-2 p-2.5 text-sm text-ink">
-            {k}
-          </li>
-        ))}
+        {content.keyPoints.map((raw, i) => {
+          const k = normalizeKeyPoint(raw);
+          return (
+            <li key={i} className="rounded-lg border border-border bg-surface-2 p-2.5 text-sm">
+              <p className="text-ink">{k.observation}</p>
+              {k.solution && (
+                <p className="mt-1.5 border-l-2 border-success pl-2 text-ink">
+                  <span className="font-semibold text-success">{d.solutionLabel}</span> {k.solution}
+                </p>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -74,7 +88,7 @@ function DeliverableKpiDashboardContentView({ content, d }: { content: Deliverab
             <div className="flex items-baseline justify-between gap-2">
               <p className="font-semibold text-ink">{k.name}</p>
               <span
-                className={`text-[10px] font-semibold uppercase ${
+                className={`text-xs font-semibold uppercase ${
                   k.source === "trajectory" ? "text-success" : "text-accent-strong"
                 }`}
               >
@@ -127,13 +141,13 @@ function DeliverableRiskMapContentView({ content, d }: { content: DeliverableRis
         <div className="grid min-w-[420px] grid-cols-[auto_1fr_1fr_1fr] gap-1.5 text-xs">
           <div />
           {levels.map((impact) => (
-            <div key={impact} className="text-center font-mono text-[10px] uppercase tracking-wide text-muted">
+            <div key={impact} className="text-center font-mono text-xs uppercase tracking-wide text-muted">
               {severityLabel[impact]}
             </div>
           ))}
           {levels.map((likelihood) => (
             <Fragment key={likelihood}>
-              <div className="flex items-center justify-end pr-1 font-mono text-[10px] uppercase tracking-wide text-muted">
+              <div className="flex items-center justify-end pr-1 font-mono text-xs uppercase tracking-wide text-muted">
                 {severityLabel[likelihood]}
               </div>
               {levels.map((impact) => {
@@ -149,7 +163,7 @@ function DeliverableRiskMapContentView({ content, d }: { content: DeliverableRis
                       <span
                         key={r.i}
                         title={r.name}
-                        className="flex h-5 w-5 items-center justify-center rounded-full bg-ink text-[10px] font-semibold text-surface"
+                        className="flex h-5 w-5 items-center justify-center rounded-full bg-ink text-xs font-semibold text-surface"
                       >
                         {r.i + 1}
                       </span>
@@ -160,7 +174,7 @@ function DeliverableRiskMapContentView({ content, d }: { content: DeliverableRis
             </Fragment>
           ))}
         </div>
-        <p className="mt-1.5 flex justify-between px-1 text-[10px] font-mono uppercase tracking-wide text-muted">
+        <p className="mt-1.5 flex justify-between px-1 text-xs font-mono uppercase tracking-wide text-muted">
           <span>↑ {d.likelihood}</span>
           <span>{d.impact} →</span>
         </p>
@@ -170,7 +184,7 @@ function DeliverableRiskMapContentView({ content, d }: { content: DeliverableRis
           <div key={i} className={`rounded-lg border p-3 text-sm ${TONE_CLASSES[riskCellTone(r.likelihood, r.impact)]}`}>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <p className="font-semibold text-ink">
-                <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-ink text-[10px] font-semibold text-surface">
+                <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-ink text-xs font-semibold text-surface">
                   {i + 1}
                 </span>
                 {r.name}
@@ -206,7 +220,9 @@ function DeliverableContentView({
   d: Dictionary["deliver"]["deliverables"];
 }) {
   if (kind === "roadmap") {
-    return <ExecutionGantt transformationId={transformationId} initialPhases={roadmapPhases} />;
+    return (
+      <ExecutionGantt transformationId={transformationId} initialPhases={roadmapPhases} guidedInputs={deliverable.inputs ?? {}} />
+    );
   }
 
   if (kind === "action_plan") {
@@ -256,8 +272,10 @@ function DeliverableContentView({
 // The guided questionnaire shown inline on a card before its first
 // generation — replaces the old one-click blind "Générer". Every field is
 // optional; "Générer sans répondre" keeps the original one-click behavior
-// available for anyone who wants to skip straight past it.
-function DeliverableInputsForm({
+// available for anyone who wants to skip straight past it. Exported so
+// Décider's roadmap generation reuses the exact same questionnaire
+// (src/components/decide/roadmap-view.tsx) instead of a copy.
+export function DeliverableInputsForm({
   kind,
   language,
   values,
@@ -268,6 +286,8 @@ function DeliverableInputsForm({
   hasDocuments,
   submitting,
   d,
+  fieldContext,
+  excludeKeys = [],
 }: {
   kind: DeliverableKind;
   language: "fr" | "en";
@@ -279,36 +299,49 @@ function DeliverableInputsForm({
   hasDocuments: boolean;
   submitting: boolean;
   d: Dictionary["deliver"]["deliverables"];
+  // KPI dashboard: the indicators already identified, one baseline + one
+  // owner question each (see kpiIndicatorFields in src/lib/deliver.ts).
+  fieldContext?: DeliverableFieldContext;
+  // Fields the host screen already asks on its own (e.g. Décider's roadmap
+  // has its own start-date picker).
+  excludeKeys?: string[];
 }) {
-  const fields = getDeliverableInputFields(kind, language);
+  const fields = getDeliverableInputFields(kind, language, fieldContext).filter((f) => !excludeKeys.includes(f.key));
+  const inputClass =
+    "mt-1 w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none";
   return (
     <div className="mt-4 border-t border-border pt-4">
       <p className="font-semibold text-ink">{d.inputsTitle}</p>
       <p className="mt-1 text-xs text-muted">{d.inputsSubtitle}</p>
+      {kind === "kpi_dashboard" && (
+        <p className="mt-2 text-xs text-muted">{fieldContext?.indicatorNames?.length ? d.kpiInputsHint : d.kpiInputsNoIndicators}</p>
+      )}
+      {kind === "roadmap" && <p className="mt-2 text-xs text-muted">{d.roadmapInputsHint}</p>}
       {hasDocuments && <p className="mt-2 text-xs text-accent-strong">{d.inputsDocHint}</p>}
       <div className="mt-3 flex flex-col gap-3">
         {fields.map((f) => (
-          <div key={f.key}>
-            <label className="text-xs font-medium text-muted">
+          <label key={f.key} className="block">
+            <span className="text-xs font-medium text-muted">
               {f.label} <span className="text-muted/70">({d.inputsOptional})</span>
-            </label>
+            </span>
             {f.multiline ? (
               <textarea
                 value={values[f.key] ?? ""}
                 onChange={(e) => onChange(f.key, e.target.value)}
                 placeholder={f.placeholder}
-                rows={2}
-                className="mt-1 w-full resize-none rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+                rows={f.placeholder.includes("\n") ? 3 : 2}
+                className={`${inputClass} resize-none`}
               />
             ) : (
               <input
+                type={f.inputType === "date" ? "date" : "text"}
                 value={values[f.key] ?? ""}
                 onChange={(e) => onChange(f.key, e.target.value)}
                 placeholder={f.placeholder}
-                className="mt-1 w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+                className={inputClass}
               />
             )}
-          </div>
+          </label>
         ))}
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -337,12 +370,16 @@ export function DeliverablesTab({
   onDeliverablesChange,
   roadmapPhases,
   sourceDocText,
+  indicatorNames = [],
 }: {
   transformationId: string;
   deliverables: Partial<Record<DeliverableKind, Deliverable>>;
   onDeliverablesChange: (next: Partial<Record<DeliverableKind, Deliverable>>) => void;
   roadmapPhases: RoadmapPhaseEntry[];
   sourceDocText: string;
+  // Names of the chosen trajectory's indicators (Décider) — drive the KPI
+  // dashboard's per-indicator questions.
+  indicatorNames?: string[];
 }) {
   const { t, language } = useLanguage();
   const d = t.deliver.deliverables;
@@ -489,6 +526,7 @@ export function DeliverablesTab({
                   hasDocuments={sourceDocText.trim().length > 0}
                   submitting={generatingKind === kind}
                   d={d}
+                  fieldContext={{ indicatorNames }}
                 />
               )}
               {isOpen && deliverable && (
@@ -499,7 +537,9 @@ export function DeliverablesTab({
                       <summary className="cursor-pointer text-xs font-semibold text-accent-strong">{d.basedOnInputs}</summary>
                       <ul className="mt-2 flex flex-col gap-1">
                         {filledInputs.map(([key, value]) => {
-                          const field = getDeliverableInputFields(kind, language).find((f) => f.key === key);
+                          const field = getDeliverableInputFields(kind, language, { indicatorNames }).find(
+                            (f) => f.key === key
+                          );
                           return (
                             <li key={key} className="text-xs text-muted">
                               <span className="font-medium text-ink">{field?.label ?? key} :</span> {value}

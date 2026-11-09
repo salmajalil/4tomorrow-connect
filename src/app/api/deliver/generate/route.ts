@@ -81,11 +81,17 @@ export async function POST(request: Request) {
         messages: [
           {
             role: "user",
-            content: buildDeliverableUserPrompt(
-              { ...mission.context, sourceDocText: body.sourceDocText || undefined },
-              body.kind,
-              body.inputs
-            ),
+            content:
+              buildDeliverableUserPrompt(
+                { ...mission.context, sourceDocText: body.sourceDocText || undefined },
+                body.kind,
+                body.inputs
+              ) +
+              // The roadmap deliverable details the phases Décider already
+              // generated — its prompt refers to them "below", so list them.
+              (body.kind === "roadmap" && mission.phaseNames.length > 0
+                ? `\n\nPhases de la roadmap déjà choisies, dans l'ordre : ${mission.phaseNames.join(" → ")}`
+                : ""),
           },
         ],
       });

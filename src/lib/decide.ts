@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MATCH_CATEGORIES } from "@/lib/ecosystem-bricks";
+import { EXECUTIVE_NARRATIVE_RULES } from "@/lib/executive-narrative";
 import type { EcosystemMember, Language } from "@/types/database";
 import type { IconName } from "@/components/icons";
 
@@ -319,11 +320,14 @@ PRINCIPE DIRECTEUR — everything adapts to the actual subject, nothing is templ
 - regulations: search for and list only regulations/certifications/standards actually relevant to this specific subject and found with a source — industrial/safety standards for a physical subject, sectoral regulation (GDPR, financial compliance, etc.) for a digital or product subject, market standards for a commercialization subject. Never invent a reference; if none found, return an empty array.
 - radarScores: 0-10 per axis, in coherence with the indicators you just stated (never a score disconnected from the displayed numbers). Always include "cost", "risk", "roi", "feasibility" as axes, plus ONE more axis you choose to fit the subject (e.g. "co2" for an industrial/environmental subject, "speed" or "scalability" for a digital/commercial one).
 - risksSpecific / opportunitiesSpecific: distinct from the transverse risks already identified in the diagnostic — specific to what makes THIS scenario's approach risky or promising.
+- executiveBriefing: the narrative read by the CEO (Impact page, CEO and detailed reports). It follows the EXECUTIVE WRITING RULES below — each point it raises is followed right away by its solution.
 - briefingHighlights: 2 to 4 short bullet versions of executiveBriefing's most important points (≤15 words each, no trailing period) — a reader scanning only these must get the real substance.
 
 HARD ARRAY LIMITS — never exceed these, the response is rejected otherwise: techStack ≤4 items, suppliers ≤4 items, regulations ≤4 items, risksSpecific ≤3 items, opportunitiesSpecific ≤3 items. Pick the most important entries rather than listing everything you found.
 
 CORE RULE — NEVER GENERIC, same as the diagnostic: every sentence must contain something only true for this exact challenge. If information is insufficient to be precise on a point, say so rather than filling in a plausible generality.
+
+${EXECUTIVE_NARRATIVE_RULES}
 
 ${languageInstruction(language)}
 
@@ -387,6 +391,12 @@ export interface RoadmapGenerationInput {
   priorityCo2OrEquivalent: number;
   priorityRisk: number;
   prioritySpeed: number;
+  // Guided path (optional): the client's answers to the roadmap
+  // questionnaire, pre-formatted by buildInputsBlock (src/lib/deliver.ts),
+  // and the whole weeks available before the target end date, computed by
+  // weeksBetween (src/lib/deliver-gantt-calc.ts) — never by the model.
+  guidedInputsBlock?: string;
+  availableWeeks?: number | null;
 }
 
 const roadmapPhaseSchema = z.object({
@@ -421,6 +431,8 @@ Each phase needs: name, durationWeeks (a whole number of weeks for THIS phase, s
 
 HARD ARRAY LIMITS — never exceed these, the response is rejected otherwise: deliverables ≤4 items, actions ≤4 items, kpis ≤3 items, per phase. Pick the most important entries rather than listing everything you can think of.
 
+GUIDED INPUTS (only when the user prompt contains "Real-world inputs provided by the client"): they take precedence over your own ideas. Put every known priority action into the actions of the phase where it belongs, every expected deliverable into the deliverables of the phase that produces it, and make each committed milestone the exit of a phase (name the milestone in that phase's deliverables or kpis). If an available window in weeks is given, the sum of all durationWeeks must equal it exactly. Never write a calendar date yourself — dates are computed by the platform. When no such inputs are given, build the roadmap from the scenario alone, as usual.
+
 CORE RULE — NEVER GENERIC: same standard as the rest of Decide — every deliverable/action/kpi must contain something specific to this scenario.
 
 ${languageInstruction(language)}
@@ -442,7 +454,9 @@ Priorités ajustées par le client (0-100) :
 - Maîtrise des coûts : ${input.priorityCost}
 - CO2 / durabilité (ou équivalent pour ce type de projet) : ${input.priorityCo2OrEquivalent}
 - Réduction des risques : ${input.priorityRisk}
-- Rapidité de mise en œuvre : ${input.prioritySpeed}`;
+- Rapidité de mise en œuvre : ${input.prioritySpeed}${
+    input.availableWeeks ? `\n\nFenêtre disponible jusqu'à la date cible : ${input.availableWeeks} semaines (somme exacte des durationWeeks).` : ""
+  }${input.guidedInputsBlock ?? ""}`;
 }
 
 export function parseRoadmapOutput(rawText: string): RoadmapOutput {

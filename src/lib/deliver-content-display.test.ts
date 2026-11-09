@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { leadingNumber, riskCellTone } from "./deliver-content-display";
+import { leadingNumber, normalizeKeyPoint, riskCellTone } from "./deliver-content-display";
 
 describe("leadingNumber", () => {
   it("extracts an integer", () => {
@@ -54,5 +54,22 @@ describe("riskCellTone", () => {
 
   it("is symmetric in its two arguments", () => {
     expect(riskCellTone("medium", "high")).toBe(riskCellTone("high", "medium"));
+  });
+});
+
+describe("normalizeKeyPoint", () => {
+  it("keeps an observation/solution pair as-is", () => {
+    expect(normalizeKeyPoint({ observation: "Stock à 45 jours", solution: "Passer en flux tiré sur la ligne 2 d'ici mars" })).toEqual({
+      observation: "Stock à 45 jours",
+      solution: "Passer en flux tiré sur la ligne 2 d'ici mars",
+    });
+  });
+
+  it("shows a legacy plain-string key point without inventing a solution", () => {
+    expect(normalizeKeyPoint("Ancien point")).toEqual({ observation: "Ancien point", solution: null });
+  });
+
+  it("treats a blank solution as absent", () => {
+    expect(normalizeKeyPoint({ observation: "x", solution: "   " }).solution).toBeNull();
   });
 });

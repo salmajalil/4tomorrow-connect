@@ -242,6 +242,9 @@ export type Risk = {
   impact: number | null;
   owner: string | null;
   treatment: string | null;
+  // AR — objet impacté (option de décision, jalon, bénéfice…), texte libre
+  // saisi par l'utilisateur (0027_risk_impacted_object_action_completed_at.sql).
+  impacted_object: string | null;
   created_at: string;
 };
 
@@ -255,6 +258,9 @@ export type Action = {
   due_date: string | null;
   status: ActionStatus;
   source_module: string | null;
+  // Posée par un trigger base de données au passage à "done", remise à null
+  // sinon (0027) — null aussi pour les actions terminées avant cette migration.
+  completed_at: string | null;
   created_at: string;
 };
 
@@ -467,9 +473,14 @@ export type DeliverableRiskMapContent = {
     mitigation: string;
   }[];
 };
+// Each key point pairs an observation with its concrete solution — never a
+// problem stated alone. Plain strings are the pre-pairing shape still stored
+// on older rows; renderers normalize both (normalizeKeyPoint in
+// src/lib/deliver-content-display.ts).
+export type ExecutiveKeyPoint = { observation: string; solution: string };
 export type DeliverableExecutiveReportContent = {
   summary: string;
-  keyPoints: string[];
+  keyPoints: (ExecutiveKeyPoint | string)[];
 };
 export type DeliverableToolkitContent = {
   tools: { name: string; purpose: string; whyThisProject: string }[];

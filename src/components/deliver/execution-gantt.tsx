@@ -4,13 +4,11 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { parseJsonResponse } from "@/lib/parse-json-response";
 import { useLanguage } from "@/components/language-provider";
+import { GanttTimeline } from "@/components/deliver/gantt-timeline";
+import { isIsoDate, parseMilestones } from "@/lib/deliver-gantt-calc";
 import type { RoadmapExecutionStatus, RoadmapPhaseEntry } from "@/types/database";
 
 const GANTT_COLORS = ["#c8955a", "#7fb8c4", "#d48a6a", "#9cc08a", "#d9c3a5"];
-
-function daysBetween(a: string, b: string) {
-  return (new Date(b).getTime() - new Date(a).getTime()) / 86_400_000;
-}
 
 function SliderMini({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
@@ -40,11 +38,15 @@ function SliderMini({ label, value, onChange }: { label: string; value: number; 
 export function ExecutionGantt({
   transformationId,
   initialPhases,
+  guidedInputs = {},
 }: {
   transformationId: string;
   initialPhases: RoadmapPhaseEntry[];
+  // Answers to the roadmap questionnaire saved on the roadmap deliverable
+  // (deliverables.inputs) — milestones and target date are drawn on the axis.
+  guidedInputs?: Record<string, string>;
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const gantt = t.deliver.gantt;
   const STATUS_LABELS: Record<RoadmapExecutionStatus, string> = {
     upcoming: gantt.statusUpcoming,
@@ -94,47 +96,31 @@ export function ExecutionGantt({
     return <p className="text-sm text-muted">{gantt.noRoadmap}</p>;
   }
 
-  const rangeStart = sorted[0].start_date;
-  const rangeEnd = sorted.reduce((max, p) => (p.end_date > max ? p.end_date : max), sorted[0].end_date);
-  const totalDays = Math.max(1, daysBetween(rangeStart, rangeEnd));
+  const today = new Date().toISOString().slice(0, 10);
+  const targetDate = isIsoDate(guidedInputs.targetEndDate?.trim()) ? guidedInputs.targetEndDate.trim() : null;
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-xl border border-border bg-surface p-4">
-        <div className="flex items-center justify-between text-xs text-muted">
-          <span>{rangeStart}</span>
-          <span>{rangeEnd}</span>
-        </div>
-        <div className="mt-2 flex flex-col gap-2">
-          {sorted.map((phase) => {
-            const offsetPct = (daysBetween(rangeStart, phase.start_date) / totalDays) * 100;
-            const widthPct = Math.max(3, (daysBetween(phase.start_date, phase.end_date) / totalDays) * 100);
-            return (
-              <div key={phase.id} className="flex items-center gap-3">
-                <span className="w-24 shrink-0 truncate text-xs font-medium text-ink" title={phase.phase_name}>
-                  {phase.phase_name}
-                </span>
-                <div className="relative h-5 flex-1 rounded bg-surface-2">
-                  <div
-                    className={`absolute top-0 h-5 rounded ${
-                      phase.execution_status === "done"
-                        ? "opacity-100"
-                        : phase.execution_status === "in_progress"
-                          ? "opacity-90 ring-2 ring-live"
-                          : "opacity-35"
-                    }`}
-                    style={{
-                      left: `${offsetPct}%`,
-                      width: `${widthPct}%`,
-                      backgroundColor: GANTT_COLORS[phase.order_index % GANTT_COLORS.length],
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <GanttTimeline
+        rows={sorted.map((phase) => ({
+          key: phase.id,
+          label: phase.phase_name,
+          start: phase.start_date,
+          end: phase.end_date,
+          color: GANTT_COLORS[phase.order_index % GANTT_COLORS.length],
+          barClassName:
+            phase.execution_status === "done"
+              ? "opacity-100"
+              : phase.execution_status === "in_progress"
+                ? "opacity-90 ring-2 ring-live"
+                : "opacity-35",
+        }))}
+        milestones={parseMilestones(guidedInputs.milestones)}
+        targetDate={targetDate}
+        today={today}
+        language={language}
+        labels={{ today: gantt.today, target: gantt.target, milestones: gantt.milestones, undated: gantt.undatedMilestone }}
+      />
 
       <div className="flex flex-col gap-3">
         {sorted.map((phase) => (

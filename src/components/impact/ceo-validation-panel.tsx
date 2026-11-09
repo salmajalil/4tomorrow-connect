@@ -9,6 +9,7 @@ type HistoryEntry = {
   id: string;
   trajectory_id: string;
   decision_snapshot: string;
+  decision_hash: string | null;
   expires_at: string;
   used_at: string | null;
   outcome: "validated" | "needs_more_info" | "rejected" | null;
@@ -115,6 +116,7 @@ export function CeoValidationPanel({ transformationId }: { transformationId: str
                 transformationId,
                 trajectoryId: h.trajectory_id,
                 decisionSnapshot: h.decision_snapshot,
+                decisionHash: h.decision_hash,
                 expiresAt: h.expires_at,
                 usedAt: h.used_at,
                 outcome: h.outcome,

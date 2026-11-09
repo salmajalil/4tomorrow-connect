@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getLanguage } from "@/lib/i18n/language";
-import { canPerform, type TransformationActor } from "@/lib/transformation-roles";
-import type { Database, ModuleName } from "@/types/database";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { canPerform } from "@/lib/transformation-roles";
+import { loadActor } from "@/lib/transformation-actor";
+import type { ModuleName } from "@/types/database";
 
 const inviteSchema = z
   .object({
@@ -19,32 +19,6 @@ const inviteSchema = z
   });
 
 const memberIdSchema = z.string().uuid();
-
-// The caller's real standing on this transformation: owner of its
-// organization, or an accepted member with a given role — or nobody (null:
-// the transformation is invisible to them, or they have no role on it).
-async function loadActor(
-  supabase: SupabaseClient<Database>,
-  userId: string,
-  transformationId: string
-): Promise<TransformationActor | null> {
-  const [{ data: transformation }, { data: ownedOrgs }, { data: membership }] = await Promise.all([
-    supabase.from("transformations").select("id, organization_id").eq("id", transformationId).maybeSingle(),
-    supabase.from("organizations").select("id").eq("owner_id", userId),
-    supabase
-      .from("transformation_members")
-      .select("role, domain")
-      .eq("transformation_id", transformationId)
-      .eq("user_id", userId)
-      .not("accepted_at", "is", null)
-      .maybeSingle(),
-  ]);
-  if (!transformation) return null;
-  const isOwner = (ownedOrgs ?? []).some((o) => o.id === transformation.organization_id);
-  if (isOwner) return { role: "consultant", isOwner: true };
-  if (membership) return { role: membership.role, domain: membership.domain, isOwner: false };
-  return null;
-}
 
 // No email is actually sent here — there is no mailer configured anywhere
 // in this codebase (src/lib/anthropic.ts is the only outbound integration).

@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { MAX_FREE_TEXT_LENGTH } from "@/lib/input-limits";
 import { createServiceClient } from "@/lib/supabase/service";
-import { evaluateConsumption, isTokenStillUsable, type ValidationTokenRecord, type CurrentDecisionState } from "@/lib/validation-token";
+import {
+  evaluateConsumption,
+  isNoteRequired,
+  isTokenStillUsable,
+  type ValidationTokenRecord,
+  type CurrentDecisionState,
+} from "@/lib/validation-token";
+import { fetchDecisionHash } from "@/lib/decision-hash";
 import { getLanguage } from "@/lib/i18n/language";
 import { getDictionary } from "@/lib/i18n/dictionary";
 
@@ -30,11 +37,14 @@ async function loadState(supabase: ReturnType<typeof createServiceClient>, token
     decisionSnapshot: tokenRow.decision_snapshot,
     expiresAt: tokenRow.expires_at,
     usedAt: tokenRow.used_at,
+    decisionHash: tokenRow.decision_hash ?? null,
   };
   const current: CurrentDecisionState = {
     transformationId: tx.id,
     trajectoryId: tx.selected_trajectory_id,
     decisionUpdatedAt: tx.decision_updated_at,
+    // Recalculée à chaque lecture : comparée à celle figée dans le jeton.
+    decisionHash: await fetchDecisionHash(supabase, tx),
   };
   return { tokenRow, record, current };
 }
@@ -76,23 +86,48 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
   });
 }
 
-const postSchema = z.object({
-  confirmed: z.boolean(),
-  outcome: z.enum(["validated", "needs_more_info", "rejected"]),
-  note: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
-});
+// Motif OBLIGATOIRE pour un refus ou une demande de complément (blocage
+// réel côté serveur, pas seulement une indication à l'écran) ; optionnel
+// pour une validation simple. Le motif est toujours tapé par le CEO :
+// aucun code ne le pré-remplit, et l'IA n'intervient jamais sur cette route.
+const postSchema = z
+  .object({
+    confirmed: z.boolean(),
+    outcome: z.enum(["validated", "needs_more_info", "rejected"]),
+    note: z.string().trim().max(MAX_FREE_TEXT_LENGTH).default(""),
+  })
+  .superRefine((body, ctx) => {
+    if (isNoteRequired(body.outcome) && body.note.length < 1) {
+      ctx.addIssue({ code: "custom", path: ["note"], message: "note_required" });
+    }
+  });
 
 export async function POST(request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const language = await getLanguage();
   const supabase = createServiceClient();
 
-  let body: z.infer<typeof postSchema>;
+  let raw: unknown;
   try {
-    body = postSchema.parse(await request.json());
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: language === "en" ? "Invalid request." : "Requête invalide." }, { status: 400 });
   }
+  const parsed = postSchema.safeParse(raw);
+  if (!parsed.success) {
+    const noteMissing = parsed.error.issues.some((issue) => issue.message === "note_required");
+    return NextResponse.json(
+      {
+        error: noteMissing
+          ? getDictionary(language).impact.ceoValidation.noteRequired
+          : language === "en"
+            ? "Invalid request."
+            : "Requête invalide.",
+      },
+      { status: 400 }
+    );
+  }
+  const body = parsed.data;
 
   const state = await loadState(supabase, token);
   if (!state) {

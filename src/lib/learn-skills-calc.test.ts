@@ -5,6 +5,7 @@ import {
   validateSkillInputs,
   suggestTrainingForGap,
   topGapPerDomain,
+  buildTrainingSuggestions,
   DEFAULT_TRAINING_SUGGESTIONS,
   type SkillAssessmentInput,
 } from "./learn-skills-calc";
@@ -151,5 +152,48 @@ describe("topGapPerDomain", () => {
   it("excludes cells with no gap", () => {
     const results = computeSkillGaps([input({ required: 2, demonstrated: 2 })]);
     expect(topGapPerDomain(results)).toHaveLength(0);
+  });
+});
+
+describe("buildTrainingSuggestions", () => {
+  const results = computeSkillGaps([
+    input({ role: "Chef de ligne", domain: "manufacturing", required: 4, demonstrated: 1, criticality: 5 }), // écart 3, pondéré 15
+    input({ role: "Opérateur", domain: "manufacturing", required: 3, demonstrated: 2, criticality: 2 }), // écart 1, pondéré 2
+    input({ role: "Data analyst", domain: "digitalization", required: 4, demonstrated: 2, criticality: 4 }), // écart 2, pondéré 8
+    input({ role: "Directeur", domain: "strategy", required: 2, demonstrated: 3, criticality: 5 }), // pas d'écart
+  ]);
+
+  it("propose une formation par domaine en écart, jamais pour un domaine sans écart", () => {
+    const suggestions = buildTrainingSuggestions(results, {});
+    expect(suggestions.map((s) => s.domain)).toEqual(["manufacturing", "digitalization"]);
+  });
+
+  it("dérive l'impact visé des niveaux saisis : écart du rôle prioritaire, rôles et niveaux cumulés du domaine", () => {
+    const [manufacturing, digital] = buildTrainingSuggestions(results, {});
+    expect(manufacturing.topGap.role).toBe("Chef de ligne");
+    expect(manufacturing.levelsTargeted).toBe(3);
+    expect(manufacturing.rolesAffected).toBe(2);
+    expect(manufacturing.totalGapLevels).toBe(4);
+    expect(manufacturing.totalWeighted).toBe(17);
+    expect(digital.levelsTargeted).toBe(2);
+    expect(digital.rolesAffected).toBe(1);
+  });
+
+  it("prend l'intitulé du catalogue éditable, sinon le catalogue par défaut", () => {
+    const [manufacturing, digital] = buildTrainingSuggestions(results, { manufacturing: "SMED en atelier" });
+    expect(manufacturing.suggestion).toBe("SMED en atelier");
+    expect(digital.suggestion).toBe(DEFAULT_TRAINING_SUGGESTIONS.digitalization);
+  });
+
+  it("classe par priorité pondérée cumulée décroissante", () => {
+    const flipped = computeSkillGaps([
+      input({ role: "A", domain: "manufacturing", required: 1, demonstrated: 0, criticality: 1 }), // 1
+      input({ role: "B", domain: "gtm", required: 4, demonstrated: 0, criticality: 5 }), // 20
+    ]);
+    expect(buildTrainingSuggestions(flipped, {}).map((s) => s.domain)).toEqual(["gtm", "manufacturing"]);
+  });
+
+  it("renvoie une liste vide sans aucun écart", () => {
+    expect(buildTrainingSuggestions(computeSkillGaps([input({ required: 1, demonstrated: 2 })]), {})).toEqual([]);
   });
 });

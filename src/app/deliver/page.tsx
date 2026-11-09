@@ -10,6 +10,8 @@ import type { DeliverableKind, Deliverable, BenefitExpectation, BenefitItem, Ben
 import type { Domain } from "@/lib/decide";
 import { projectTitle as toProjectTitle } from "@/lib/text";
 import { fetchProjectAccessScope, isAccessibleTransformation } from "@/lib/project-access";
+import { loadActor } from "@/lib/transformation-actor";
+import { canReview, filterVisibleDeliverables } from "@/lib/review-status";
 
 function EmptyState({
   title,
@@ -96,6 +98,7 @@ export default async function DeliverPage({
   const trajectoryId = transformation.selected_trajectory_id as string;
 
   const [
+    actor,
     { data: deliverableRows },
     { data: phases },
     { data: priorities },
@@ -103,6 +106,7 @@ export default async function DeliverPage({
     { data: benefitItems },
     { data: benefitObservations },
   ] = await Promise.all([
+    loadActor(supabase, user.id, transformation.id),
     supabase
       .from("deliverables")
       .select("*")
@@ -119,8 +123,17 @@ export default async function DeliverPage({
     supabase.from("benefit_observations").select("*").eq("transformation_id", transformation.id).order("month"),
   ]);
 
+  // Confiance v2 — un executive report encore « Brouillon IA » n'est
+  // montré qu'à son propriétaire / aux consultants (src/lib/review-status.ts) ;
+  // le client et le CEO ne voient que ce qu'un humain a relu. La RLS de
+  // `deliverables` (owner-only) reste le filet de sécurité en dessous.
+  const viewerCanReview = canReview(actor);
+  const { visible: visibleDeliverables, hiddenDraftKinds } = filterVisibleDeliverables(
+    actor,
+    (deliverableRows ?? []) as Deliverable[]
+  );
   const deliverables: Partial<Record<DeliverableKind, Deliverable>> = {};
-  for (const row of (deliverableRows ?? []) as Deliverable[]) {
+  for (const row of visibleDeliverables) {
     deliverables[row.kind] = row;
   }
 
@@ -141,6 +154,8 @@ export default async function DeliverPage({
         domains={(transformation.domains as Domain[]) ?? []}
         initialConstraints={transformation.constraints ?? ""}
         initialDeliverables={deliverables}
+        canReview={viewerCanReview}
+        hiddenDraftKinds={hiddenDraftKinds as DeliverableKind[]}
         roadmapPhases={phases ?? []}
         priorities={priorities ?? []}
         initialBenefitExpectation={(benefitExpectation as BenefitExpectation | null) ?? null}

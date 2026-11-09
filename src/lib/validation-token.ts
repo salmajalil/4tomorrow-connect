@@ -20,12 +20,19 @@ export interface ValidationTokenRecord {
   decisionSnapshot: string; // ISO timestamp, copie de transformations.decision_updated_at à l'émission
   expiresAt: string; // ISO timestamp
   usedAt: string | null;
+  // SHA-256 de la décision à l'émission (src/lib/decision-hash.ts, 0026).
+  // Absent/null pour un jeton émis avant 0026 : seule la vérification
+  // trajectoire + decisionSnapshot s'applique alors.
+  decisionHash?: string | null;
 }
 
 export interface CurrentDecisionState {
   transformationId: string;
   trajectoryId: string | null; // selected_trajectory_id actuel
   decisionUpdatedAt: string; // ISO timestamp actuel
+  // Empreinte recalculée côté serveur sur l'état actuel de la décision.
+  // Absente côté client (historique) : la comparaison est alors ignorée.
+  decisionHash?: string | null;
 }
 
 export type ValidationRefusalCode = "not_confirmed" | "used" | "expired" | "other_project" | "decision_changed";
@@ -36,6 +43,22 @@ export interface ConsumeResult {
   // Code stable du motif de refus — permet aux écrans/routes de traduire le
   // motif (fr/en) sans dépendre du texte français ci-dessus.
   code: ValidationRefusalCode | null;
+}
+
+const DECISION_CHANGED_REASON = "Décision modifiée depuis l'envoi — ce lien n'est plus valide, il faut en réémettre un.";
+
+/**
+ * Motif obligatoire : un refus ou une demande de complément doit toujours
+ * être expliqué par le CEO lui-même (jamais pré-rempli, jamais par l'IA) ;
+ * une validation simple reste possible sans commentaire.
+ */
+export function isNoteRequired(outcome: ValidationOutcome): boolean {
+  return outcome === "rejected" || outcome === "needs_more_info";
+}
+
+/** True si le motif fourni satisfait la règle ci-dessus (espaces seuls = vide). */
+export function isOutcomeNoteValid(outcome: ValidationOutcome, note: string | null | undefined): boolean {
+  return !isNoteRequired(outcome) || (note ?? "").trim().length > 0;
 }
 
 /** Calcule l'expiration d'un nouveau jeton émis à `issuedAt`. */
@@ -67,10 +90,15 @@ export function evaluateConsumption(
     return { ok: false, reason: "Ce lien concerne un autre projet.", code: "other_project" };
   }
   if (current.trajectoryId !== token.trajectoryId) {
-    return { ok: false, reason: "La décision a changé depuis l'envoi de ce lien. Un nouveau lien est nécessaire.", code: "decision_changed" };
+    return { ok: false, reason: DECISION_CHANGED_REASON, code: "decision_changed" };
   }
   if (current.decisionUpdatedAt !== token.decisionSnapshot) {
-    return { ok: false, reason: "La décision a changé depuis l'envoi de ce lien. Un nouveau lien est nécessaire.", code: "decision_changed" };
+    return { ok: false, reason: DECISION_CHANGED_REASON, code: "decision_changed" };
+  }
+  // Empreinte du contenu de la décision : compare seulement quand les deux
+  // côtés en ont une (jeton post-0026 ET état courant calculé côté serveur).
+  if (token.decisionHash && current.decisionHash && token.decisionHash !== current.decisionHash) {
+    return { ok: false, reason: DECISION_CHANGED_REASON, code: "decision_changed" };
   }
   return { ok: true, reason: null, code: null };
 }

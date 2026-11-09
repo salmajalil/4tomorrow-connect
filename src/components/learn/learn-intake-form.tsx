@@ -3,6 +3,7 @@
 import { Icon, type IconName } from "@/components/icons";
 import { useEffect, useRef, useState } from "react";
 import { Eyebrow } from "@/components/eyebrow";
+import { ComputedBadge } from "@/components/computed-badge";
 import { extractFileText } from "@/lib/extract-file-text";
 import { useLanguage } from "@/components/language-provider";
 import type { Dictionary } from "@/lib/i18n/dictionary";
@@ -18,11 +19,11 @@ import {
   computeSkillGaps,
   validateSkillInputs,
   rankSkillGaps,
-  topGapPerDomain,
-  suggestTrainingForGap,
+  buildTrainingSuggestions,
   type Domain,
   type SkillAssessmentInput,
   type SkillGapResult,
+  type TrainingSuggestionImpact,
 } from "@/lib/learn-skills-calc";
 
 export interface LearnIntakeState {
@@ -60,17 +61,7 @@ function defaultSkillRow(): SkillRow {
 // to close up to the required level, empty = above what's required. Numbers
 // themselves (gap, priorité) are never recomputed here — straight from
 // computeSkillGaps()/rankSkillGaps() in src/lib/learn-skills-calc.ts.
-function SkillGapCard({
-  result: r,
-  skillsT,
-  suggestion,
-  onUseTopic,
-}: {
-  result: SkillGapResult;
-  skillsT: Dictionary["learn"]["skills"];
-  suggestion: string | null;
-  onUseTopic: () => void;
-}) {
+function SkillGapCard({ result: r, skillsT }: { result: SkillGapResult; skillsT: Dictionary["learn"]["skills"] }) {
   const toConfirm = r.status === "à confirmer";
   return (
     <div
@@ -109,7 +100,7 @@ function SkillGapCard({
       </div>
 
       {r.gap > 0 && (
-        <div className="flex items-center gap-3 border-t border-border/60 pt-2.5 text-xs">
+        <div className="flex flex-wrap items-center gap-3 border-t border-border/60 pt-2.5 text-xs">
           <span className="font-semibold text-ink">
             {skillsT.gap} {r.gap}
           </span>
@@ -117,21 +108,114 @@ function SkillGapCard({
           <span className="text-muted">
             {skillsT.priority} <span className="font-semibold text-ink">{r.weighted}</span>
           </span>
+          <ComputedBadge className="ml-auto" />
         </div>
       )}
+    </div>
+  );
+}
 
-      {suggestion && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-accent/10 px-3 py-2 text-xs">
-          <span className="text-ink">{suggestion}</span>
-          <button
-            type="button"
-            onClick={onUseTopic}
-            className="shrink-0 rounded-lg border border-border bg-surface px-2.5 py-1 font-medium text-ink transition hover:border-accent/50"
-          >
-            {skillsT.useTopic}
-          </button>
+// F01 — formation suggérée, au moins aussi visuelle que les cartes de
+// diagnostic : intitulé en titre, impact visé en gros chiffre (écart du
+// rôle le plus prioritaire du domaine), barre segmentée avant → visé sur la
+// même échelle 0-4 que les cartes d'écart, puis l'ampleur sur le domaine
+// (rôles concernés, niveaux cumulés, priorité). Tous les chiffres viennent
+// de buildTrainingSuggestions() (learn-skills-calc.ts) — aucun n'est
+// recalculé ni inventé ici ; l'intitulé vient du catalogue, jamais de l'IA.
+function TrainingSuggestionCard({
+  item,
+  rank,
+  skillsT,
+  selected,
+  onUseTopic,
+}: {
+  item: TrainingSuggestionImpact;
+  rank: number;
+  skillsT: Dictionary["learn"]["skills"];
+  selected: boolean;
+  onUseTopic: () => void;
+}) {
+  const top = item.topGap;
+  return (
+    <div
+      className={`flex flex-col gap-3 rounded-xl border p-4 transition ${
+        selected ? "border-accent bg-accent/10" : "border-accent/30 bg-surface"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 font-mono text-xs font-semibold text-accent-strong">
+          {String(rank).padStart(2, "0")}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold leading-snug text-ink">{item.suggestion}</p>
+          <p className="text-xs text-muted">{DOMAIN_LABELS[item.domain]}</p>
         </div>
-      )}
+        <div className="shrink-0 text-right">
+          <p className="font-display text-2xl leading-none text-success tabular-nums">
+            {skillsT.impactLevels.replace("{n}", String(item.levelsTargeted))}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-xs text-muted">{skillsT.impactTarget.replace("{role}", top.role)}</p>
+          <ComputedBadge />
+        </div>
+        <div className="flex gap-0.5" aria-hidden>
+          {Array.from({ length: SKILL_LEVEL_MAX }, (_, i) => {
+            const level = i + 1;
+            const filled =
+              level <= top.demonstrated
+                ? "bg-accent"
+                : level <= top.required
+                  ? "bg-success/70"
+                  : "bg-border";
+            return <span key={i} className={`h-2.5 flex-1 rounded-full ${filled}`} />;
+          })}
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+          <span className="flex items-center gap-3">
+            <span className="flex items-center gap-1">
+              <span aria-hidden className="h-2 w-2 rounded-full bg-accent" />
+              {skillsT.legendToday}
+            </span>
+            <span className="flex items-center gap-1">
+              <span aria-hidden className="h-2 w-2 rounded-full bg-success/70" />
+              {skillsT.legendClosed}
+            </span>
+          </span>
+          <span className="tabular-nums">
+            {skillsT.impactBeforeAfter
+              .replace("{from}", String(top.demonstrated))
+              .replace("{to}", String(top.required))
+              .replaceAll("{max}", String(SKILL_LEVEL_MAX))}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5 text-xs">
+        <span className="rounded-full bg-surface-2 px-2.5 py-1 text-ink">
+          {skillsT.impactRoles.replace("{n}", String(item.rolesAffected))}
+        </span>
+        <span className="rounded-full bg-surface-2 px-2.5 py-1 text-ink">
+          {skillsT.impactTotalLevels.replace("{n}", String(item.totalGapLevels))}
+        </span>
+        <span className="rounded-full bg-danger/10 px-2.5 py-1 text-danger">
+          {skillsT.impactPriority.replace("{n}", String(item.totalWeighted))}
+        </span>
+      </div>
+
+      <button
+        type="button"
+        onClick={onUseTopic}
+        disabled={selected}
+        className={`self-start rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+          selected ? "bg-accent text-accent-ink" : "border border-accent text-accent-strong hover:bg-accent/10"
+        }`}
+      >
+        {selected ? `✓ ${skillsT.topicSelected}` : skillsT.useTopic}
+      </button>
     </div>
   );
 }
@@ -218,7 +302,7 @@ export function LearnIntakeForm({
   const validSkillInputs: SkillAssessmentInput[] = skillRows.filter((r) => !skillRowErrors.has(r.id)).map(toSkillInput);
   const skillResults = computeSkillGaps(validSkillInputs);
   const rankedSkillResults = rankSkillGaps(skillResults);
-  const topGaps = topGapPerDomain(skillResults);
+  const trainingSuggestions = buildTrainingSuggestions(skillResults, catalog);
 
   function updateSkillRow(id: string, patch: Partial<SkillAssessmentInput>) {
     setSkillRows((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -546,26 +630,29 @@ export function LearnIntakeForm({
                     .replace("{domain}", DOMAIN_LABELS[rankedSkillResults[0].domain])
                 : skillsT.noGaps}
             </p>
-            <p className="text-xs text-muted">{skillsT.topGapsTitle}</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {rankedSkillResults.map((r, i) => {
-                // The top (highest-priority) gap in r's domain gets the suggested
-                // training surfaced directly on its own card — never more than one
-                // per domain (see topGapPerDomain in learn-skills-calc.ts).
-                const isTopGapForDomain = topGaps.some((g) => g.domain === r.domain && g.role === r.role && g.gap > 0);
-                const suggestion = isTopGapForDomain
-                  ? (suggestTrainingForGap(r.domain, catalog) ?? DEFAULT_TRAINING_SUGGESTIONS[r.domain])
-                  : null;
-                return (
-                  <SkillGapCard
-                    key={`${r.role}-${r.domain}-${i}`}
-                    result={r}
-                    skillsT={skillsT}
-                    suggestion={suggestion}
-                    onUseTopic={() => suggestion && setState((s) => ({ ...s, topic: suggestion }))}
-                  />
-                );
-              })}
+              {rankedSkillResults.map((r, i) => (
+                <SkillGapCard key={`${r.role}-${r.domain}-${i}`} result={r} skillsT={skillsT} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {trainingSuggestions.length > 0 && (
+          <div className="flex flex-col gap-2 border-t border-border pt-4">
+            <span className="text-xs font-semibold uppercase tracking-wide text-accent-strong">{skillsT.suggestionsTitle}</span>
+            <p className="text-xs text-muted">{skillsT.suggestionsHint}</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {trainingSuggestions.map((item, i) => (
+                <TrainingSuggestionCard
+                  key={item.domain}
+                  item={item}
+                  rank={i + 1}
+                  skillsT={skillsT}
+                  selected={state.topic.trim() === item.suggestion.trim()}
+                  onUseTopic={() => setState((s) => ({ ...s, topic: item.suggestion }))}
+                />
+              ))}
             </div>
           </div>
         )}

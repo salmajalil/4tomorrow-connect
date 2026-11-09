@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Icon } from "@/components/icons";
+import { ComputedBadge } from "@/components/computed-badge";
 import { useLanguage } from "@/components/language-provider";
 import {
   computeSupplierAssessment,
@@ -130,6 +131,9 @@ export function SupplierAssessmentPanel({
             {!shown.recommended && shown.missingProofs.length > 0 && (
               <span className="text-muted">{a.missingProofsCount.replace("{n}", String(shown.missingProofs.length))}</span>
             )}
+            {/* Éligibilité, score et « recommandé » : computeSupplierAssessment
+                (connect-supplier-calc.ts), jamais saisis ni choisis par l'IA. */}
+            <ComputedBadge className="ml-auto" />
           </div>
           {shown.totalCriteria > 0 && (
             <div className="flex items-center gap-2">

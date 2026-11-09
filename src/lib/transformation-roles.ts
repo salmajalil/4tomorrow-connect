@@ -9,6 +9,8 @@
 //   client = modifie les données de son usine ;
 //   expert = consulte, commente, modifie son domaine ;
 //   CEO = valide / demande un complément / refuse.
+// Ajout Confiance v2 : un livrable « Brouillon IA » n'est visible et
+// révisable que par son propriétaire ou un consultant (review_deliverable).
 import type { ModuleName } from "@/types/database";
 
 export type TransformationRole = "consultant" | "client" | "expert" | "ceo";
@@ -19,7 +21,11 @@ export type TransformationAction =
   | "edit_data" // modifier les données d'un module (diagnostic, scénarios, etc.)
   | "manage_members" // inviter / modifier / retirer un membre
   | "send_to_ceo" // envoyer une décision en validation
-  | "validate_decision"; // valider / demander un complément / refuser une décision
+  | "validate_decision" // valider / demander un complément / refuser une décision
+  // Voir un livrable encore « Brouillon IA » et le marquer revu / validé
+  // (0026, src/lib/review-status.ts) — geste humain de celui qui porte le
+  // livrable, jamais du client ni du CEO, qui ne voient que le contenu revu.
+  | "review_deliverable";
 
 export interface TransformationActor {
   role: TransformationRole;
@@ -44,6 +50,8 @@ export function canPerform(actor: TransformationActor, action: TransformationAct
   switch (actor.role) {
     case "consultant":
       // "modifie tout, envoie au CEO" — tout sauf valider la décision à sa place (ça, c'est le CEO).
+      // Inclut review_deliverable : relire et valider un brouillon IA fait
+      // partie de « modifie tout ».
       return action !== "validate_decision";
 
     case "client":
@@ -74,6 +82,14 @@ export function canPerform(actor: TransformationActor, action: TransformationAct
 
 /** Liste les actions permises pour un acteur donné dans un contexte donné — pratique pour l'UI (griser un bouton plutôt que laisser l'API le refuser). */
 export function allowedActions(actor: TransformationActor, context: TransformationActionContext = {}): TransformationAction[] {
-  const all: TransformationAction[] = ["read", "comment", "edit_data", "manage_members", "send_to_ceo", "validate_decision"];
+  const all: TransformationAction[] = [
+    "read",
+    "comment",
+    "edit_data",
+    "manage_members",
+    "send_to_ceo",
+    "validate_decision",
+    "review_deliverable",
+  ];
   return all.filter((action) => canPerform(actor, action, context));
 }

@@ -11,6 +11,7 @@ import { RadarChart } from "@/components/decide/radar-chart";
 import { ScenarioCard, type ScenarioWithId } from "@/components/decide/scenario-card";
 import { BusinessCaseForm } from "@/components/decide/business-case-form";
 import { Eyebrow } from "@/components/eyebrow";
+import { ComputedBadge } from "@/components/computed-badge";
 import { ExportPdfButton } from "@/components/export-pdf-button";
 import { createClient } from "@/lib/supabase/client";
 import { parseJsonResponse } from "@/lib/parse-json-response";
@@ -422,6 +423,40 @@ export function DecideFlow({
                 </label>
               ))}
             </div>
+            {/* Résultat de rankScenarios (decide-scenario-calc.ts) pour les
+                poids saisis ci-dessus — jamais modifiable directement. */}
+            {ranked.length > 0 && (
+              <div className="mt-4 rounded-lg border border-border bg-surface-2/40 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+                    {t.decide.scenarios.weightedRankingTitle}
+                  </p>
+                  <ComputedBadge />
+                </div>
+                <ol className="mt-2 flex flex-col gap-1.5">
+                  {ranked.map((r, rank) => {
+                    const s = scenarios.find((sc) => sc.trajectoryId === r.trajectoryId);
+                    if (!s) return null;
+                    return (
+                      <li key={r.trajectoryId} className="flex items-center gap-3 text-sm">
+                        <span className="w-5 font-mono text-xs text-muted">{rank + 1}.</span>
+                        <span className={`min-w-0 flex-1 truncate ${r.veto ? "text-muted line-through" : "text-ink"}`}>{s.name}</span>
+                        <span className="h-1.5 w-24 overflow-hidden rounded-full bg-surface">
+                          <span
+                            className={`block h-full rounded-full ${r.veto ? "bg-border" : "bg-accent"}`}
+                            style={{ width: `${Math.min(100, Math.max(0, r.weightedScore * 10))}%` }}
+                          />
+                        </span>
+                        <span className="w-14 text-right font-display tabular-nums text-ink">
+                          {r.weightedScore.toFixed(1)}
+                          <span className="text-xs text-muted">{t.decide.scenarios.weightedScoreOutOf}</span>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
+            )}
             {weightsError && <p className="mt-3 text-xs text-danger">{weightsError}</p>}
             {weightErrors.length > 0 && !weightsError && (
               <p className="mt-3 text-xs text-danger">{weightErrors[0]}</p>

@@ -3,6 +3,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getLanguage } from "@/lib/i18n/language";
 import { computeBusinessCase, validateBusinessCaseInputs } from "@/lib/decide-business-case-calc";
+import { loadActor } from "@/lib/transformation-actor";
+import { canReview, isVisibleTo, normalizeReviewStatus } from "@/lib/review-status";
 
 // D05 — Business case, en option (désactivée par défaut). Appelé depuis
 // l'écran de détail d'un scénario une fois un chiffrage saisi par
@@ -129,5 +131,16 @@ export async function GET(request: Request) {
   }
 
   const { data } = await supabase.from("business_cases").select("*").eq("trajectory_id", trajectoryId).maybeSingle();
-  return NextResponse.json({ businessCase: data ?? null });
+  if (!data) return NextResponse.json({ businessCase: null, canReview: false, hiddenDraft: false });
+
+  // Confiance v2 — un business case encore en brouillon (jamais relu) n'est
+  // montré qu'au propriétaire / aux consultants ; le client et le CEO ne
+  // voient que ce qu'un humain a marqué revu ou validé.
+  const actor = await loadActor(supabase, user.id, data.transformation_id);
+  const visible = isVisibleTo(actor, normalizeReviewStatus(data.review_status));
+  return NextResponse.json({
+    businessCase: visible ? data : null,
+    canReview: canReview(actor),
+    hiddenDraft: !visible,
+  });
 }

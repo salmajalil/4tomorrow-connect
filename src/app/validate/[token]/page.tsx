@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { evaluateConsumption, type ValidationTokenRecord, type CurrentDecisionState } from "@/lib/validation-token";
 import { fetchProjectImpact } from "@/lib/project-impact";
+import { fetchDecisionHash } from "@/lib/decision-hash";
 import { ValidationActions } from "@/components/validate/validation-actions";
 import { getLanguage } from "@/lib/i18n/language";
 import { getDictionary } from "@/lib/i18n/dictionary";
@@ -44,11 +45,16 @@ export default async function ValidatePage({ params }: { params: Promise<{ token
     decisionSnapshot: tokenRow.decision_snapshot,
     expiresAt: tokenRow.expires_at,
     usedAt: tokenRow.used_at,
+    decisionHash: tokenRow.decision_hash ?? null,
   };
   const current: CurrentDecisionState = {
     transformationId: tx.id,
     trajectoryId: tx.selected_trajectory_id,
     decisionUpdatedAt: tx.decision_updated_at,
+    // Empreinte recalculée sur l'état actuel : si elle diffère de celle
+    // figée à l'émission, la page affiche « Décision modifiée depuis
+    // l'envoi » au lieu des boutons de validation.
+    decisionHash: await fetchDecisionHash(supabase, tx),
   };
 
   if (tokenRow.used_at !== null) {

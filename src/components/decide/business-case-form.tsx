@@ -13,6 +13,9 @@ import {
   type BusinessCaseFormValues,
 } from "@/lib/decide-business-case-calc";
 import type { BusinessCase } from "@/types/database";
+import { ComputedBadge } from "@/components/computed-badge";
+import { ReviewStatusBar, type ReviewState } from "@/components/review-status";
+import { normalizeReviewStatus } from "@/lib/review-status";
 
 // D05 — Business case, en option (désactivée par défaut, checkbox décochée
 // à l'ouverture tant qu'aucun business case n'a été enregistré). Les
@@ -94,6 +97,17 @@ function fmt(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }
 
+function rowToReview(row: BusinessCase): { id: string; state: ReviewState } {
+  return {
+    id: row.id,
+    state: {
+      review_status: normalizeReviewStatus(row.review_status),
+      reviewed_by_name: row.reviewed_by_name ?? null,
+      reviewed_at: row.reviewed_at ?? null,
+    },
+  };
+}
+
 function rowToResult(row: BusinessCase): Result {
   return {
     netAnnual: Number(row.net_annual),
@@ -115,6 +129,12 @@ export function BusinessCaseForm({ transformationId, trajectoryId }: { transform
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [actionCreated, setActionCreated] = useState(false);
+  // Confiance v2 — statut de revue humaine de la ligne business_cases
+  // enregistrée (Brouillon → Revu → Validé), et droit de l'appelant à le
+  // faire avancer (propriétaire / consultant, calculé côté serveur).
+  const [review, setReview] = useState<{ id: string; state: ReviewState } | null>(null);
+  const [viewerCanReview, setViewerCanReview] = useState(false);
+  const [hiddenDraft, setHiddenDraft] = useState(false);
 
   // Relecture du dernier business case enregistré pour cette trajectoire
   // (même principe que FlowView pour process_flows) — la table n'était
@@ -127,7 +147,10 @@ export function BusinessCaseForm({ transformationId, trajectoryId }: { transform
         const { data } = await parseJsonResponse(res);
         if (cancelled) return;
         const row = (data.businessCase ?? null) as BusinessCase | null;
+        setViewerCanReview(data.canReview === true);
+        setHiddenDraft(data.hiddenDraft === true);
         if (row) {
+          setReview(rowToReview(row));
           const input = {
             capex: Number(row.capex),
             annualGains: Number(row.annual_gains),
@@ -181,6 +204,9 @@ export function BusinessCaseForm({ transformationId, trajectoryId }: { transform
       if (!res.ok) throw new Error((data.error as string) || bc.errorGeneric);
       setResult(data.result as Result);
       setResultSignature(businessCaseInputsSignature(input));
+      // Nouveau chiffrage : la ligne relue en base est retombée en brouillon
+      // si les entrées ont changé (trigger 0026) — on affiche son statut réel.
+      if (data.businessCase) setReview(rowToReview(data.businessCase as BusinessCase));
       setBenefitLinked(data.benefitLinked === true);
     } catch (err) {
       setError(err instanceof Error ? err.message : bc.errorGeneric);
@@ -228,6 +254,8 @@ export function BusinessCaseForm({ transformationId, trajectoryId }: { transform
         {bc.toggle}
       </label>
 
+      {hiddenDraft && <p className="mt-3 text-xs text-muted">{t.trust.review.hiddenDraft}</p>}
+
       {enabled && (
         <div className="mt-4 flex flex-col gap-4">
           {/* 1. Réponse chiffrée en titre + état du gabarit */}
@@ -237,6 +265,18 @@ export function BusinessCaseForm({ transformationId, trajectoryId }: { transform
               {stateBadge[state].label}
             </span>
           </div>
+
+          {review && state === "resultat" && (
+            <ReviewStatusBar
+              key={`${review.id}-${review.state.review_status}`}
+              target="business_case"
+              id={review.id}
+              state={review.state}
+              canReview={viewerCanReview}
+              aiGenerated={false}
+              onChange={(next) => setReview({ id: review.id, state: next })}
+            />
+          )}
 
           {state === "a_revoir" && (
             <p className="rounded-lg border border-danger/40 bg-danger/5 px-4 py-2 text-sm text-ink">{bc.staleNotice}</p>
@@ -254,7 +294,10 @@ export function BusinessCaseForm({ transformationId, trajectoryId }: { transform
                 <Stat label={bc.npv} value={result.npv !== null ? `${fmt(result.npv)} k€` : bc.npvNoRate} />
               </div>
               <div className="rounded-xl border border-border bg-surface p-4">
-                <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted">{bc.cumulativeTitle}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted">{bc.cumulativeTitle}</p>
+                  <ComputedBadge />
+                </div>
                 <div className="mt-3">
                   <CumulativeFlowChart cumulativeByYear={result.cumulativeByYear} paybackYears={result.paybackYears} bc={bc} />
                 </div>
@@ -366,10 +409,15 @@ function Field({
   );
 }
 
+// Résultat (gain net, payback, VAN) : toujours issu du calcul serveur,
+// jamais saisi — marqué « Calculé » pour le distinguer des champs de saisie.
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-border p-3">
-      <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted">{label}</p>
+    <div className="rounded-lg border border-border bg-surface-2/40 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted">{label}</p>
+        <ComputedBadge />
+      </div>
       <p className="mt-1 font-display text-xl text-ink tabular-nums">{value}</p>
     </div>
   );

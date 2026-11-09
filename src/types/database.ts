@@ -483,6 +483,9 @@ export type DeliverableContent =
   | DeliverableExecutiveReportContent
   | DeliverableToolkitContent;
 
+// 0026 — Brouillon IA / Revu / Validé (src/lib/review-status.ts).
+export type ReviewStatusValue = "ai_draft" | "reviewed" | "validated";
+
 export type Deliverable = {
   id: string;
   transformation_id: string;
@@ -495,6 +498,13 @@ export type Deliverable = {
   // (e.g. the "Boost All" fast path). Shown back on the view as "basé sur
   // tes réponses" transparency, same spirit as "Comment c'est calculé".
   inputs: Record<string, string>;
+  // 0026 — statut de revue humaine (jamais écrit par l'IA, voir
+  // src/lib/review-status.ts). Retombe à 'ai_draft' en base dès que le
+  // contenu change (trigger deliverables_reset_review_status).
+  review_status: ReviewStatusValue;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  reviewed_by_name: string | null;
   created_at: string;
 };
 
@@ -547,6 +557,11 @@ export type BusinessCase = {
   payback_years: number | null;
   npv: number | null;
   cumulative_by_year: number[];
+  // 0026 — statut de revue humaine, voir Deliverable ci-dessus.
+  review_status: ReviewStatusValue;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  reviewed_by_name: string | null;
   created_at: string;
 };
 
@@ -577,6 +592,9 @@ export type CeoValidationToken = {
   used_at: string | null;
   outcome: ValidationOutcomeValue | null;
   outcome_note: string | null;
+  // 0026 — SHA-256 de la décision à l'émission (src/lib/decision-hash.ts) ;
+  // null pour un jeton émis avant cette migration.
+  decision_hash: string | null;
   created_at: string;
 };
 

@@ -27,11 +27,13 @@ export function ConnectFlow({
   initialDescription = "",
   transformationId = null,
   initialResult = null,
+  canSeeCompetitors = true,
 }: {
   initialIndustry?: string;
   initialDescription?: string;
   transformationId?: string | null;
   initialResult?: ModelOutput | null;
+  canSeeCompetitors?: boolean;
 }) {
   const { t } = useLanguage();
   const [step, setStep] = useState(1);
@@ -144,6 +146,7 @@ export function ConnectFlow({
           transformationId={activeTransformationId}
           projectLabel={state.industry || t.connect.results.yourProject}
           storageKey={`connect-shortlist-${activeTransformationId ?? "draft"}`}
+          canSeeCompetitors={canSeeCompetitors}
         />
         <div className="mt-10 rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted">
           {t.connect.results.missingPartner}{" "}

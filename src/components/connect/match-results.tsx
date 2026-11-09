@@ -290,6 +290,7 @@ export function MatchResults({
   transformationId = null,
   projectLabel,
   storageKey = "connect-shortlist",
+  canSeeCompetitors = true,
 }: {
   result: ModelOutput;
   // C02 — DB id of each match, same order as result.matches (see
@@ -299,6 +300,13 @@ export function MatchResults({
   transformationId?: string | null;
   projectLabel?: string;
   storageKey?: string;
+  // Veille concurrentielle interne : réservée au propriétaire et au
+  // consultant (modifie tout / porte la stratégie) — pas au client (son
+  // usine) ni à l'expert (son domaine), qui n'ont pas besoin de voir les
+  // concurrents directs de 4 Tomorrow. Par défaut true (session fraîche,
+  // hors transformation partagée : l'utilisateur qui lance le matching est
+  // toujours propriétaire ou consultant).
+  canSeeCompetitors?: boolean;
 }) {
   const { t } = useLanguage();
   const r = t.connect.results;
@@ -451,7 +459,7 @@ export function MatchResults({
       {/* Same-sector players (category "competitor_reference"): kept for the
           firm's internal market watch, in their own dashed section, never
           mixed into the recommendations above, the bricks or the counts. */}
-      {competitors.length > 0 && (
+      {competitors.length > 0 && canSeeCompetitors && (
         <section aria-labelledby="connect-competitors-title" className="flex flex-col gap-3 border border-dashed border-border-strong p-4">
           <div>
             <h3 id="connect-competitors-title" className="text-sm font-semibold text-ink">
